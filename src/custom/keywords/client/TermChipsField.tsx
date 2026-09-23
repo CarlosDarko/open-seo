@@ -134,9 +134,9 @@ export function TermChipsField({
           ) : null}
           <span
             className="text-xs tabular-nums text-base-content/50"
-            aria-label={`${value.length} de ${MAX_TERMS_PER_KIND} palabras`}
+            title={`Máximo ${MAX_TERMS_PER_KIND} palabras en este campo (DataForSEO admite 8 condiciones por búsqueda entre los dos campos).`}
           >
-            {value.length}/{MAX_TERMS_PER_KIND}
+            {value.length} de {MAX_TERMS_PER_KIND}
           </span>
         </div>
       </div>
