@@ -21,6 +21,7 @@ import {
   KeywordResearchPagination,
   useKeywordResearchPagination,
 } from "./KeywordResearchPagination";
+import { NoSeedDataNotice } from "@/custom/keywords/client/NoSeedDataNotice";
 import type { KeywordResearchControllerState } from "./types";
 import {
   TableBulkActionBar,
@@ -131,6 +132,7 @@ function MobileKeywordResults({ controller }: Props) {
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
+      <NoSeedDataNotice controller={controller} compact />
       {controller.showApproximateMatchNotice ? (
         <div
           className="mx-4 mt-2 rounded-lg border border-warning/40 bg-warning/15 px-3 py-2 text-xs text-base-content"

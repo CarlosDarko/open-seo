@@ -28,6 +28,7 @@ import {
   FilterRangeInputs,
   FilterTextInput,
 } from "./keywordResearchFilters";
+import { NoSeedDataNotice } from "@/custom/keywords/client/NoSeedDataNotice";
 import { KeywordResearchDesktopTable } from "./KeywordResearchDesktopTable";
 import {
   KeywordResearchPagination,
@@ -111,6 +112,7 @@ function DesktopKeywordPanel({ controller }: Props) {
           ) : null}
         </div>
       ) : null}
+      <NoSeedDataNotice controller={controller} />
       {controller.overviewKeyword ? (
         <OverviewStats keyword={controller.overviewKeyword} />
       ) : null}
