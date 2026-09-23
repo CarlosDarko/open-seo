@@ -56,6 +56,7 @@ import {
   fetchLlmTopPages,
 } from "@/server/lib/dataforseo/ai";
 import { isHostedServerAuthMode } from "@/server/lib/runtime-env";
+import { runAndRecordCost } from "@/custom/costs/server/record";
 import { AppError } from "@/server/lib/errors";
 
 export { mapDataforseoPathToCreditFeature };
@@ -155,8 +156,8 @@ async function meterDataforseoCall<T>(
   const isHostedMode = await isHostedServerAuthMode();
 
   if (!isHostedMode) {
-    const result = await execute();
-    return result.data;
+    // Fork: self-hosted calls are recorded in the euro cost ledger.
+    return runAndRecordCost(customer, execute, creditFeature);
   }
 
   const billingCustomer = await getOrCreateOrganizationCustomer(customer);

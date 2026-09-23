@@ -1,4 +1,5 @@
 import { Monitor, Plus, Settings, Smartphone } from "lucide-react";
+import { useEuros } from "@/custom/costs/client/eur";
 import { SegmentedToggle } from "@/client/components/SegmentedToggle";
 import { LOCATIONS } from "@/client/features/keywords/locations";
 import { devicesLabel, scheduleLabel } from "@/shared/rank-tracking";
@@ -41,6 +42,7 @@ export function RankTrackingDetailHeader({
   onEdit: () => void;
   onToggleAddKeywords: () => void;
 }) {
+  const euros = useEuros();
   return (
     <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2 px-4 pt-4 pb-3">
       <div>
@@ -58,7 +60,7 @@ export function RankTrackingDetailHeader({
             </>
           )}
           {costEstimate && costEstimate.keywordCount > 0 && (
-            <> &middot; ~${costEstimate.costUsd.toFixed(2)}/check</>
+            <> &middot; ~{euros.fromUsd(costEstimate.costUsd)}/check</>
           )}
         </p>
       </div>

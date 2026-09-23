@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Info, Loader2, X } from "lucide-react";
 import { Modal } from "@/client/components/Modal";
+import { useEuros } from "@/custom/costs/client/eur";
 import type { RankTrackingConfig } from "@/types/schemas/rank-tracking";
 import { domainField, normalizeDomain } from "@/types/schemas/domain";
 import {
@@ -75,6 +76,7 @@ function RankTrackingConfigModalContent({
   onSaved,
   onConfigCreated,
 }: Props & { initialMarket: ProjectMarket }) {
+  const euros = useEuros();
   const isEdit = !!existingConfig;
   const [step, setStep] = useState<"config" | "keywords">("config");
   const [domain, setDomain] = useState(existingConfig?.domain ?? "");
@@ -357,7 +359,7 @@ function RankTrackingConfigModalContent({
             <div className="rounded-lg bg-base-200/50 px-3 py-2.5 text-xs text-base-content/70 space-y-0.5">
               <div>
                 <span className="font-mono font-semibold text-base-content">
-                  ~${costPerKeyword.toFixed(4)}
+                  ~{euros.fromUsd(costPerKeyword)}
                 </span>{" "}
                 per keyword per check
               </div>
@@ -365,7 +367,7 @@ function RankTrackingConfigModalContent({
                 <div>
                   50 keywords would cost{" "}
                   <span className="font-mono font-semibold text-base-content">
-                    ~${(costPerKeyword * 50 * checksPerMonth).toFixed(2)}
+                    ~{euros.fromUsd(costPerKeyword * 50 * checksPerMonth)}
                   </span>
                   /month
                 </div>

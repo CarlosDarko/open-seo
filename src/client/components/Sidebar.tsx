@@ -27,6 +27,7 @@ import { closeDropdown } from "@/client/lib/dropdown";
 import { signOutAndRedirect, useSession } from "@/lib/auth-client";
 import { isHostedClientAuthMode } from "@/lib/auth-mode";
 import { BILLING_ROUTE } from "@/shared/billing";
+import { SidebarCostMeter } from "@/custom/costs/client/SidebarCostMeter";
 
 interface SidebarProps {
   projectId: string | null;
@@ -270,6 +271,7 @@ function SidebarFooter({ onNavigate }: { onNavigate?: () => void }) {
 
   return (
     <div className="shrink-0 border-t border-base-300 px-2 py-2 pb-safe">
+      {!isHostedMode ? <SidebarCostMeter onNavigate={onNavigate} /> : null}
       <SidebarNavLink
         icon={CircleHelp}
         label="Help & Community"

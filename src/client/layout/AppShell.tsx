@@ -10,6 +10,8 @@ import {
 import { GscReEngagementModal } from "@/client/features/gsc/GscReEngagementModal";
 import { Sidebar } from "@/client/components/Sidebar";
 import { BILLING_ROUTE } from "@/shared/billing";
+import { isHostedClientAuthMode } from "@/lib/auth-mode";
+import { CostAlertBanner } from "@/custom/costs/client/CostAlertBanner";
 import { getSeoApiKeyStatus } from "@/serverFunctions/config";
 import { getProjects } from "@/serverFunctions/projects";
 import { getLastProjectId } from "@/client/lib/active-project";
@@ -134,6 +136,8 @@ export function AuthenticatedAppLayout({
               shouldShowSeoApiWarning={shouldShowSeoApiWarning}
               seoApiKeyStatusError={seoApiKeyStatusError}
             />
+
+            {!isHostedClientAuthMode() ? <CostAlertBanner /> : null}
 
             {banner}
 

@@ -1,6 +1,8 @@
-import type { FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { Search } from "lucide-react";
 import { isHostedClientAuthMode } from "@/lib/auth-mode";
+import { CostConfirmModal } from "@/custom/costs/client/CostConfirmModal";
+import { useEuros } from "@/custom/costs/client/eur";
 import { applyBillingMarkupUsd } from "@/shared/billing";
 import { ResearchScopeSelect } from "@/client/components/ResearchScopeSelect";
 import type { ResearchScope } from "@/shared/researchScope";
@@ -60,10 +62,50 @@ export function BrandLookupSearchCard({
   const queryError = validationError?.field === "query";
   const competitorsError = validationError?.field === "competitors";
 
+  // Fork: costs are shown in euros, and a lookup above the confirmation
+  // threshold (Costes → Presupuesto y avisos) asks before spending.
+  const euros = useEuros();
+  const pendingEvent = useRef<FormEvent | null>(null);
+  const [confirming, setConfirming] = useState(false);
+  const estimateUsd =
+    BRAND_LOOKUP_DISPLAYED_COST_USD +
+    (hasCompetitors ? BRAND_LOOKUP_COMPETITOR_DISPLAYED_COST_USD : 0);
+  const needsConfirmation =
+    !isHostedClientAuthMode() &&
+    query.trim().length > 0 &&
+    euros.toEur(estimateUsd) >= euros.settings.confirmAboveEur;
+
+  function handleSubmit(event: FormEvent) {
+    if (!needsConfirmation) {
+      onSubmit(event);
+      return;
+    }
+    event.preventDefault();
+    pendingEvent.current = event;
+    setConfirming(true);
+  }
+
   return (
     <div className="card border border-base-300 bg-base-100">
+      {confirming ? (
+        <CostConfirmModal
+          title="Búsqueda de marca en IA"
+          estimateEur={euros.toEur(estimateUsd)}
+          details={
+            hasCompetitors
+              ? "Consulta ChatGPT y Google AI Overview e incluye la comparación con competidores."
+              : "Consulta ChatGPT y Google AI Overview (6 consultas de pago). Repetir la misma búsqueda no vuelve a cobrar."
+          }
+          confirmLabel="Buscar"
+          onCancel={() => setConfirming(false)}
+          onConfirm={() => {
+            setConfirming(false);
+            if (pendingEvent.current) onSubmit(pendingEvent.current);
+          }}
+        />
+      ) : null}
       <div className="card-body gap-4">
-        <form onSubmit={onSubmit} className="flex flex-col gap-3">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-3">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
             <label
               className={`input input-bordered flex flex-1 items-center gap-2 ${
@@ -136,14 +178,13 @@ export function BrandLookupSearchCard({
           <p className="tabular-nums">
             Est.{" "}
             <span className="font-medium text-base-content/80">
-              ${BRAND_LOOKUP_DISPLAYED_COST_USD.toFixed(2)}
+              {euros.fromUsd(BRAND_LOOKUP_DISPLAYED_COST_USD)}
             </span>
             {hasCompetitors ? (
               <span>
                 {" "}
-                plus ~$
-                {BRAND_LOOKUP_COMPETITOR_DISPLAYED_COST_USD.toFixed(2)} to
-                compare competitors
+                más ~{euros.fromUsd(BRAND_LOOKUP_COMPETITOR_DISPLAYED_COST_USD)}{" "}
+                por comparar competidores
               </span>
             ) : null}
           </p>

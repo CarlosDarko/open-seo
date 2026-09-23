@@ -1,5 +1,6 @@
 import { Loader2, Zap } from "lucide-react";
 import { Modal } from "@/client/components/Modal";
+import { useEuros } from "@/custom/costs/client/eur";
 import type { RankTrackingConfig } from "@/types/schemas/rank-tracking";
 import {
   estimateRankCheckCredits,
@@ -23,6 +24,7 @@ export function CheckConfirmModal({
   onRunNow: () => void;
   onCancel: () => void;
 }) {
+  const euros = useEuros();
   const { costUsd } = estimateRankCheckCredits(
     keywordCount,
     devices,
@@ -67,7 +69,7 @@ export function CheckConfirmModal({
           </p>
         </div>
         <div className="text-right">
-          <p className="font-mono font-semibold">~${costUsd.toFixed(2)}</p>
+          <p className="font-mono font-semibold">~{euros.fromUsd(costUsd)}</p>
           {isPending && <Loader2 className="size-3 animate-spin ml-auto" />}
         </div>
       </button>
