@@ -10,6 +10,7 @@ import {
 } from "@/client/features/keywords/keywordResearchTypes";
 import { isLabsLocationCode } from "@/client/features/keywords/locations";
 import { LocationSelect } from "@/client/components/LocationSelect";
+import { TermChipsField } from "@/custom/keywords/client/TermChipsField";
 import type { KeywordResearchControllerState } from "./types";
 
 type Props = {
@@ -172,6 +173,46 @@ export function KeywordResearchSearchBar({ controller }: Props) {
             )
           }
         </controlsForm.Field>
+
+        {/* Fork: term filters, applied by DataForSEO before the result limit. */}
+        <div className="mt-1 flex flex-col gap-3 border-t border-base-300 pt-3">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold">Filtrar antes de buscar</span>
+            <span className="badge badge-ghost badge-sm">Opcional</span>
+            <div
+              className="tooltip tooltip-right"
+              data-tip="Los filtros se aplican en DataForSEO antes del límite de resultados: tus 150, 300 o 500 resultados salen ya filtrados, sin gastar hueco en palabras que no te interesan."
+            >
+              <Info className="size-3.5 text-base-content/50" />
+            </div>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <controlsForm.Field name="includeTerms">
+              {(field) => (
+                <TermChipsField
+                  tone="include"
+                  label="Debe contener"
+                  help="Solo palabras clave que incluyan todas estas palabras."
+                  placeholder="p. ej. gratis, precio"
+                  value={field.state.value}
+                  onChange={field.handleChange}
+                />
+              )}
+            </controlsForm.Field>
+            <controlsForm.Field name="excludeTerms">
+              {(field) => (
+                <TermChipsField
+                  tone="exclude"
+                  label="Excluir"
+                  help="Se descartan las que incluyan cualquiera de estas palabras."
+                  placeholder="p. ej. madrid, barcelona"
+                  value={field.state.value}
+                  onChange={field.handleChange}
+                />
+              )}
+            </controlsForm.Field>
+          </div>
+        </div>
       </div>
     </div>
   );

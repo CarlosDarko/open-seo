@@ -21,6 +21,7 @@ import {
   useSearchTabNavigation,
 } from "@/client/features/search-tabs/useSearchTabNavigation";
 import { KeywordResearchEmptyState } from "./KeywordResearchEmptyState";
+import { sanitizeTerms, termsToParam } from "@/custom/keywords/termFilters";
 import { KeywordResearchLoadingState } from "./KeywordResearchLoadingState";
 import { KeywordResearchResults } from "./KeywordResearchResults";
 import { KeywordResearchSearchBar } from "./KeywordResearchSearchBar";
@@ -32,6 +33,14 @@ type Props = Omit<
   "locationCode" | "displayedLocationCode" | "setPreferredLocationCode"
 > & { locationCode?: number };
 type KeywordSearchTab = SearchTab & { input: KeywordSearchTabInput };
+
+// Tabs that differ only by their term filters need a visible difference.
+function keywordTabLabel(input: KeywordSearchTabInput) {
+  const count = input.includeTerms.length + input.excludeTerms.length;
+  return count > 0
+    ? `${input.keyword} · ${count} filtro${count === 1 ? "" : "s"}`
+    : input.keyword;
+}
 
 function isKeywordSearchTab(tab: SearchTab): tab is KeywordSearchTab {
   return tab.input.type === "keyword";
@@ -55,6 +64,8 @@ export function KeywordResearchPage(input: Props) {
           kLimit: undefined,
           mode: undefined,
           cs: undefined,
+          must: undefined,
+          not: undefined,
         });
         return;
       }
@@ -65,6 +76,8 @@ export function KeywordResearchPage(input: Props) {
         kLimit: tabInput.resultLimit === 150 ? undefined : tabInput.resultLimit,
         mode: tabInput.mode === "auto" ? undefined : tabInput.mode,
         cs: tabInput.clickstream ? true : undefined,
+        must: termsToParam(tabInput.includeTerms),
+        not: termsToParam(tabInput.excludeTerms),
       });
     },
     [setSearchParams],
@@ -81,9 +94,13 @@ export function KeywordResearchPage(input: Props) {
       resultLimit: input.resultLimit,
       mode: input.keywordMode,
       clickstream: input.clickstream,
+      includeTerms: input.includeTerms,
+      excludeTerms: input.excludeTerms,
     };
   }, [
     input.clickstream,
+    input.excludeTerms,
+    input.includeTerms,
     input.keywordInput,
     input.keywordMode,
     locationCode,
@@ -93,7 +110,10 @@ export function KeywordResearchPage(input: Props) {
     storageKey: `keyword:${projectId}`,
     urlInput,
     getLabel: useCallback(
-      (tabInput) => (tabInput.type === "keyword" ? tabInput.keyword : ""),
+      (tabInput) =>
+        tabInput.type === "keyword"
+          ? keywordTabLabel(tabInput)
+          : "",
       [],
     ),
     navigateToInput: useCallback(
@@ -130,6 +150,8 @@ export function KeywordResearchPage(input: Props) {
         resultLimit: value.resultLimit,
         mode: value.mode,
         clickstream: value.clickstream,
+        includeTerms: sanitizeTerms(value.includeTerms),
+        excludeTerms: sanitizeTerms(value.excludeTerms),
       }));
 
       for (const tabInput of inputs) {
@@ -156,6 +178,8 @@ export function KeywordResearchPage(input: Props) {
             resultLimit: activeTab.input.resultLimit,
             keywordMode: activeTab.input.mode,
             clickstream: activeTab.input.clickstream,
+            includeTerms: activeTab.input.includeTerms,
+            excludeTerms: activeTab.input.excludeTerms,
           }
         : {
             ...input,

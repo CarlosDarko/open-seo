@@ -151,6 +151,8 @@ export async function fetchRelatedKeywords(input: {
   limit: number;
   depth?: number;
   includeClickstreamData?: boolean;
+  /** DataForSEO Labs filters (applied before the limit). */
+  filters?: unknown[];
 }): Promise<DataforseoApiResponse<RelatedKeywordItem[]>> {
   const response = await dataforseoPost<
     DataforseoItemsTask<RelatedKeywordItem>
@@ -160,6 +162,7 @@ export async function fetchRelatedKeywords(input: {
       location_code: input.locationCode,
       language_code: input.languageCode,
       limit: input.limit,
+      ...(input.filters ? { filters: input.filters } : {}),
       depth: input.depth ?? 3,
       // Clickstream-refined volumes DOUBLE the request cost, so they are
       // opt-in — see specs/0004-keyword-data-source-routing.md.
@@ -180,6 +183,8 @@ export async function fetchKeywordSuggestions(input: {
   languageCode: string;
   limit: number;
   includeClickstreamData?: boolean;
+  /** DataForSEO Labs filters (applied before the limit). */
+  filters?: unknown[];
 }): Promise<DataforseoApiResponse<LabsKeywordDataItem[]>> {
   const response = await dataforseoPost<
     DataforseoItemsTask<LabsKeywordDataItem>
@@ -191,6 +196,7 @@ export async function fetchKeywordSuggestions(input: {
       limit: input.limit,
       include_clickstream_data: input.includeClickstreamData ?? false,
       include_serp_info: false,
+      ...(input.filters ? { filters: input.filters } : {}),
       include_seed_keyword: true,
       ignore_synonyms: false,
       exact_match: false,
@@ -209,6 +215,8 @@ export async function fetchKeywordIdeas(input: {
   languageCode: string;
   limit: number;
   includeClickstreamData?: boolean;
+  /** DataForSEO Labs filters (applied before the limit). */
+  filters?: unknown[];
 }): Promise<DataforseoApiResponse<LabsKeywordDataItem[]>> {
   const response = await dataforseoPost<
     DataforseoItemsTask<LabsKeywordDataItem>
@@ -221,6 +229,7 @@ export async function fetchKeywordIdeas(input: {
       include_clickstream_data: input.includeClickstreamData ?? false,
       include_serp_info: false,
       ignore_synonyms: false,
+      ...(input.filters ? { filters: input.filters } : {}),
       closely_variants: false,
     },
   ]);

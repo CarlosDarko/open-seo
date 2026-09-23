@@ -24,6 +24,9 @@ type KeywordResearchRequestInput = {
   resultLimit: ResultLimit;
   mode: KeywordMode;
   clickstream: boolean;
+  // Fork: terms every keyword must / must not contain (sent as DataForSEO filters).
+  includeTerms: string[];
+  excludeTerms: string[];
 };
 
 type KeywordResearchQueryInput = KeywordResearchRequestInput & {
@@ -38,6 +41,8 @@ type KeywordResearchRequest = {
   resultLimit: ResultLimit;
   mode: KeywordMode;
   clickstream: boolean;
+  includeTerms: string[];
+  excludeTerms: string[];
 };
 
 export const KEYWORD_RESEARCH_STALE_TIME_MS = 24 * 60 * 60 * 1000;
@@ -57,6 +62,8 @@ export function buildKeywordResearchRequest(
     resultLimit: input.resultLimit,
     mode: input.mode,
     clickstream: input.clickstream,
+    includeTerms: input.includeTerms,
+    excludeTerms: input.excludeTerms,
   };
 }
 
@@ -72,6 +79,8 @@ export function buildKeywordResearchQueryKey(
         request.resultLimit,
         request.mode,
         request.clickstream,
+        request.includeTerms,
+        request.excludeTerms,
       ]
     : ["keywordResearch", "idle"];
 }
@@ -85,6 +94,8 @@ export function keywordResearchQueryFn(request: KeywordResearchRequest) {
       resultLimit: request.resultLimit,
       mode: request.mode,
       clickstream: request.clickstream,
+      includeTerms: request.includeTerms.length > 0 ? request.includeTerms : undefined,
+      excludeTerms: request.excludeTerms.length > 0 ? request.excludeTerms : undefined,
     },
   });
 }
@@ -96,24 +107,37 @@ export function useKeywordResearchData(
   const {
     clickstream,
     displayedLocationCode,
+    excludeTerms,
+    includeTerms,
     keywordInput,
     locationCode,
     mode,
     projectId,
     resultLimit,
   } = input;
-  const request = useMemo<KeywordResearchRequest | null>(
-    () =>
-      buildKeywordResearchRequest({
-        keywordInput,
-        locationCode,
-        mode,
-        projectId,
-        resultLimit,
-        clickstream,
-      }),
-    [clickstream, keywordInput, locationCode, mode, projectId, resultLimit],
-  );
+  // The term lists are new arrays on every render; key the memo on their content.
+  const termsKey = JSON.stringify([includeTerms, excludeTerms]);
+  const request = useMemo<KeywordResearchRequest | null>(() => {
+    const [include, exclude] = JSON.parse(termsKey) as [string[], string[]];
+    return buildKeywordResearchRequest({
+      keywordInput,
+      locationCode,
+      mode,
+      projectId,
+      resultLimit,
+      clickstream,
+      includeTerms: include,
+      excludeTerms: exclude,
+    });
+  }, [
+    clickstream,
+    keywordInput,
+    locationCode,
+    mode,
+    projectId,
+    resultLimit,
+    termsKey,
+  ]);
   const queryKey = useMemo(
     () => buildKeywordResearchQueryKey(request),
     [request],

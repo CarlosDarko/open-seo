@@ -146,6 +146,30 @@ describe("parseStoredState", () => {
       resultLimit: 150,
       mode: "auto",
       clickstream: false,
+      includeTerms: [],
+      excludeTerms: [],
+    });
+  });
+
+  it("restores the term filters of a keyword tab", () => {
+    const state = parseStoredState({
+      activeTabId: "tab-1",
+      tabs: [
+        persistedTab({
+          type: "keyword",
+          keyword: "abogado divorcio",
+          resultLimit: 150,
+          mode: "auto",
+          clickstream: false,
+          includeTerms: ["gratis", 5, "Gratis"],
+          excludeTerms: ["Madrid"],
+        }),
+      ],
+    });
+
+    expect(state.tabs[0].input).toMatchObject({
+      includeTerms: ["gratis"],
+      excludeTerms: ["madrid"],
     });
   });
 

@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { KeywordResearchPage } from "@/client/features/keywords/page/KeywordResearchPage";
 import {
@@ -8,6 +9,7 @@ import {
   normalizeSortField,
 } from "@/client/features/keywords/keywordSearchParams";
 import { keywordsSearchSchema } from "@/types/schemas/keywords";
+import { termsFromParam } from "@/custom/keywords/termFilters";
 
 export const Route = createFileRoute("/_project/p/$projectId/keywords")({
   validateSearch: keywordsSearchSchema,
@@ -36,6 +38,9 @@ function KeywordResearchPageRoute() {
     sort: sortField = "searchVolume",
     order: sortDir = "desc",
   } = search;
+  // Stable arrays, so downstream memos do not re-run on every render.
+  const includeTerms = useMemo(() => termsFromParam(search.must), [search.must]);
+  const excludeTerms = useMemo(() => termsFromParam(search.not), [search.not]);
   return (
     <KeywordResearchPage
       projectId={projectId}
@@ -44,6 +49,8 @@ function KeywordResearchPageRoute() {
       resultLimit={isResultLimit(resultLimit) ? resultLimit : 150}
       keywordMode={normalizeKeywordMode(keywordMode)}
       clickstream={search.cs ?? false}
+      includeTerms={includeTerms}
+      excludeTerms={excludeTerms}
       sortField={normalizeSortField(sortField)}
       sortDir={normalizeSortDir(sortDir)}
     />

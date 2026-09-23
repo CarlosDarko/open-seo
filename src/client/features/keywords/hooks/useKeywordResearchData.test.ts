@@ -4,7 +4,10 @@ import { describe, expect, it, vi } from "vitest";
 // Workers-only bindings that don't resolve outside workerd.
 vi.mock("cloudflare:workers", () => ({ env: {} }));
 
-import { buildKeywordResearchRequest } from "./useKeywordResearchData";
+import {
+  buildKeywordResearchQueryKey,
+  buildKeywordResearchRequest,
+} from "./useKeywordResearchData";
 
 const baseInput = {
   projectId: "project_1",
@@ -13,6 +16,8 @@ const baseInput = {
   resultLimit: 150 as const,
   mode: "auto" as const,
   clickstream: false,
+  includeTerms: [] as string[],
+  excludeTerms: [] as string[],
 };
 
 describe("buildKeywordResearchRequest", () => {
@@ -31,5 +36,27 @@ describe("buildKeywordResearchRequest", () => {
 
     expect(request).toMatchObject({ locationCode: undefined });
     expect(request).not.toHaveProperty("languageCode");
+  });
+
+  it("carries the must-contain and exclude terms", () => {
+    const request = buildKeywordResearchRequest({
+      ...baseInput,
+      includeTerms: ["gratis"],
+      excludeTerms: ["madrid", "barcelona"],
+    });
+
+    expect(request).toMatchObject({
+      includeTerms: ["gratis"],
+      excludeTerms: ["madrid", "barcelona"],
+    });
+  });
+
+  it("keys the query on the terms so a filtered search is a separate result", () => {
+    const plain = buildKeywordResearchQueryKey(buildKeywordResearchRequest(baseInput));
+    const filtered = buildKeywordResearchQueryKey(
+      buildKeywordResearchRequest({ ...baseInput, excludeTerms: ["madrid"] }),
+    );
+
+    expect(filtered).not.toEqual(plain);
   });
 });

@@ -12,6 +12,7 @@ import type { KeywordResearchRow } from "@/types/keywords";
 import type { ResolvedResearchKeywordsInput } from "@/types/schemas/keywords";
 import { z } from "zod";
 import { getKeywordDataProvider } from "@/shared/keyword-locations";
+import { keywordMatchesTerms, termsCacheKey } from "@/custom/keywords/termFilters";
 import { type EnrichedKeyword, normalizeKeyword } from "./helpers";
 import {
   fetchGoogleAdsResearchRows,
@@ -106,6 +107,8 @@ async function fetchRowsFromSource(
       languageCode: input.languageCode,
       resultLimit: input.resultLimit,
       includeClickstreamData: input.clickstream,
+      includeTerms: input.includeTerms,
+      excludeTerms: input.excludeTerms,
       creditFeature,
     },
     billingCustomer,
@@ -180,16 +183,19 @@ async function fetchGoogleAdsRows(
   billingCustomer: BillingCustomerContext,
   creditFeature?: CreditFeature,
 ): Promise<ResearchResult> {
-  const rows = await fetchGoogleAdsResearchRows(
-    {
-      seedKeyword,
-      locationCode: input.locationCode,
-      languageCode: input.languageCode,
-      resultLimit: input.resultLimit,
-      creditFeature,
-    },
-    billingCustomer,
-  );
+  // Google Ads endpoints cannot filter remotely, so the terms are applied here.
+  const rows = (
+    await fetchGoogleAdsResearchRows(
+      {
+        seedKeyword,
+        locationCode: input.locationCode,
+        languageCode: input.languageCode,
+        resultLimit: input.resultLimit,
+        creditFeature,
+      },
+      billingCustomer,
+    )
+  ).filter((row) => keywordMatchesTerms(row.keyword, input));
 
   return {
     rows,
@@ -258,6 +264,8 @@ async function buildResearchCacheKey(
     mode,
     depth: 3,
     clickstream: input.clickstream,
+    // Only present when used, so searches without terms keep their old key.
+    ...(termsCacheKey(input) ? { terms: termsCacheKey(input) } : {}),
   });
 }
 

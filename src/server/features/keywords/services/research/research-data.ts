@@ -11,6 +11,7 @@ import {
   type EnrichedKeyword,
 } from "./helpers";
 import type { KeywordSource } from "./selection";
+import { buildLabsTermFilters } from "@/custom/keywords/termFilters";
 
 type FetchResearchRowsParams = {
   seedKeyword: string;
@@ -19,6 +20,10 @@ type FetchResearchRowsParams = {
   resultLimit: number;
   source: KeywordSource;
   includeClickstreamData?: boolean;
+  // Fork: terms the keywords must / must not contain, applied by DataForSEO
+  // before the result limit.
+  includeTerms?: string[];
+  excludeTerms?: string[];
   // Attribute the DataForSEO spend to a specific feature (e.g. "agent");
   // defaults to the path-derived feature when omitted.
   creditFeature?: CreditFeature;
@@ -126,6 +131,8 @@ async function fetchRelatedRows(
     limit: params.resultLimit,
     depth: 3,
     includeClickstreamData: params.includeClickstreamData,
+    // Related items nest the keyword one level deeper.
+    filters: buildLabsTermFilters("keyword_data.keyword", params),
     creditFeature: params.creditFeature,
   });
 
@@ -156,6 +163,7 @@ export async function fetchResearchRowsBySource(
         languageCode: params.languageCode,
         limit: params.resultLimit,
         includeClickstreamData: params.includeClickstreamData,
+        filters: buildLabsTermFilters("keyword", params),
         creditFeature: params.creditFeature,
       }),
     );
@@ -168,6 +176,7 @@ export async function fetchResearchRowsBySource(
       languageCode: params.languageCode,
       limit: params.resultLimit,
       includeClickstreamData: params.includeClickstreamData,
+      filters: buildLabsTermFilters("keyword", params),
       creditFeature: params.creditFeature,
     }),
   );

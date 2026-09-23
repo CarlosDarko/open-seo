@@ -3,6 +3,7 @@ import {
   researchScopeSchema,
   type ResearchScope,
 } from "@/shared/researchScope";
+import { sanitizeTerms } from "@/custom/keywords/termFilters";
 import type { SearchTab, SearchTabInput } from "./types";
 
 type TabsState = {
@@ -110,10 +111,19 @@ function parseTabInput(value: unknown): SearchTabInput | null {
       mode: value.mode,
       // Tabs persisted before the clickstream toggle existed default to off.
       clickstream: value.clickstream === true,
+      // Tabs persisted before the term filters existed have none.
+      includeTerms: sanitizeTerms(readStrings(value.includeTerms)),
+      excludeTerms: sanitizeTerms(readStrings(value.excludeTerms)),
     };
   }
 
   return null;
+}
+
+function readStrings(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string")
+    : [];
 }
 
 function storageKey(key: string) {

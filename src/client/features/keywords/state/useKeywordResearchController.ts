@@ -37,6 +37,8 @@ export type KeywordResearchControllerInput = {
   resultLimit: ResultLimit;
   keywordMode: KeywordMode;
   clickstream: boolean;
+  includeTerms: string[];
+  excludeTerms: string[];
   sortField: SortField;
   sortDir: SortDir;
   /**
@@ -113,6 +115,8 @@ export function useKeywordResearchController(
       resultLimit: input.resultLimit,
       mode: input.keywordMode,
       clickstream: input.clickstream,
+      includeTerms: input.includeTerms,
+      excludeTerms: input.excludeTerms,
     },
     addSearch,
   );
@@ -126,6 +130,8 @@ export function useKeywordResearchController(
         resultLimit: input.resultLimit,
         mode: input.keywordMode,
         clickstream: input.clickstream,
+        includeTerms: input.includeTerms,
+        excludeTerms: input.excludeTerms,
       })
     : null;
 

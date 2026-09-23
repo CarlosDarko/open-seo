@@ -17,6 +17,8 @@ type UseKeywordControlsFormInput = {
   resultLimit: ResultLimit;
   keywordMode: KeywordMode;
   clickstream: boolean;
+  includeTerms: string[];
+  excludeTerms: string[];
 };
 
 export type KeywordControlsValues = {
@@ -25,6 +27,8 @@ export type KeywordControlsValues = {
   resultLimit: ResultLimit;
   mode: KeywordMode;
   clickstream: boolean;
+  includeTerms: string[];
+  excludeTerms: string[];
 };
 
 function getKeywordSearchValidationErrors(
@@ -67,6 +71,8 @@ export function useKeywordControlsForm(
       resultLimit: input.resultLimit,
       mode: input.keywordMode,
       clickstream: input.clickstream,
+      includeTerms: input.includeTerms,
+      excludeTerms: input.excludeTerms,
     },
     validators: {
       onChange: ({ formApi, value }) =>
@@ -83,13 +89,18 @@ export function useKeywordControlsForm(
     },
   });
 
+  // The term lists are new arrays on every render; reset only when their content changes.
+  const termsKey = JSON.stringify([input.includeTerms, input.excludeTerms]);
   useEffect(() => {
+    const [includeTerms, excludeTerms] = JSON.parse(termsKey) as [string[], string[]];
     form.reset({
       keyword: input.keywordInput,
       locationCode: input.locationCode,
       resultLimit: input.resultLimit,
       mode: input.keywordMode,
       clickstream: input.clickstream,
+      includeTerms,
+      excludeTerms,
     });
   }, [
     form,
@@ -98,6 +109,7 @@ export function useKeywordControlsForm(
     input.locationCode,
     input.resultLimit,
     input.clickstream,
+    termsKey,
   ]);
 
   return form;

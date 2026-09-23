@@ -24,6 +24,8 @@ export type KeywordSearchTabInput = {
   resultLimit: ResultLimit;
   mode: KeywordMode;
   clickstream: boolean;
+  includeTerms: string[];
+  excludeTerms: string[];
 };
 
 export type SearchTabInput =

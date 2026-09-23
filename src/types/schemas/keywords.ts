@@ -29,6 +29,10 @@ export const researchKeywordsSchema = z.object({
     .default("auto"),
   // Clickstream-refined volumes double the DataForSEO request cost; opt-in.
   clickstream: z.boolean().optional().default(false),
+  // Fork: terms every keyword must contain / must not contain. Sent to
+  // DataForSEO as filters so they apply before the result limit.
+  includeTerms: z.array(z.string().trim().min(2).max(40)).max(4).optional(),
+  excludeTerms: z.array(z.string().trim().min(2).max(40)).max(4).optional(),
 });
 
 export const savedKeywordMetricSchema = z.object({
@@ -202,6 +206,9 @@ export const keywordsSearchSchema = z.object({
   kLimit: z.union([z.literal(150), z.literal(300), z.literal(500)]).optional(),
   mode: z.enum(keywordModes).optional(),
   cs: booleanSearchParamSchema.optional(),
+  // Fork: comma-separated terms the keywords must / must not contain.
+  must: z.string().optional(),
+  not: z.string().optional(),
   sort: z.enum(keywordSortFields).optional(),
   order: z.enum(sortDirs).optional(),
   minVol: z.string().optional(),
