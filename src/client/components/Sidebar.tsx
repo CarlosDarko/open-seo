@@ -130,7 +130,17 @@ export function Sidebar({ projectId, onNavigate, onClose }: SidebarProps) {
           onClick={onNavigate}
           className="text-base font-semibold text-base-content"
         >
-          OpenSEO
+          <picture>
+            <source
+              srcSet="/carlos-ortega-logo-dark.svg"
+              media="(prefers-color-scheme: dark)"
+            />
+            <img
+              src="/carlos-ortega-logo.svg"
+              alt="Carlos Ortega"
+              className="h-6 w-auto"
+            />
+          </picture>
         </Link>
         {onClose ? (
           <button
