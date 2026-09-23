@@ -148,6 +148,8 @@ describe("parseStoredState", () => {
       clickstream: false,
       includeTerms: [],
       excludeTerms: [],
+      includeMatch: "all",
+      excludeMatch: "any",
     });
   });
 
@@ -163,6 +165,8 @@ describe("parseStoredState", () => {
           clickstream: false,
           includeTerms: ["gratis", 5, "Gratis"],
           excludeTerms: ["Madrid"],
+          includeMatch: "any",
+          excludeMatch: "all",
         }),
       ],
     });
@@ -170,6 +174,8 @@ describe("parseStoredState", () => {
     expect(state.tabs[0].input).toMatchObject({
       includeTerms: ["gratis"],
       excludeTerms: ["madrid"],
+      includeMatch: "any",
+      excludeMatch: "all",
     });
   });
 

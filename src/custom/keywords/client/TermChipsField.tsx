@@ -1,5 +1,6 @@
 import { useId, useRef, useState, type KeyboardEvent } from "react";
 import { Minus, Plus, X } from "lucide-react";
+import type { TermMatch } from "@/custom/keywords/termFilters";
 import {
   MAX_TERMS_PER_KIND,
   MAX_TERM_LENGTH,
@@ -16,6 +17,10 @@ type Props = {
   onChange: (next: string[]) => void;
   /** "include" terms are required; "exclude" terms are discarded. */
   tone: "include" | "exclude";
+  /** How several terms combine: all together (Y) or any one of them (O). */
+  match?: TermMatch;
+  onMatchChange?: (next: TermMatch) => void;
+  matchTitles?: Record<TermMatch, string>;
 };
 
 /**
@@ -30,6 +35,9 @@ export function TermChipsField({
   value,
   onChange,
   tone,
+  match,
+  onMatchChange,
+  matchTitles,
 }: Props) {
   const inputId = useId();
   const helpId = `${inputId}-help`;
@@ -99,12 +107,38 @@ export function TermChipsField({
           </span>
           {label}
         </label>
-        <span
-          className="text-xs tabular-nums text-base-content/50"
-          aria-label={`${value.length} de ${MAX_TERMS_PER_KIND} palabras`}
-        >
-          {value.length}/{MAX_TERMS_PER_KIND}
-        </span>
+        <div className="flex items-center gap-2">
+          {onMatchChange && match && value.length > 1 ? (
+            <div
+              role="group"
+              aria-label={`Cómo se combinan las palabras de «${label}»`}
+              className="join"
+            >
+              {(["all", "any"] as const).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  aria-pressed={match === mode}
+                  title={matchTitles?.[mode]}
+                  className={`btn btn-xs join-item min-w-8 ${
+                    match === mode
+                      ? "btn-neutral"
+                      : "btn-ghost border border-base-300"
+                  }`}
+                  onClick={() => onMatchChange(mode)}
+                >
+                  {mode === "all" ? "Y" : "O"}
+                </button>
+              ))}
+            </div>
+          ) : null}
+          <span
+            className="text-xs tabular-nums text-base-content/50"
+            aria-label={`${value.length} de ${MAX_TERMS_PER_KIND} palabras`}
+          >
+            {value.length}/{MAX_TERMS_PER_KIND}
+          </span>
+        </div>
       </div>
 
       <div

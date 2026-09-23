@@ -3,7 +3,11 @@ import {
   researchScopeSchema,
   type ResearchScope,
 } from "@/shared/researchScope";
-import { sanitizeTerms } from "@/custom/keywords/termFilters";
+import {
+  excludeMatchFromParam,
+  includeMatchFromParam,
+  sanitizeTerms,
+} from "@/custom/keywords/termFilters";
 import type { SearchTab, SearchTabInput } from "./types";
 
 type TabsState = {
@@ -114,6 +118,12 @@ function parseTabInput(value: unknown): SearchTabInput | null {
       // Tabs persisted before the term filters existed have none.
       includeTerms: sanitizeTerms(readStrings(value.includeTerms)),
       excludeTerms: sanitizeTerms(readStrings(value.excludeTerms)),
+      includeMatch: includeMatchFromParam(
+        typeof value.includeMatch === "string" ? value.includeMatch : undefined,
+      ),
+      excludeMatch: excludeMatchFromParam(
+        typeof value.excludeMatch === "string" ? value.excludeMatch : undefined,
+      ),
     };
   }
 

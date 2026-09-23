@@ -9,7 +9,11 @@ import {
   normalizeSortField,
 } from "@/client/features/keywords/keywordSearchParams";
 import { keywordsSearchSchema } from "@/types/schemas/keywords";
-import { termsFromParam } from "@/custom/keywords/termFilters";
+import {
+  excludeMatchFromParam,
+  includeMatchFromParam,
+  termsFromParam,
+} from "@/custom/keywords/termFilters";
 
 export const Route = createFileRoute("/_project/p/$projectId/keywords")({
   validateSearch: keywordsSearchSchema,
@@ -51,6 +55,8 @@ function KeywordResearchPageRoute() {
       clickstream={search.cs ?? false}
       includeTerms={includeTerms}
       excludeTerms={excludeTerms}
+      includeMatch={includeMatchFromParam(search.mm)}
+      excludeMatch={excludeMatchFromParam(search.nm)}
       sortField={normalizeSortField(sortField)}
       sortDir={normalizeSortDir(sortDir)}
     />

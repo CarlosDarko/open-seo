@@ -5,6 +5,7 @@ import { captureClientEvent } from "@/client/lib/posthog";
 import { LOCATIONS } from "@/client/features/keywords/utils";
 import { parseKeywordInput } from "@/client/features/keywords/state/keywordControllerActions";
 import { researchKeywords } from "@/serverFunctions/keywords";
+import type { TermMatch } from "@/custom/keywords/termFilters";
 import type {
   KeywordMode,
   ResearchSource,
@@ -27,6 +28,8 @@ type KeywordResearchRequestInput = {
   // Fork: terms every keyword must / must not contain (sent as DataForSEO filters).
   includeTerms: string[];
   excludeTerms: string[];
+  includeMatch: TermMatch;
+  excludeMatch: TermMatch;
 };
 
 type KeywordResearchQueryInput = KeywordResearchRequestInput & {
@@ -43,6 +46,8 @@ type KeywordResearchRequest = {
   clickstream: boolean;
   includeTerms: string[];
   excludeTerms: string[];
+  includeMatch: TermMatch;
+  excludeMatch: TermMatch;
 };
 
 export const KEYWORD_RESEARCH_STALE_TIME_MS = 24 * 60 * 60 * 1000;
@@ -64,6 +69,8 @@ export function buildKeywordResearchRequest(
     clickstream: input.clickstream,
     includeTerms: input.includeTerms,
     excludeTerms: input.excludeTerms,
+    includeMatch: input.includeMatch,
+    excludeMatch: input.excludeMatch,
   };
 }
 
@@ -81,6 +88,8 @@ export function buildKeywordResearchQueryKey(
         request.clickstream,
         request.includeTerms,
         request.excludeTerms,
+        request.includeMatch,
+        request.excludeMatch,
       ]
     : ["keywordResearch", "idle"];
 }
@@ -96,6 +105,8 @@ export function keywordResearchQueryFn(request: KeywordResearchRequest) {
       clickstream: request.clickstream,
       includeTerms: request.includeTerms.length > 0 ? request.includeTerms : undefined,
       excludeTerms: request.excludeTerms.length > 0 ? request.excludeTerms : undefined,
+      includeMatch: request.includeTerms.length > 0 ? request.includeMatch : undefined,
+      excludeMatch: request.excludeTerms.length > 0 ? request.excludeMatch : undefined,
     },
   });
 }
@@ -107,7 +118,9 @@ export function useKeywordResearchData(
   const {
     clickstream,
     displayedLocationCode,
+    excludeMatch,
     excludeTerms,
+    includeMatch,
     includeTerms,
     keywordInput,
     locationCode,
@@ -128,9 +141,13 @@ export function useKeywordResearchData(
       clickstream,
       includeTerms: include,
       excludeTerms: exclude,
+      includeMatch,
+      excludeMatch,
     });
   }, [
     clickstream,
+    excludeMatch,
+    includeMatch,
     keywordInput,
     locationCode,
     mode,

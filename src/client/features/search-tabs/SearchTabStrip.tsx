@@ -219,6 +219,8 @@ function getSearchTabQueryConfig(
     clickstream: input.clickstream,
     includeTerms: input.includeTerms,
     excludeTerms: input.excludeTerms,
+    includeMatch: input.includeMatch,
+    excludeMatch: input.excludeMatch,
   });
 
   return {

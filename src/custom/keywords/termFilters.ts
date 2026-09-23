@@ -9,15 +9,49 @@ export const MAX_TERMS_PER_KIND = 4;
 export const MIN_TERM_LENGTH = 2;
 export const MAX_TERM_LENGTH = 40;
 
+/**
+ * How the terms of one field combine:
+ *  - "all": every term counts together (Y)
+ *  - "any": one term is enough (O)
+ * For "Debe contener" the default is all (Y): the keyword needs every term.
+ * For "Excluir" the default is any (O): one excluded term drops the keyword.
+ * "Excluir" with all (Y) drops a keyword only when all its terms appear.
+ */
+export type TermMatch = "all" | "any";
+
 export type TermFilters = {
   includeTerms: string[];
   excludeTerms: string[];
+  includeMatch: TermMatch;
+  excludeMatch: TermMatch;
 };
+
+export const DEFAULT_INCLUDE_MATCH: TermMatch = "all";
+export const DEFAULT_EXCLUDE_MATCH: TermMatch = "any";
 
 export const EMPTY_TERM_FILTERS: TermFilters = {
   includeTerms: [],
   excludeTerms: [],
+  includeMatch: DEFAULT_INCLUDE_MATCH,
+  excludeMatch: DEFAULT_EXCLUDE_MATCH,
 };
+
+/** URL form: only the non-default value is stored. */
+export function includeMatchToParam(match: TermMatch): "any" | undefined {
+  return match === "any" ? "any" : undefined;
+}
+
+export function includeMatchFromParam(value: string | undefined): TermMatch {
+  return value === "any" ? "any" : DEFAULT_INCLUDE_MATCH;
+}
+
+export function excludeMatchToParam(match: TermMatch): "all" | undefined {
+  return match === "all" ? "all" : undefined;
+}
+
+export function excludeMatchFromParam(value: string | undefined): TermMatch {
+  return value === "all" ? "all" : DEFAULT_EXCLUDE_MATCH;
+}
 
 export function normalizeTerm(raw: string): string {
   return raw
@@ -58,29 +92,56 @@ export function termsFromParam(value: string | undefined): string[] {
 }
 
 type LabsCondition = [string, string, string];
+type LabsGroup = (LabsCondition | LabsGroup | "and" | "or")[];
+type LabsFilters = LabsGroup;
+
+// Conditions joined by one operator. A single condition stays as it is.
+function join(
+  items: (LabsCondition | LabsGroup)[],
+  operator: "and" | "or",
+): LabsCondition | LabsGroup {
+  if (items.length === 1) return items[0];
+  return items.flatMap((item, index) => (index === 0 ? [item] : [operator, item]));
+}
 
 /**
- * DataForSEO Labs `filters` value: every required term must appear
- * ("like %term%") and none of the excluded ones may ("not_like %term%"),
- * chained with "and". Returns undefined when there is nothing to filter.
+ * DataForSEO Labs `filters` value.
+ *  - required terms: "like %term%", joined with and (all) or or (any)
+ *  - excluded terms: "not_like %term%", joined with and (any of them drops the
+ *    keyword) or or (dropped only when all of them appear)
+ * The two groups are then chained with "and". Returns undefined when there is
+ * nothing to filter.
  */
 export function buildLabsTermFilters(
   field: string,
   filters: Partial<TermFilters>,
-): (LabsCondition | "and")[] | undefined {
-  const conditions: LabsCondition[] = [
-    ...(filters.includeTerms ?? []).map(
-      (term): LabsCondition => [field, "like", `%${normalizeTerm(term)}%`],
-    ),
-    ...(filters.excludeTerms ?? []).map(
-      (term): LabsCondition => [field, "not_like", `%${normalizeTerm(term)}%`],
-    ),
-  ].slice(0, MAX_TERMS_PER_KIND * 2);
+): LabsFilters | undefined {
+  const include = (filters.includeTerms ?? []).slice(0, MAX_TERMS_PER_KIND);
+  const exclude = (filters.excludeTerms ?? []).slice(0, MAX_TERMS_PER_KIND);
 
-  if (conditions.length === 0) return undefined;
-  return conditions.flatMap((condition, index) =>
-    index === 0 ? [condition] : (["and", condition] as const),
-  );
+  const groups: (LabsCondition | LabsGroup)[] = [];
+  if (include.length > 0) {
+    groups.push(
+      join(
+        include.map((term): LabsCondition => [field, "like", `%${normalizeTerm(term)}%`]),
+        (filters.includeMatch ?? DEFAULT_INCLUDE_MATCH) === "any" ? "or" : "and",
+      ),
+    );
+  }
+  if (exclude.length > 0) {
+    groups.push(
+      join(
+        exclude.map((term): LabsCondition => [field, "not_like", `%${normalizeTerm(term)}%`]),
+        (filters.excludeMatch ?? DEFAULT_EXCLUDE_MATCH) === "all" ? "or" : "and",
+      ),
+    );
+  }
+
+  if (groups.length === 0) return undefined;
+  if (groups.length === 2) return [groups[0], "and", groups[1]];
+  const only = groups[0];
+  // A lone condition goes in a list; a lone group already is the list.
+  return typeof only[0] === "string" ? [only as LabsCondition] : (only as LabsGroup);
 }
 
 /** Same rule applied in code, for data sources that cannot filter remotely. */
@@ -91,10 +152,19 @@ export function keywordMatchesTerms(
   const haystack = keyword.toLocaleLowerCase();
   const include = filters.includeTerms ?? [];
   const exclude = filters.excludeTerms ?? [];
-  return (
-    include.every((term) => haystack.includes(term)) &&
-    !exclude.some((term) => haystack.includes(term))
-  );
+  const has = (term: string) => haystack.includes(term);
+
+  const includeOk =
+    include.length === 0 ||
+    ((filters.includeMatch ?? DEFAULT_INCLUDE_MATCH) === "any"
+      ? include.some(has)
+      : include.every(has));
+  const excluded =
+    exclude.length > 0 &&
+    ((filters.excludeMatch ?? DEFAULT_EXCLUDE_MATCH) === "all"
+      ? exclude.every(has)
+      : exclude.some(has));
+  return includeOk && !excluded;
 }
 
 /** Stable text for cache keys: null when there are no terms. */
@@ -102,5 +172,10 @@ export function termsCacheKey(filters: Partial<TermFilters>): string | null {
   const include = [...(filters.includeTerms ?? [])].sort();
   const exclude = [...(filters.excludeTerms ?? [])].sort();
   if (include.length === 0 && exclude.length === 0) return null;
-  return JSON.stringify({ include, exclude });
+  return JSON.stringify({
+    include,
+    exclude,
+    includeMatch: filters.includeMatch ?? DEFAULT_INCLUDE_MATCH,
+    excludeMatch: filters.excludeMatch ?? DEFAULT_EXCLUDE_MATCH,
+  });
 }

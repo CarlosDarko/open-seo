@@ -181,7 +181,7 @@ export function KeywordResearchSearchBar({ controller }: Props) {
             <span className="badge badge-ghost badge-sm">Opcional</span>
             <div
               className="tooltip tooltip-right"
-              data-tip="Los filtros se aplican en DataForSEO antes del límite de resultados: tus 150, 300 o 500 resultados salen ya filtrados. Con filtros, el modo Auto usa solo las fuentes más cercanas a tu palabra (relacionadas y sugerencias), así que pueden salir pocos resultados pero relevantes. Si quieres más, prueba con una palabra más general (por ejemplo «seo» + «barcelona») o elige el modo Ideas."
+              data-tip="Los filtros se aplican en DataForSEO antes del límite de resultados: tus 150, 300 o 500 resultados salen ya filtrados. Si salen pocos resultados, prueba con una palabra más general (por ejemplo «seo» + «barcelona»)."
             >
               <Info className="size-3.5 text-base-content/50" />
             </div>
@@ -189,26 +189,58 @@ export function KeywordResearchSearchBar({ controller }: Props) {
           <div className="grid gap-4 md:grid-cols-2">
             <controlsForm.Field name="includeTerms">
               {(field) => (
-                <TermChipsField
-                  tone="include"
-                  label="Debe contener"
-                  help="Solo palabras clave que incluyan todas estas palabras."
-                  placeholder="p. ej. gratis, precio"
-                  value={field.state.value}
-                  onChange={field.handleChange}
-                />
+                <controlsForm.Field name="includeMatch">
+                  {(matchField) => (
+                    <TermChipsField
+                      tone="include"
+                      label="Debe contener"
+                      help={
+                        field.state.value.length < 2
+                          ? "Solo palabras clave que incluyan esta palabra."
+                          : matchField.state.value === "any"
+                            ? "Palabras clave que incluyan al menos una de estas palabras (O)."
+                            : "Solo palabras clave que incluyan todas estas palabras a la vez (Y)."
+                      }
+                      placeholder="p. ej. gratis, precio"
+                      value={field.state.value}
+                      onChange={field.handleChange}
+                      match={matchField.state.value}
+                      onMatchChange={matchField.handleChange}
+                      matchTitles={{
+                        all: "Y: deben aparecer todas las palabras",
+                        any: "O: basta con que aparezca una",
+                      }}
+                    />
+                  )}
+                </controlsForm.Field>
               )}
             </controlsForm.Field>
             <controlsForm.Field name="excludeTerms">
               {(field) => (
-                <TermChipsField
-                  tone="exclude"
-                  label="Excluir"
-                  help="Se descartan las que incluyan cualquiera de estas palabras."
-                  placeholder="p. ej. madrid, barcelona"
-                  value={field.state.value}
-                  onChange={field.handleChange}
-                />
+                <controlsForm.Field name="excludeMatch">
+                  {(matchField) => (
+                    <TermChipsField
+                      tone="exclude"
+                      label="Excluir"
+                      help={
+                        field.state.value.length < 2
+                          ? "Se descartan las que incluyan esta palabra."
+                          : matchField.state.value === "all"
+                            ? "Se descartan solo las que incluyan todas estas palabras a la vez (Y)."
+                            : "Se descartan las que incluyan cualquiera de estas palabras (O)."
+                      }
+                      placeholder="p. ej. madrid, barcelona"
+                      value={field.state.value}
+                      onChange={field.handleChange}
+                      match={matchField.state.value}
+                      onMatchChange={matchField.handleChange}
+                      matchTitles={{
+                        all: "Y: se descarta solo si aparecen todas juntas",
+                        any: "O: se descarta si aparece cualquiera",
+                      }}
+                    />
+                  )}
+                </controlsForm.Field>
               )}
             </controlsForm.Field>
           </div>

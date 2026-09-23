@@ -12,7 +12,6 @@ import type { KeywordResearchRow } from "@/types/keywords";
 import type { ResolvedResearchKeywordsInput } from "@/types/schemas/keywords";
 import { z } from "zod";
 import { getKeywordDataProvider } from "@/shared/keyword-locations";
-import { autoSourcesFor, shouldStopAutoFetch } from "@/custom/keywords/autoMode";
 import { keywordMatchesTerms, termsCacheKey } from "@/custom/keywords/termFilters";
 import { type EnrichedKeyword, normalizeKeyword } from "./helpers";
 import {
@@ -110,6 +109,8 @@ async function fetchRowsFromSource(
       includeClickstreamData: input.clickstream,
       includeTerms: input.includeTerms,
       excludeTerms: input.excludeTerms,
+      includeMatch: input.includeMatch,
+      excludeMatch: input.excludeMatch,
       creditFeature,
     },
     billingCustomer,
@@ -127,8 +128,7 @@ async function fetchAutoRows(
   const accumulatedRows: EnrichedKeyword[] = [];
   const seenKeywords = new Set<string>();
 
-  const filtering = termsCacheKey(input) !== null;
-  for (const source of autoSourcesFor(AUTO_KEYWORD_SOURCES, filtering)) {
+  for (const source of AUTO_KEYWORD_SOURCES) {
     const rows = await fetchRowsFromSource(
       source,
       input,
@@ -152,16 +152,7 @@ async function fetchAutoRows(
     lastSource = source;
 
     if (
-      shouldStopAutoFetch({
-        filtering,
-        collected: accumulatedRows.length,
-        resultLimit: input.resultLimit,
-        hasSufficientCoverage: hasSufficientCoverage(
-          accumulatedRows,
-          seedKeyword,
-          MIN_NON_SEED_FOR_AUTO,
-        ),
-      })
+      hasSufficientCoverage(accumulatedRows, seedKeyword, MIN_NON_SEED_FOR_AUTO)
     ) {
       return {
         rows: accumulatedRows,
@@ -276,11 +267,10 @@ async function buildResearchCacheKey(
     depth: 3,
     clickstream: input.clickstream,
     // Only present when used, so searches without terms keep their old key.
-    // termsRev 3: filtered Auto searches changed twice (first stopped at one
-    // source, then wrongly pulled in the broad ideas source); older entries
-    // must not be served.
+    // termsRev: bump when the meaning of a filtered search changes, so older
+    // cached entries are not served.
     ...(termsCacheKey(input)
-      ? { terms: termsCacheKey(input), termsRev: 3 }
+      ? { terms: termsCacheKey(input), termsRev: 4 }
       : {}),
   });
 }

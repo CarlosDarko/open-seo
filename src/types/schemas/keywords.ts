@@ -33,6 +33,9 @@ export const researchKeywordsSchema = z.object({
   // DataForSEO as filters so they apply before the result limit.
   includeTerms: z.array(z.string().trim().min(2).max(40)).max(4).optional(),
   excludeTerms: z.array(z.string().trim().min(2).max(40)).max(4).optional(),
+  // Y ("all") / O ("any") for each group of terms.
+  includeMatch: z.enum(["all", "any"]).optional(),
+  excludeMatch: z.enum(["all", "any"]).optional(),
 });
 
 export const savedKeywordMetricSchema = z.object({
@@ -209,6 +212,8 @@ export const keywordsSearchSchema = z.object({
   // Fork: comma-separated terms the keywords must / must not contain.
   must: z.string().optional(),
   not: z.string().optional(),
+  mm: z.enum(["any"]).optional(),
+  nm: z.enum(["all"]).optional(),
   sort: z.enum(keywordSortFields).optional(),
   order: z.enum(sortDirs).optional(),
   minVol: z.string().optional(),

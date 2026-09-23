@@ -10,6 +10,7 @@ import {
   type ResultLimit,
 } from "@/client/features/keywords/keywordResearchTypes";
 import { parseKeywordInput } from "@/client/features/keywords/state/keywordControllerActions";
+import type { TermMatch } from "@/custom/keywords/termFilters";
 
 type UseKeywordControlsFormInput = {
   keywordInput: string;
@@ -19,6 +20,8 @@ type UseKeywordControlsFormInput = {
   clickstream: boolean;
   includeTerms: string[];
   excludeTerms: string[];
+  includeMatch: TermMatch;
+  excludeMatch: TermMatch;
 };
 
 export type KeywordControlsValues = {
@@ -29,6 +32,8 @@ export type KeywordControlsValues = {
   clickstream: boolean;
   includeTerms: string[];
   excludeTerms: string[];
+  includeMatch: TermMatch;
+  excludeMatch: TermMatch;
 };
 
 function getKeywordSearchValidationErrors(
@@ -73,6 +78,8 @@ export function useKeywordControlsForm(
       clickstream: input.clickstream,
       includeTerms: input.includeTerms,
       excludeTerms: input.excludeTerms,
+      includeMatch: input.includeMatch,
+      excludeMatch: input.excludeMatch,
     },
     validators: {
       onChange: ({ formApi, value }) =>
@@ -101,6 +108,8 @@ export function useKeywordControlsForm(
       clickstream: input.clickstream,
       includeTerms,
       excludeTerms,
+      includeMatch: input.includeMatch,
+      excludeMatch: input.excludeMatch,
     });
   }, [
     form,
@@ -109,6 +118,8 @@ export function useKeywordControlsForm(
     input.locationCode,
     input.resultLimit,
     input.clickstream,
+    input.includeMatch,
+    input.excludeMatch,
     termsKey,
   ]);
 

@@ -18,6 +18,8 @@ const baseInput = {
   clickstream: false,
   includeTerms: [] as string[],
   excludeTerms: [] as string[],
+  includeMatch: "all" as const,
+  excludeMatch: "any" as const,
 };
 
 describe("buildKeywordResearchRequest", () => {
@@ -58,5 +60,20 @@ describe("buildKeywordResearchRequest", () => {
     );
 
     expect(filtered).not.toEqual(plain);
+  });
+
+  it("keys the query on Y/O so the same terms combined differently do not share a result", () => {
+    const all = buildKeywordResearchQueryKey(
+      buildKeywordResearchRequest({ ...baseInput, includeTerms: ["barcelona", "madrid"] }),
+    );
+    const any = buildKeywordResearchQueryKey(
+      buildKeywordResearchRequest({
+        ...baseInput,
+        includeTerms: ["barcelona", "madrid"],
+        includeMatch: "any",
+      }),
+    );
+
+    expect(any).not.toEqual(all);
   });
 });

@@ -24,6 +24,8 @@ type FetchResearchRowsParams = {
   // before the result limit.
   includeTerms?: string[];
   excludeTerms?: string[];
+  includeMatch?: "all" | "any";
+  excludeMatch?: "all" | "any";
   // Attribute the DataForSEO spend to a specific feature (e.g. "agent");
   // defaults to the path-derived feature when omitted.
   creditFeature?: CreditFeature;

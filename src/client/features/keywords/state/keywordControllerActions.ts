@@ -67,6 +67,8 @@ export function buildKeywordSearchKey(params: {
   clickstream: boolean;
   includeTerms?: string[];
   excludeTerms?: string[];
+  includeMatch?: string;
+  excludeMatch?: string;
 }) {
   return [
     parseKeywordInput(params.keyword).join(""),
@@ -76,6 +78,8 @@ export function buildKeywordSearchKey(params: {
     params.clickstream ? "cs" : "",
     (params.includeTerms ?? []).join(","),
     (params.excludeTerms ?? []).join(","),
+    params.includeMatch ?? "",
+    params.excludeMatch ?? "",
   ].join("|");
 }
 

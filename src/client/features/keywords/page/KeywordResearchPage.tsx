@@ -21,7 +21,12 @@ import {
   useSearchTabNavigation,
 } from "@/client/features/search-tabs/useSearchTabNavigation";
 import { KeywordResearchEmptyState } from "./KeywordResearchEmptyState";
-import { sanitizeTerms, termsToParam } from "@/custom/keywords/termFilters";
+import {
+  excludeMatchToParam,
+  includeMatchToParam,
+  sanitizeTerms,
+  termsToParam,
+} from "@/custom/keywords/termFilters";
 import { KeywordResearchLoadingState } from "./KeywordResearchLoadingState";
 import { KeywordResearchResults } from "./KeywordResearchResults";
 import { KeywordResearchSearchBar } from "./KeywordResearchSearchBar";
@@ -66,6 +71,8 @@ export function KeywordResearchPage(input: Props) {
           cs: undefined,
           must: undefined,
           not: undefined,
+          mm: undefined,
+          nm: undefined,
         });
         return;
       }
@@ -78,6 +85,8 @@ export function KeywordResearchPage(input: Props) {
         cs: tabInput.clickstream ? true : undefined,
         must: termsToParam(tabInput.includeTerms),
         not: termsToParam(tabInput.excludeTerms),
+        mm: includeMatchToParam(tabInput.includeMatch),
+        nm: excludeMatchToParam(tabInput.excludeMatch),
       });
     },
     [setSearchParams],
@@ -96,10 +105,14 @@ export function KeywordResearchPage(input: Props) {
       clickstream: input.clickstream,
       includeTerms: input.includeTerms,
       excludeTerms: input.excludeTerms,
+      includeMatch: input.includeMatch,
+      excludeMatch: input.excludeMatch,
     };
   }, [
     input.clickstream,
+    input.excludeMatch,
     input.excludeTerms,
+    input.includeMatch,
     input.includeTerms,
     input.keywordInput,
     input.keywordMode,
@@ -152,6 +165,8 @@ export function KeywordResearchPage(input: Props) {
         clickstream: value.clickstream,
         includeTerms: sanitizeTerms(value.includeTerms),
         excludeTerms: sanitizeTerms(value.excludeTerms),
+        includeMatch: value.includeMatch,
+        excludeMatch: value.excludeMatch,
       }));
 
       for (const tabInput of inputs) {
@@ -180,6 +195,8 @@ export function KeywordResearchPage(input: Props) {
             clickstream: activeTab.input.clickstream,
             includeTerms: activeTab.input.includeTerms,
             excludeTerms: activeTab.input.excludeTerms,
+            includeMatch: activeTab.input.includeMatch,
+            excludeMatch: activeTab.input.excludeMatch,
           }
         : {
             ...input,

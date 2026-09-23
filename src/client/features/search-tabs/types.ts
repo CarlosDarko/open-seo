@@ -3,6 +3,7 @@ import type {
   ResultLimit,
 } from "@/client/features/keywords/keywordResearchTypes";
 import type { ResearchScope } from "@/shared/researchScope";
+import type { TermMatch } from "@/custom/keywords/termFilters";
 
 export type BacklinksSearchTabInput = {
   type: "backlinks";
@@ -26,6 +27,8 @@ export type KeywordSearchTabInput = {
   clickstream: boolean;
   includeTerms: string[];
   excludeTerms: string[];
+  includeMatch: TermMatch;
+  excludeMatch: TermMatch;
 };
 
 export type SearchTabInput =

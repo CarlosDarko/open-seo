@@ -12,6 +12,8 @@ type KeywordSearchParams = {
   cs?: boolean;
   must?: string;
   not?: string;
+  mm?: "any";
+  nm?: "all";
   sort?: SortField;
   order?: SortDir;
   minVol?: string;
@@ -37,6 +39,8 @@ export function normalizeLegacyKeywordSearch(search: KeywordSearchParams): {
     cs: search.cs === true ? true : undefined,
     must: search.must === "" ? undefined : search.must,
     not: search.not === "" ? undefined : search.not,
+    mm: search.mm,
+    nm: search.nm,
     sort: search.sort === "searchVolume" ? undefined : search.sort,
     order: search.order === "desc" ? undefined : search.order,
     minVol: undefined,
@@ -57,6 +61,8 @@ export function normalizeLegacyKeywordSearch(search: KeywordSearchParams): {
     "cs",
     "must",
     "not",
+    "mm",
+    "nm",
     "sort",
     "order",
     "minVol",

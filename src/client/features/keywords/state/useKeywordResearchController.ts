@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, type FormEvent } from "react";
+import type { TermMatch } from "@/custom/keywords/termFilters";
 import {
   useKeywordControlsForm,
   type KeywordControlsValues,
@@ -39,6 +40,8 @@ export type KeywordResearchControllerInput = {
   clickstream: boolean;
   includeTerms: string[];
   excludeTerms: string[];
+  includeMatch: TermMatch;
+  excludeMatch: TermMatch;
   sortField: SortField;
   sortDir: SortDir;
   /**
@@ -117,6 +120,8 @@ export function useKeywordResearchController(
       clickstream: input.clickstream,
       includeTerms: input.includeTerms,
       excludeTerms: input.excludeTerms,
+      includeMatch: input.includeMatch,
+      excludeMatch: input.excludeMatch,
     },
     addSearch,
   );
@@ -132,6 +137,8 @@ export function useKeywordResearchController(
         clickstream: input.clickstream,
         includeTerms: input.includeTerms,
         excludeTerms: input.excludeTerms,
+        includeMatch: input.includeMatch,
+        excludeMatch: input.excludeMatch,
       })
     : null;
 
