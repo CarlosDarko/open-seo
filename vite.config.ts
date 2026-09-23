@@ -6,6 +6,7 @@ import tailwindcss from "@tailwindcss/vite";
 import { cloudflare } from "@cloudflare/vite-plugin";
 import { devtools } from "@tanstack/devtools-vite";
 import { leanWorkerBundle } from "./vite-plugin-lean-worker-bundle";
+import { translateEs } from "./custom/i18n/vite-plugin-i18n.mjs";
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
@@ -43,6 +44,7 @@ export default defineConfig(({ mode }) => {
       outDir: emitSourcemaps ? "dist-sourcemaps" : "dist",
     },
     plugins: [
+      translateEs(),
       leanWorkerBundle(),
       showDevtools
         ? devtools({
