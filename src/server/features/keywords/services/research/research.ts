@@ -12,7 +12,7 @@ import type { KeywordResearchRow } from "@/types/keywords";
 import type { ResolvedResearchKeywordsInput } from "@/types/schemas/keywords";
 import { z } from "zod";
 import { getKeywordDataProvider } from "@/shared/keyword-locations";
-import { shouldStopAutoFetch } from "@/custom/keywords/autoMode";
+import { autoSourcesFor, shouldStopAutoFetch } from "@/custom/keywords/autoMode";
 import { keywordMatchesTerms, termsCacheKey } from "@/custom/keywords/termFilters";
 import { type EnrichedKeyword, normalizeKeyword } from "./helpers";
 import {
@@ -127,7 +127,8 @@ async function fetchAutoRows(
   const accumulatedRows: EnrichedKeyword[] = [];
   const seenKeywords = new Set<string>();
 
-  for (const source of AUTO_KEYWORD_SOURCES) {
+  const filtering = termsCacheKey(input) !== null;
+  for (const source of autoSourcesFor(AUTO_KEYWORD_SOURCES, filtering)) {
     const rows = await fetchRowsFromSource(
       source,
       input,
@@ -152,7 +153,7 @@ async function fetchAutoRows(
 
     if (
       shouldStopAutoFetch({
-        filtering: termsCacheKey(input) !== null,
+        filtering,
         collected: accumulatedRows.length,
         resultLimit: input.resultLimit,
         hasSufficientCoverage: hasSufficientCoverage(
@@ -275,10 +276,11 @@ async function buildResearchCacheKey(
     depth: 3,
     clickstream: input.clickstream,
     // Only present when used, so searches without terms keep their old key.
-    // termsRev 2: filtered Auto searches used to stop at the first source and
-    // cached a handful of rows; those entries must not be served any more.
+    // termsRev 3: filtered Auto searches changed twice (first stopped at one
+    // source, then wrongly pulled in the broad ideas source); older entries
+    // must not be served.
     ...(termsCacheKey(input)
-      ? { terms: termsCacheKey(input), termsRev: 2 }
+      ? { terms: termsCacheKey(input), termsRev: 3 }
       : {}),
   });
 }

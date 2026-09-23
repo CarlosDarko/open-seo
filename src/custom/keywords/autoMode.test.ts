@@ -1,5 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { shouldStopAutoFetch } from "@/custom/keywords/autoMode";
+import { autoSourcesFor, shouldStopAutoFetch } from "@/custom/keywords/autoMode";
+
+describe("autoSourcesFor", () => {
+  const sources = ["related", "suggestions", "ideas"] as const;
+
+  it("uses every source when nothing is filtered", () => {
+    expect(autoSourcesFor(sources, false)).toEqual(["related", "suggestions", "ideas"]);
+  });
+
+  it("skips the broad ideas source when filtering", () => {
+    expect(autoSourcesFor(sources, true)).toEqual(["related", "suggestions"]);
+  });
+});
 
 describe("shouldStopAutoFetch", () => {
   it("keeps the usual coverage rule when nothing is filtered", () => {

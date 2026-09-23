@@ -181,7 +181,7 @@ export function KeywordResearchSearchBar({ controller }: Props) {
             <span className="badge badge-ghost badge-sm">Opcional</span>
             <div
               className="tooltip tooltip-right"
-              data-tip="Los filtros se aplican en DataForSEO antes del límite de resultados: tus 150, 300 o 500 resultados salen ya filtrados. Con filtros, el modo Auto recorre todas las fuentes hasta completar el límite. Si salen pocos, prueba con una palabra más general (por ejemplo «seo» + «barcelona»)."
+              data-tip="Los filtros se aplican en DataForSEO antes del límite de resultados: tus 150, 300 o 500 resultados salen ya filtrados. Con filtros, el modo Auto usa solo las fuentes más cercanas a tu palabra (relacionadas y sugerencias), así que pueden salir pocos resultados pero relevantes. Si quieres más, prueba con una palabra más general (por ejemplo «seo» + «barcelona») o elige el modo Ideas."
             >
               <Info className="size-3.5 text-base-content/50" />
             </div>
