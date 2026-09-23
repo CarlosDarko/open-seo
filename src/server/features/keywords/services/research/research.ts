@@ -12,6 +12,7 @@ import type { KeywordResearchRow } from "@/types/keywords";
 import type { ResolvedResearchKeywordsInput } from "@/types/schemas/keywords";
 import { z } from "zod";
 import { getKeywordDataProvider } from "@/shared/keyword-locations";
+import { shouldStopAutoFetch } from "@/custom/keywords/autoMode";
 import { keywordMatchesTerms, termsCacheKey } from "@/custom/keywords/termFilters";
 import { type EnrichedKeyword, normalizeKeyword } from "./helpers";
 import {
@@ -150,7 +151,16 @@ async function fetchAutoRows(
     lastSource = source;
 
     if (
-      hasSufficientCoverage(accumulatedRows, seedKeyword, MIN_NON_SEED_FOR_AUTO)
+      shouldStopAutoFetch({
+        filtering: termsCacheKey(input) !== null,
+        collected: accumulatedRows.length,
+        resultLimit: input.resultLimit,
+        hasSufficientCoverage: hasSufficientCoverage(
+          accumulatedRows,
+          seedKeyword,
+          MIN_NON_SEED_FOR_AUTO,
+        ),
+      })
     ) {
       return {
         rows: accumulatedRows,
