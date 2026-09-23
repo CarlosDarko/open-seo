@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { Coins } from "lucide-react";
 import { costSummaryQuery } from "@/custom/costs/client/queries";
+import { useRefreshCostsAfterActivity } from "@/custom/costs/client/useRefreshCostsAfterActivity";
 import { formatEur } from "@/custom/costs/shared";
 
 /**
@@ -11,6 +12,7 @@ import { formatEur } from "@/custom/costs/shared";
  */
 export function SidebarCostMeter({ onNavigate }: { onNavigate?: () => void }) {
   const { data } = useQuery(costSummaryQuery());
+  useRefreshCostsAfterActivity();
   if (!data) return null;
 
   const budget = data.settings.monthlyBudgetEur;
