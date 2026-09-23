@@ -130,17 +130,15 @@ export function Sidebar({ projectId, onNavigate, onClose }: SidebarProps) {
           onClick={onNavigate}
           className="text-base font-semibold text-base-content"
         >
-          <picture>
-            <source
-              srcSet="/carlos-ortega-logo-dark.svg"
-              media="(prefers-color-scheme: dark)"
-            />
+          <span className="flex items-center gap-2">
+            <img src="/isotipo.svg" alt="" className="brand-mark-light h-6 w-6" />
             <img
-              src="/carlos-ortega-logo.svg"
-              alt="Carlos Ortega"
-              className="h-6 w-auto"
+              src="/isotipo-dark.svg"
+              alt=""
+              className="brand-mark-dark h-6 w-6"
             />
-          </picture>
+            Control Center
+          </span>
         </Link>
         {onClose ? (
           <button

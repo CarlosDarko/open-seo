@@ -44,8 +44,9 @@
   --color-success-content: oklch(100% 0 0);
   --color-warning: oklch(80% 0.15 80);
   --color-warning-content: oklch(100% 0 0);
-  --color-error: oklch(65% 0.2 25);
-  --color-error-content: oklch(100% 0 0);
+  /* Errors must not read as the Crimson brand color: dark brick on light, coral on dark. */
+  --color-error: #b42318;
+  --color-error-content: #f6f6f6;
   --radius-selector: 0.5rem;
   --radius-field: 0.5rem;
   --radius-box: 0.75rem;
@@ -79,8 +80,8 @@
   --color-success-content: oklch(100% 0 0);
   --color-warning: oklch(80% 0.15 80);
   --color-warning-content: oklch(100% 0 0);
-  --color-error: oklch(65% 0.2 25);
-  --color-error-content: oklch(100% 0 0);
+  --color-error: #ff8f70;
+  --color-error-content: #1a1a1a;
   --radius-selector: 0.5rem;
   --radius-field: 0.5rem;
   --radius-box: 0.75rem;
@@ -89,6 +90,17 @@
   --border: 1px;
   --depth: 0;
   --noise: 0;
+}
+
+/* Brand mark: positive isotype on the light theme, negative on the dark one. */
+.brand-mark-dark {
+  display: none;
+}
+[data-theme="openseo-dark"] .brand-mark-light {
+  display: none;
+}
+[data-theme="openseo-dark"] .brand-mark-dark {
+  display: inline;
 }
 
 html,
