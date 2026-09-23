@@ -275,7 +275,11 @@ async function buildResearchCacheKey(
     depth: 3,
     clickstream: input.clickstream,
     // Only present when used, so searches without terms keep their old key.
-    ...(termsCacheKey(input) ? { terms: termsCacheKey(input) } : {}),
+    // termsRev 2: filtered Auto searches used to stop at the first source and
+    // cached a handful of rows; those entries must not be served any more.
+    ...(termsCacheKey(input)
+      ? { terms: termsCacheKey(input), termsRev: 2 }
+      : {}),
   });
 }
 
