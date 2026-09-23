@@ -563,24 +563,77 @@ function History() {
   );
 }
 
+type SettingKey = keyof CostSettings;
+
+const SETTING_FIELDS: {
+  key: SettingKey;
+  label: string;
+  help: string;
+  suffix: string;
+  integer?: boolean;
+  max?: number;
+}[] = [
+  {
+    key: "monthlyBudgetEur",
+    label: "Presupuesto mensual",
+    help: "Límite de gasto al mes. Con 0 se desactivan los avisos de presupuesto.",
+    suffix: "€",
+  },
+  {
+    key: "warnAtPercent",
+    label: "Avisar al llegar al",
+    help: "Porcentaje del presupuesto en el que aparece el aviso amarillo.",
+    suffix: "%",
+    integer: true,
+    max: 100,
+  },
+  {
+    key: "confirmAboveEur",
+    label: "Pedir confirmación por encima de",
+    help: "Antes de lanzar una acción con un coste estimado superior a esta cifra, se te pedirá confirmar.",
+    suffix: "€",
+  },
+  {
+    key: "lowBalanceEur",
+    label: "Avisar si el saldo baja de",
+    help: "Aviso cuando el saldo de DataForSEO cae por debajo de esta cifra.",
+    suffix: "€",
+  },
+];
+
+const toInput = (value: number) => String(value).replace(".", ",");
+const parseInput = (text: string) => Number(text.trim().replace(",", "."));
+
+function isValidSetting(field: (typeof SETTING_FIELDS)[number], text: string) {
+  const value = parseInput(text);
+  if (text.trim() === "" || !Number.isFinite(value) || value < 0) return false;
+  if (field.integer && !Number.isInteger(value)) return false;
+  if (field.max !== undefined && value > field.max) return false;
+  if (field.key === "warnAtPercent" && value < 1) return false;
+  return true;
+}
+
 function SettingsForm({ settings }: { settings: CostSettings }) {
   const queryClient = useQueryClient();
-  const [values, setValues] = useState({
-    monthlyBudgetEur: String(settings.monthlyBudgetEur),
-    warnAtPercent: String(settings.warnAtPercent),
-    confirmAboveEur: String(settings.confirmAboveEur),
-    lowBalanceEur: String(settings.lowBalanceEur),
-  });
+  const initial = Object.fromEntries(
+    SETTING_FIELDS.map((field) => [field.key, toInput(settings[field.key])]),
+  ) as Record<SettingKey, string>;
+  const [values, setValues] = useState(initial);
   const [saved, setSaved] = useState(false);
+
+  const dirty = SETTING_FIELDS.some((field) => values[field.key] !== initial[field.key]);
+  const allValid = SETTING_FIELDS.every((field) =>
+    isValidSetting(field, values[field.key]),
+  );
 
   const save = useMutation({
     mutationFn: () =>
       saveCostSettings({
         data: {
-          monthlyBudgetEur: Number(values.monthlyBudgetEur.replace(",", ".")),
-          warnAtPercent: Math.round(Number(values.warnAtPercent)),
-          confirmAboveEur: Number(values.confirmAboveEur.replace(",", ".")),
-          lowBalanceEur: Number(values.lowBalanceEur.replace(",", ".")),
+          monthlyBudgetEur: parseInput(values.monthlyBudgetEur),
+          warnAtPercent: parseInput(values.warnAtPercent),
+          confirmAboveEur: parseInput(values.confirmAboveEur),
+          lowBalanceEur: parseInput(values.lowBalanceEur),
         },
       }),
     onSuccess: async () => {
@@ -589,76 +642,76 @@ function SettingsForm({ settings }: { settings: CostSettings }) {
     },
   });
 
-  const field = (
-    key: keyof typeof values,
-    label: string,
-    help: string,
-    suffix: string,
-  ) => (
-    <label className="form-control">
-      <span className="label-text text-sm font-medium">{label}</span>
-      <div className="join mt-1">
-        <input
-          className="input input-bordered input-sm join-item w-full"
-          inputMode="decimal"
-          value={values[key]}
-          onChange={(event) => {
-            setSaved(false);
-            setValues({ ...values, [key]: event.target.value });
-          }}
-        />
-        <span className="btn btn-sm join-item no-animation pointer-events-none">
-          {suffix}
-        </span>
-      </div>
-      <span className="mt-1 text-xs text-base-content/50">{help}</span>
-    </label>
-  );
-
   return (
     <section className="rounded-lg border border-base-300 bg-base-100 p-4">
-      <h2 className="mb-3 font-semibold">Presupuesto y avisos</h2>
-      <div className="space-y-3">
-        {field(
-          "monthlyBudgetEur",
-          "Presupuesto mensual",
-          "Límite de gasto al mes. Con 0 se desactivan los avisos de presupuesto.",
-          "€",
-        )}
-        {field(
-          "warnAtPercent",
-          "Avisar al llegar al",
-          "Porcentaje del presupuesto en el que aparece el aviso amarillo.",
-          "%",
-        )}
-        {field(
-          "confirmAboveEur",
-          "Pedir confirmación por encima de",
-          "Antes de lanzar una acción cuyo coste estimado supere esta cifra, se pide confirmación.",
-          "€",
-        )}
-        {field(
-          "lowBalanceEur",
-          "Avisar si el saldo baja de",
-          "Aviso cuando el saldo de DataForSEO cae por debajo de esta cifra.",
-          "€",
-        )}
+      <h2 className="font-semibold">Presupuesto y avisos</h2>
+      <p className="mt-0.5 text-xs text-base-content/60">
+        Todo en euros. Los avisos aparecen en un banner en toda la aplicación.
+      </p>
+
+      <div className="mt-2 divide-y divide-base-300">
+        {SETTING_FIELDS.map((field) => {
+          const invalid = !isValidSetting(field, values[field.key]);
+          const id = `cost-setting-${field.key}`;
+          return (
+            <div
+              key={field.key}
+              className="grid gap-2 py-3 sm:grid-cols-[minmax(0,1fr)_9rem] sm:items-center sm:gap-6"
+            >
+              <div>
+                <label htmlFor={id} className="block text-sm font-medium">
+                  {field.label}
+                </label>
+                <p className="mt-0.5 text-xs leading-snug text-base-content/60">
+                  {field.help}
+                </p>
+              </div>
+              <div className="join w-full">
+                <input
+                  id={id}
+                  inputMode="decimal"
+                  autoComplete="off"
+                  aria-invalid={invalid || undefined}
+                  className={`input input-bordered input-sm join-item w-full text-right tabular-nums ${
+                    invalid ? "input-error" : ""
+                  }`}
+                  value={values[field.key]}
+                  onChange={(event) => {
+                    setSaved(false);
+                    setValues({ ...values, [field.key]: event.target.value });
+                  }}
+                />
+                <span className="join-item flex h-8 w-9 shrink-0 items-center justify-center border border-base-300 bg-base-200 text-sm text-base-content/70">
+                  {field.suffix}
+                </span>
+              </div>
+            </div>
+          );
+        })}
       </div>
+
       {save.isError ? (
-        <p className="mt-3 text-sm text-error">
-          Revisa los valores: deben ser números positivos.
+        <p className="mt-2 text-sm text-error">
+          No se pudo guardar. Inténtalo de nuevo.
         </p>
       ) : null}
-      <div className="mt-4 flex items-center gap-3">
+      <div className="mt-3 flex items-center gap-3">
         <button
           type="button"
           className="btn btn-primary btn-sm"
-          disabled={save.isPending}
+          disabled={!dirty || !allValid || save.isPending}
           onClick={() => save.mutate()}
         >
-          Guardar
+          {save.isPending ? "Guardando…" : "Guardar cambios"}
         </button>
-        {saved ? <span className="text-sm text-success">Guardado</span> : null}
+        {saved && !dirty ? (
+          <span className="text-sm text-success">Guardado</span>
+        ) : null}
+        {dirty && !allValid ? (
+          <span className="text-sm text-error">
+            Revisa los campos marcados en rojo.
+          </span>
+        ) : null}
       </div>
     </section>
   );
