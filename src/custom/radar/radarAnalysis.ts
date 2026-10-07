@@ -787,6 +787,8 @@ export type DailyPoint = {
   date: string;
   clicks: number;
   impressions: number;
+  /** Average position of the day. */
+  position: number;
   prevClicks: number | null;
   prevImpressions: number | null;
 };
@@ -816,6 +818,7 @@ export function alignDaily(
       date,
       clicks: row.clicks,
       impressions: row.impressions,
+      position: row.position,
       prevClicks: old ? old.clicks : null,
       prevImpressions: old ? old.impressions : null,
     });

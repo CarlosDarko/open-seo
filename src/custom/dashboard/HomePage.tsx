@@ -1,7 +1,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Line, LineChart } from "recharts";
+import { Line, LineChart, YAxis } from "recharts";
 import {
   ArrowRight,
   BarChart3,
@@ -464,18 +464,29 @@ function Delta({
 const sparkConfig = {
   clicks: { label: "Clics", color: "var(--primary)" },
   impressions: { label: "Impresiones", color: "var(--primary)" },
+  ctr: { label: "CTR", color: "var(--primary)" },
+  position: { label: "Posición", color: "var(--primary)" },
 } satisfies ChartConfig;
 
+type SparkKey = keyof typeof sparkConfig;
+
+/** A tiny line of the daily figure. A lower position is better, so that
+ *  line is drawn upside down: up always means better. */
 function Spark({
   data,
   dataKey,
 }: {
-  data: DailyPoint[];
-  dataKey: "clicks" | "impressions";
+  data: Record<string, unknown>[];
+  dataKey: SparkKey;
 }) {
   return (
     <ChartContainer config={sparkConfig} className="h-7 w-full">
       <LineChart data={data} margin={{ top: 3, right: 0, bottom: 3, left: 0 }}>
+        <YAxis
+          hide
+          reversed={dataKey === "position"}
+          domain={["dataMin", "dataMax"]}
+        />
         <Line
           dataKey={dataKey}
           stroke={`var(--color-${dataKey})`}
@@ -489,7 +500,11 @@ function Spark({
 }
 
 function KpiRow({ report }: { report: Report }) {
-  const { totals, prevTotals, daily } = report;
+  const { totals, prevTotals } = report;
+  const daily = report.daily.map((point) => ({
+    ...point,
+    ctr: point.impressions > 0 ? point.clicks / point.impressions : 0,
+  }));
   const cards: {
     label: string;
     value: string;
@@ -512,6 +527,7 @@ function KpiRow({ report }: { report: Report }) {
       label: "CTR",
       value: percent.format(totals.ctr),
       delta: <Delta now={totals.ctr} before={prevTotals.ctr} />,
+      spark: <Spark data={daily} dataKey="ctr" />,
     },
     {
       label: "Posición media",
@@ -524,6 +540,7 @@ function KpiRow({ report }: { report: Report }) {
           asPoints
         />
       ),
+      spark: <Spark data={daily} dataKey="position" />,
     },
   ];
   return (
@@ -847,11 +864,9 @@ function MoveList({
             <span className="shrink-0 text-muted-foreground tabular-nums">
               {move.prevPosition === null
                 ? "nueva"
-                : `pos. ${decimal.format(move.prevPosition)}`}
+                : integer.format(move.prevPosition)}
               {" → "}
-              {move.position === null
-                ? "ya no sale"
-                : `pos. ${decimal.format(move.position)}`}
+              {move.position === null ? "-" : integer.format(move.position)}
             </span>
           </li>
         ))}
