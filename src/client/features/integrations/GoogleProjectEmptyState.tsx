@@ -25,8 +25,8 @@ export function GoogleProjectEmptyState({
     <div className="flex flex-1 flex-col gap-4">
       <p className="text-sm text-muted-foreground">
         {hasGrant
-          ? `Choose a ${name} property to finish connecting this project.`
-          : `Connect ${name} to see this project’s data.`}
+          ? `Elige una propiedad de ${name} para terminar de conectar este proyecto.`
+          : `Conecta ${name} para ver los datos de este proyecto.`}
       </p>
       {/* Actions sit bottom-right, with Dismiss (children) just left of the
           connect action. */}

@@ -157,7 +157,7 @@ export function DashboardOnboarding({
         <Collapsible className="border-t border-border">
           <CollapsibleTrigger className="group flex w-full items-center gap-2 px-5 py-4 text-left text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-inset sm:px-6">
             <Check className="size-4 text-success" />
-            {completed.length} completed
+            {completed.length} <span className="lowercase">Completed</span>
             <ChevronRight className="ml-auto size-4 text-muted-foreground transition-transform group-data-panel-open:rotate-90" />
           </CollapsibleTrigger>
           <CollapsibleContent>
