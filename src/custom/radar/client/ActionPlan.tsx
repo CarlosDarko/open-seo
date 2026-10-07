@@ -430,6 +430,7 @@ export function ActionCard({
   onToggle,
   onMarkDone,
   marking,
+  hideToggle,
 }: {
   action: Action;
   signals: Map<string, PageSignals>;
@@ -439,6 +440,8 @@ export function ActionCard({
   /** Marks the task as done so its impact can be measured later. */
   onMarkDone?: (title: string | null) => void;
   marking?: boolean;
+  /** Inside the pop-up the detail is always shown and the card is not folded. */
+  hideToggle?: boolean;
 }) {
   const meta = KIND_META[action.kind];
   const tone = TONES[meta.tone];
@@ -467,8 +470,9 @@ export function ActionCard({
       <CardContent className="p-0">
         {/* Head: what it is, which page, and what it is worth. */}
         <div
-          className={`flex cursor-pointer flex-col gap-4 p-4 sm:flex-row sm:items-start ${tone.wash}`}
+          className={`flex ${hideToggle ? "" : "cursor-pointer"} flex-col gap-4 p-4 sm:flex-row sm:items-start ${tone.wash}`}
           onClick={(event) => {
+            if (hideToggle) return;
             if ((event.target as HTMLElement).closest("a, button")) return;
             onToggle();
           }}
@@ -598,6 +602,7 @@ export function ActionCard({
             ) : (
               <span />
             )}
+            {hideToggle ? null : (
             <Button
               size="sm"
               variant={open ? "secondary" : "ghost"}
@@ -610,6 +615,7 @@ export function ActionCard({
                 aria-hidden
               />
             </Button>
+            )}
           </div>
         </div>
 
@@ -773,4 +779,75 @@ function EffortPill({ effort }: { effort: Effort }) {
       Esfuerzo {effort}
     </span>
   );
+}
+
+/** The small card of the board: enough to choose, the rest is in the pop-up. */
+export function TaskTile({
+  action,
+  title,
+  onOpen,
+}: {
+  action: Action;
+  title: string;
+  onOpen: () => void;
+}) {
+  const meta = KIND_META[action.kind];
+  const tone = TONES[meta.tone];
+  const Icon = meta.icon;
+  const isLoss = action.kind === "loss";
+  const path = action.kind === "cannibal" || !action.page ? null : pathOf(action.page);
+  return (
+    <button
+      type="button"
+      data-task-id={action.id}
+      onClick={onOpen}
+      className={`group w-full space-y-2 rounded-lg border border-border border-l-4 bg-card p-3 text-left shadow-xs transition hover:-translate-y-0.5 hover:shadow-md focus-visible:ring-3 focus-visible:ring-ring/50 ${tone.border}`}
+    >
+      <span className="flex items-center justify-between gap-2">
+        <span
+          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${tone.soft} ${tone.text}`}
+        >
+          <Icon className="size-3" aria-hidden />
+          {meta.label}
+        </span>
+        {action.gain !== null ? (
+          <span
+            className={`text-sm font-bold tabular-nums ${isLoss ? "text-destructive" : "text-success"}`}
+          >
+            {isLoss ? "−" : "+"}
+            {integer.format(action.gain)}
+          </span>
+        ) : null}
+      </span>
+      <span className="line-clamp-2 block text-sm leading-snug font-medium">
+        {title}
+      </span>
+      {path ? (
+        <span className="block truncate font-mono text-[11px] text-muted-foreground">
+          {path}
+        </span>
+      ) : null}
+      <span className="flex items-center justify-between gap-2">
+        <span className="line-clamp-1 text-xs text-muted-foreground">
+          {action.stats
+            .slice(0, 2)
+            .map((stat) => `${stat.label} ${stat.value}`)
+            .join(" · ")}
+        </span>
+        <EffortMeter effort={action.effort} />
+      </span>
+    </button>
+  );
+}
+
+/** The title shown for a task: the page title when read, else its path. */
+export function taskTitle(
+  action: Action,
+  signals: Map<string, PageSignals>,
+): string {
+  if (action.kind === "cannibal") return `«${action.query ?? ""}»`;
+  const info = action.page ? signals.get(action.page) : undefined;
+  if (info?.ok && info.title) return info.title;
+  const path = action.page ? pathOf(action.page) : null;
+  return path === "/" ? "Página de inicio" : (path ?? `«${action.query ?? ""}»`);
 }

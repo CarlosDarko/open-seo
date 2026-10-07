@@ -5,6 +5,11 @@ import { PageHeader } from "@/client/components/PageHeader";
 import { QueryError } from "@/client/components/QueryState";
 import { Button } from "@/client/components/ui/button";
 import { Card, CardContent } from "@/client/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+} from "@/client/components/ui/dialog";
 import { Skeleton } from "@/client/components/ui/skeleton";
 import { actionKey } from "@/custom/radar/actionKey";
 import {
@@ -17,6 +22,8 @@ import {
   ActionCard,
   KIND_META,
   KIND_ORDER,
+  TaskTile,
+  taskTitle,
   usePlanSignals,
 } from "@/custom/radar/client/ActionPlan";
 import { AlertsBanner } from "@/custom/radar/client/AlertsBanner";
@@ -29,13 +36,31 @@ import {
   markActionDone,
 } from "@/serverFunctions/radarTracking";
 
-const TILE_TONE: Record<string, string> = {
-  destructive: "text-destructive bg-destructive/10",
-  primary: "text-primary bg-primary/10",
-  success: "text-success bg-success/10",
-  info: "text-info bg-info/10",
-  warning: "text-warning bg-warning/10",
-};
+const COLUMNS: {
+  effort: Effort;
+  title: string;
+  hint: string;
+  badge: string;
+}[] = [
+  {
+    effort: "bajo",
+    title: "Rápidas de ganar",
+    hint: "Unos minutos de trabajo",
+    badge: "bg-success/15 text-success",
+  },
+  {
+    effort: "medio",
+    title: "Una tarde",
+    hint: "Esfuerzo medio",
+    badge: "bg-warning/15 text-warning",
+  },
+  {
+    effort: "alto",
+    title: "Más trabajo",
+    hint: "Varias horas, normalmente contenido",
+    badge: "bg-destructive/15 text-destructive",
+  },
+];
 
 const EMPTY_PLAN = {
   losses: [],
@@ -52,8 +77,7 @@ export function ActionPlanPage({ projectId }: { projectId: string }) {
   const queryClient = useQueryClient();
   const [view, setView] = useState<"todo" | "done">("todo");
   const [filter, setFilter] = useState<ActionKind | "all">("all");
-  const [effort, setEffort] = useState<Effort | "all">("all");
-  const [openIds, setOpenIds] = useState<Set<string>>(new Set());
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const tracked = useQuery({
     queryKey: ["radar-tracked", projectId],
@@ -82,27 +106,12 @@ export function ActionPlanPage({ projectId }: { projectId: string }) {
   const plan = useMemo(() => (report ? buildActions(report) : null), [report]);
   const { signals, loading } = usePlanSignals(projectId, plan ?? EMPTY_PLAN);
 
-  // Tasks already marked as done leave the list and move to "Hechas".
-  const matches = (action: Action) =>
-    !doneKeys.has(actionKey(action)) &&
-    (effort === "all" || action.effort === effort);
+  // Tasks already marked as done leave the board and move to "Hechas".
+  const matches = (action: Action) => !doneKeys.has(actionKey(action));
 
   const counts = KIND_ORDER.map((kind) => ({
     kind,
     count: plan ? plan[KIND_META[kind].planKey].filter(matches).length : 0,
-  }));
-  const effortCounts = (["bajo", "medio", "alto"] as const).map((level) => ({
-    level,
-    count: plan
-      ? KIND_ORDER.reduce(
-          (sum, kind) =>
-            sum +
-            plan[KIND_META[kind].planKey].filter(
-              (a) => !doneKeys.has(actionKey(a)) && a.effort === level,
-            ).length,
-          0,
-        )
-      : 0,
   }));
   const total = counts.reduce((sum, item) => sum + item.count, 0);
   const quickGain = plan
@@ -110,14 +119,21 @@ export function ActionPlanPage({ projectId }: { projectId: string }) {
         .filter(matches)
         .reduce((sum, action) => sum + (action.gain ?? 0), 0)
     : 0;
-  const visibleIds = plan
+  const visible = plan
     ? KIND_ORDER.filter((kind) => filter === "all" || filter === kind).flatMap(
-        (kind) =>
-          plan[KIND_META[kind].planKey].filter(matches).map((action) => action.id),
+        (kind) => plan[KIND_META[kind].planKey].filter(matches),
       )
     : [];
-  const allOpen =
-    visibleIds.length > 0 && visibleIds.every((id) => openIds.has(id));
+  const allActions = plan
+    ? KIND_ORDER.flatMap((kind) => plan[KIND_META[kind].planKey])
+    : [];
+  const selected = allActions.find((action) => action.id === selectedId) ?? null;
+  const columns = COLUMNS.map((column) => ({
+    ...column,
+    items: visible
+      .filter((action) => action.effort === column.effort)
+      .sort((a, b) => (b.gain ?? 0) - (a.gain ?? 0)),
+  }));
 
   // A link from the Panel (?task=<id>) opens that task's card and scrolls to it.
   useEffect(() => {
@@ -126,27 +142,11 @@ export function ActionPlanPage({ projectId }: { projectId: string }) {
     if (!id) return;
     setView("todo");
     setFilter("all");
-    setEffort("all");
-    setOpenIds((previous) => new Set(previous).add(id));
-    const timer = window.setTimeout(() => {
-      const card = Array.from(
-        document.querySelectorAll<HTMLElement>("[data-task-id]"),
-      ).find((element) => element.dataset.taskId === id);
-      card?.scrollIntoView({ block: "center", behavior: "smooth" });
-    }, 150);
-    return () => window.clearTimeout(timer);
+    setSelectedId(id);
   }, [plan]);
 
-  const toggle = (id: string) =>
-    setOpenIds((previous) => {
-      const next = new Set(previous);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-6 px-4 py-6 md:px-6">
+    <div className="mx-auto w-full max-w-7xl space-y-5 px-4 py-6 md:px-6">
       <PageHeader
         title="Plan de acción"
         description="Tareas concretas para mejorar el SEO, agrupadas por tipo. Cada una dice qué hacer y, al desplegarla, por qué y cómo. Márcalas como hechas para medir su efecto semanas después. Datos de Search Console y lectura de tu web: sin gasto en DataForSEO."
@@ -223,107 +223,40 @@ export function ActionPlanPage({ projectId }: { projectId: string }) {
             />
           ) : (
             <>
-              <div className="space-y-3">
-                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-                  <button
-                    type="button"
-                    onClick={() => setFilter("all")}
-                    aria-pressed={filter === "all"}
-                    className={`rounded-lg border p-3 text-left transition-colors ${
-                      filter === "all"
-                        ? "border-primary bg-primary/5"
-                        : "border-border bg-card hover:bg-muted/50"
-                    }`}
-                  >
-                    <p className="text-sm font-semibold">Todas ({total})</p>
-                    <p className="text-xs text-muted-foreground">
-                      Todas las tareas del plan
-                    </p>
-                  </button>
-                  {counts.map(({ kind, count }) => {
-                    const meta = KIND_META[kind];
-                    const Icon = meta.icon;
-                    return (
-                      <button
-                        key={kind}
-                        type="button"
-                        disabled={count === 0}
-                        onClick={() => setFilter(kind)}
-                        aria-pressed={filter === kind}
-                        className={`flex gap-2 rounded-lg border p-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-                          filter === kind
-                            ? "border-primary bg-primary/5"
-                            : "border-border bg-card hover:bg-muted/50"
-                        }`}
-                      >
-                        <span
-                          className={`flex size-7 shrink-0 items-center justify-center rounded-full ${TILE_TONE[meta.tone]}`}
-                        >
-                          <Icon className="size-4" aria-hidden />
-                        </span>
-                        <span className="min-w-0">
-                          <span className="block text-sm font-semibold">
-                            {meta.label} ({count})
-                          </span>
-                          <span className="block text-xs text-muted-foreground">
-                            {meta.summary}
-                          </span>
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-sm font-medium">Esfuerzo:</span>
-                  {(
-                    [
-                      { value: "all", label: "Todos" },
-                      ...effortCounts.map((item) => ({
-                        value: item.level,
-                        label: `${item.level.charAt(0).toUpperCase()}${item.level.slice(1)} (${item.count})`,
-                      })),
-                    ] as { value: Effort | "all"; label: string }[]
-                  ).map((item) => (
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  size="sm"
+                  variant={filter === "all" ? "default" : "outline"}
+                  onClick={() => setFilter("all")}
+                >
+                  Todas ({total})
+                </Button>
+                {counts.map(({ kind, count }) => {
+                  const meta = KIND_META[kind];
+                  const Icon = meta.icon;
+                  return (
                     <Button
-                      key={item.value}
+                      key={kind}
                       size="sm"
-                      variant={effort === item.value ? "default" : "outline"}
-                      onClick={() => setEffort(item.value)}
+                      variant={filter === kind ? "default" : "outline"}
+                      disabled={count === 0}
+                      onClick={() => setFilter(kind)}
+                      title={meta.summary}
                     >
-                      {item.label}
+                      <Icon className="size-3.5" aria-hidden />
+                      {meta.label} ({count})
                     </Button>
-                  ))}
-                  <span className="text-xs text-muted-foreground">
-                    Bajo: unos minutos · Medio: una tarde · Alto: varias horas
-                    de trabajo en contenido
+                  );
+                })}
+                {quickGain > 0 ? (
+                  <span className="ml-auto text-sm text-muted-foreground">
+                    Las rápidas suman unos{" "}
+                    <strong className="text-foreground">
+                      +{integer.format(quickGain)} clics
+                    </strong>{" "}
+                    (estimación)
                   </span>
-                </div>
-
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  {quickGain > 0 ? (
-                    <p className="text-sm text-muted-foreground">
-                      Títulos y metas, subir y preguntas suman unos{" "}
-                      <strong className="text-foreground">
-                        +{integer.format(quickGain)} clics
-                      </strong>{" "}
-                      al periodo (estimación, no promesa).
-                    </p>
-                  ) : (
-                    <span />
-                  )}
-                  {visibleIds.length > 0 ? (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() =>
-                        setOpenIds(allOpen ? new Set() : new Set(visibleIds))
-                      }
-                    >
-                      {allOpen ? "Plegar todo" : "Desplegar todo"}
-                    </Button>
-                  ) : null}
-                </div>
+                ) : null}
               </div>
 
               {total === 0 ? (
@@ -334,42 +267,78 @@ export function ActionPlanPage({ projectId }: { projectId: string }) {
                     marcado como hechas. Prueba con un periodo más largo.
                   </CardContent>
                 </Card>
-              ) : null}
+              ) : (
+                <div className="grid items-start gap-4 lg:grid-cols-3">
+                  {columns.map((column) => (
+                    <section
+                      key={column.effort}
+                      className="rounded-xl border border-border bg-muted/30"
+                    >
+                      <header className="flex items-center justify-between gap-2 border-b border-border p-3">
+                        <div>
+                          <h2 className="text-sm font-semibold">
+                            {column.title}
+                          </h2>
+                          <p className="text-xs text-muted-foreground">
+                            {column.hint}
+                          </p>
+                        </div>
+                        <span
+                          className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${column.badge}`}
+                        >
+                          {column.items.length}
+                        </span>
+                      </header>
+                      <div className="max-h-[70vh] space-y-2 overflow-y-auto p-2.5">
+                        {column.items.length === 0 ? (
+                          <p className="px-1 py-4 text-center text-xs text-muted-foreground">
+                            Nada aquí con este filtro.
+                          </p>
+                        ) : (
+                          column.items.map((action) => (
+                            <TaskTile
+                              key={action.id}
+                              action={action}
+                              title={taskTitle(action, signals)}
+                              onOpen={() => setSelectedId(action.id)}
+                            />
+                          ))
+                        )}
+                      </div>
+                    </section>
+                  ))}
+                </div>
+              )}
 
-              {KIND_ORDER.filter(
-                (kind) => filter === "all" || filter === kind,
-              ).map((kind) => {
-                const meta = KIND_META[kind];
-                const actions = plan[meta.planKey].filter(matches);
-                if (actions.length === 0) return null;
-                return (
-                  <section key={kind} className="space-y-3">
-                    <div>
-                      <h2 className="text-lg font-semibold">{meta.title}</h2>
-                      <p className="text-sm text-muted-foreground">
-                        {meta.help}
-                      </p>
-                    </div>
-                    {actions.map((action) => (
-                      <ActionCard
-                        key={action.id}
-                        action={action}
-                        signals={signals}
-                        loadingSignals={loading}
-                        open={openIds.has(action.id)}
-                        onToggle={() => toggle(action.id)}
-                        onMarkDone={(title) =>
-                          markDone.mutate({ action, title })
-                        }
-                        marking={
-                          markDone.isPending &&
-                          markDone.variables?.action.id === action.id
-                        }
-                      />
-                    ))}
-                  </section>
-                );
-              })}
+              <Dialog
+                open={selected !== null}
+                onOpenChange={(open) => {
+                  if (!open) setSelectedId(null);
+                }}
+              >
+                <DialogContent className="max-h-[90vh] gap-0 p-0 sm:max-w-4xl">
+                  <DialogTitle className="sr-only">
+                    {selected ? taskTitle(selected, signals) : "Tarea"}
+                  </DialogTitle>
+                  {selected ? (
+                    <ActionCard
+                      action={selected}
+                      signals={signals}
+                      loadingSignals={loading}
+                      open
+                      hideToggle
+                      onToggle={() => undefined}
+                      onMarkDone={(title) =>
+                        markDone.mutate(
+                          { action: selected, title },
+                          { onSuccess: () => setSelectedId(null) },
+                        )
+                      }
+                      marking={markDone.isPending}
+                    />
+                  ) : null}
+                </DialogContent>
+              </Dialog>
             </>
           )}
         </div>
