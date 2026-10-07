@@ -14,6 +14,13 @@ export const SOURCE_PATCHES = [
     to: 'import { HomePage as DashboardPage } from "@/custom/dashboard/HomePage";',
   },
   {
+    // Inside a project the audit starts from the project's own domain
+    // instead of asking for a URL (src/custom/audit/ProjectLaunchView.tsx).
+    file: "src/routes/_app/p/$projectId/audit/index.tsx",
+    from: 'import { LaunchView } from "@/client/features/audit/launch/LaunchView";',
+    to: 'import { ProjectLaunchView as LaunchView } from "@/custom/audit/ProjectLaunchView";',
+  },
+  {
     // The project dropdown filters its list with the combobox's internal
     // text, which can keep the name of the previously selected project: the
     // list then shows only some projects, or none. With few projects there is
