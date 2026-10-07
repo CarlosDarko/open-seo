@@ -892,7 +892,7 @@ function TopicsCard({
 }) {
   const rows =
     topics && topics.connected
-      ? topics.topics.filter((topic) => topic.label !== OTHERS).slice(0, 5)
+      ? topics.topics.filter((topic) => topic.label !== OTHERS).slice(0, 9)
       : [];
   const max = Math.max(1, ...rows.map((topic) => topic.clicks));
   return (
