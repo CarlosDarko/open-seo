@@ -32,7 +32,6 @@ const LAYOUT: { label: string; paths: string[]; collapsible?: boolean }[] = [
       "/p/$projectId/action-plan",
       "/p/$projectId/topics",
       "/p/$projectId/indexing",
-      "/p/$projectId/audit",
     ],
   },
   {
@@ -56,11 +55,12 @@ const LAYOUT: { label: string; paths: string[]; collapsible?: boolean }[] = [
     label: "Herramientas de IA",
     paths: ["/p/$projectId/reports", "/p/$projectId/context", "/ai"],
   },
-  // Kept reachable but out of the way: the Radar covers what this shows, and
-  // it keeps the filters and exports of the original Search Console view.
+  // Kept reachable but out of the way: the Radar covers what Search Console
+  // Insights shows, and the site audit needs the paid Workers plan to crawl
+  // more than ~40 pages (free plan: 50 subrequests per invocation).
   {
     label: "Más herramientas",
-    paths: ["/p/$projectId/search-performance"],
+    paths: ["/p/$projectId/search-performance", "/p/$projectId/audit"],
     collapsible: true,
   },
 ];
