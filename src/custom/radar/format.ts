@@ -39,8 +39,9 @@ export function googleSearchUrl(query: string): string {
   return `https://www.google.com/search?q=${encodeURIComponent(query)}`;
 }
 
+/** A position in a table: whole, since a decimal says nothing there. */
 export function position(value: number | null): string {
-  return value === null ? "—" : decimal.format(value);
+  return value === null ? "—" : integer.format(value);
 }
 
 /** "1 clic" / "5 clics". */

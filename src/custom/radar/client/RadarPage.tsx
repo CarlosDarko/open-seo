@@ -1,11 +1,9 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { Bar, BarChart } from "recharts";
 import {
   ArrowDownRight,
   ArrowUpRight,
-  ChevronDown,
-  ChevronUp,
   Layers,
   ListChecks,
   Tag,
@@ -43,6 +41,7 @@ import { RadarControls } from "@/custom/radar/client/RadarControls";
 import { PageLink } from "@/custom/radar/client/RadarLinks";
 import { RadarTables } from "@/custom/radar/client/RadarTables";
 import { DailyChart } from "@/custom/radar/client/DailyChart";
+import { GainLoss } from "@/custom/radar/client/GainLoss";
 import { Segments, type SegmentSet } from "@/custom/radar/client/Segments";
 import { useRadarReport } from "@/custom/radar/client/useRadarReport";
 import {
@@ -87,7 +86,6 @@ const CAUSE_SHORT: Record<ChangeCause, string> = {
 
 export function RadarPage({ projectId }: { projectId: string }) {
   const { filters, update, query, report } = useRadarReport(projectId);
-  const [showData, setShowData] = useState(false);
 
   return (
     <div className="mx-auto w-full max-w-6xl space-y-6 px-4 py-6 md:px-6">
@@ -128,26 +126,23 @@ export function RadarPage({ projectId }: { projectId: string }) {
             <TrendCard report={report} />
             <BandsCard report={report} />
           </div>
+          {report.period.comparable ? <GainLoss report={report} /> : null}
           <Segments
             sets={segmentSets(report)}
             comparable={report.period.comparable}
           />
-          <section className="space-y-3">
-            <Button
-              variant="outline"
-              onClick={() => setShowData((open) => !open)}
-            >
-              {showData ? (
-                <ChevronUp className="size-4" />
-              ) : (
-                <ChevronDown className="size-4" />
-              )}
-              {showData
-                ? "Ocultar los datos completos"
-                : "Ver los datos completos"}
-            </Button>
-            {showData ? <RadarTables report={report} /> : null}
-          </section>
+          <Card>
+            <CardHeader>
+              <CardTitle>Más datos</CardTitle>
+              <p className="text-xs text-muted-foreground">
+                Oportunidades, páginas que compiten entre sí y consultas nuevas
+                o perdidas.
+              </p>
+            </CardHeader>
+            <CardContent>
+              <RadarTables report={report} />
+            </CardContent>
+          </Card>
         </div>
       ) : null}
     </div>

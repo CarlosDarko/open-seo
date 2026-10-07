@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { PageHeader } from "@/client/components/PageHeader";
 import { QueryError } from "@/client/components/QueryState";
 import { Button } from "@/client/components/ui/button";
+import { DataTable } from "@/custom/radar/client/sortable";
 import {
   Card,
   CardContent,
@@ -263,58 +264,65 @@ export function IndexingPage({ projectId }: { projectId: string }) {
                 Lo que Search Console dice de cada sitemap que has enviado.
               </p>
             </div>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Sitemap</TableHead>
-                  <TableHead className="text-right">Última lectura</TableHead>
-                  <TableHead className="text-right">URLs enviadas</TableHead>
-                  <TableHead className="text-right">Errores</TableHead>
-                  <TableHead className="text-right">Avisos</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {data.sitemaps.length === 0 ? (
-                  <TableRow>
-                    <TableCell
-                      colSpan={5}
-                      className="py-6 text-center text-muted-foreground"
-                    >
-                      No hay ningún sitemap enviado en Search Console. Envíalo
-                      en «Sitemaps» para que Google lo lea con regularidad.
-                    </TableCell>
-                  </TableRow>
-                ) : null}
-                {data.sitemaps.map((sitemap) => (
-                  <TableRow key={sitemap.path}>
-                    <TableCell className="min-w-64">
+            <DataTable
+              rows={data.sitemaps}
+              rowKey={(sitemap) => sitemap.path}
+              empty="No hay ningún sitemap enviado en Search Console. Envíalo en «Sitemaps» para que Google lo lea con regularidad."
+              columns={[
+                {
+                  label: "Sitemap",
+                  text: true,
+                  value: (sitemap) => sitemap.path,
+                  render: (sitemap) => (
+                    <>
                       <PageLink url={sitemap.path} />
                       {sitemap.isIndex ? (
                         <span className="ml-1 text-xs text-muted-foreground">
                           (índice)
                         </span>
                       ) : null}
-                    </TableCell>
-                    <TableCell className="text-right whitespace-nowrap tabular-nums">
-                      {day(sitemap.lastDownloaded)}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {integer.format(sitemap.submitted)}
-                    </TableCell>
-                    <TableCell
-                      className={`text-right tabular-nums ${sitemap.errors > 0 ? "font-semibold text-destructive" : ""}`}
+                    </>
+                  ),
+                },
+                {
+                  label: "Última lectura",
+                  value: (sitemap) => sitemap.lastDownloaded,
+                  render: (sitemap) => day(sitemap.lastDownloaded),
+                  className: "text-right whitespace-nowrap tabular-nums",
+                },
+                {
+                  label: "URLs enviadas",
+                  value: (sitemap) => sitemap.submitted,
+                  render: (sitemap) => integer.format(sitemap.submitted),
+                },
+                {
+                  label: "Errores",
+                  value: (sitemap) => sitemap.errors,
+                  render: (sitemap) => (
+                    <span
+                      className={
+                        sitemap.errors > 0
+                          ? "font-semibold text-destructive"
+                          : ""
+                      }
                     >
                       {integer.format(sitemap.errors)}
-                    </TableCell>
-                    <TableCell
-                      className={`text-right tabular-nums ${sitemap.warnings > 0 ? "text-warning" : ""}`}
+                    </span>
+                  ),
+                },
+                {
+                  label: "Avisos",
+                  value: (sitemap) => sitemap.warnings,
+                  render: (sitemap) => (
+                    <span
+                      className={sitemap.warnings > 0 ? "text-warning" : ""}
                     >
                       {integer.format(sitemap.warnings)}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                    </span>
+                  ),
+                },
+              ]}
+            />
           </TableCard>
 
           {data.sections.length > 0 ? (
@@ -327,36 +335,45 @@ export function IndexingPage({ projectId }: { projectId: string }) {
                   ignorado o sin indexar.
                 </p>
               </div>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Sección</TableHead>
-                    <TableHead className="text-right">En el sitemap</TableHead>
-                    <TableHead className="text-right">
-                      Sin impresiones
-                    </TableHead>
-                    <TableHead className="text-right">Porcentaje</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {data.sections.map((section) => (
-                    <TableRow key={section.label}>
-                      <TableCell>{section.label}</TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {integer.format(section.inSitemap)}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {integer.format(section.unseen)}
-                      </TableCell>
-                      <TableCell
-                        className={`text-right tabular-nums ${section.unseen / section.inSitemap > 0.5 ? "font-semibold text-destructive" : ""}`}
+              <DataTable
+                rows={data.sections}
+                rowKey={(section) => section.label}
+                initial={{ col: 3, dir: "desc" }}
+                columns={[
+                  {
+                    label: "Sección",
+                    text: true,
+                    value: (section) => section.label,
+                    render: (section) => section.label,
+                    className: "",
+                  },
+                  {
+                    label: "En el sitemap",
+                    value: (section) => section.inSitemap,
+                    render: (section) => integer.format(section.inSitemap),
+                  },
+                  {
+                    label: "Sin impresiones",
+                    value: (section) => section.unseen,
+                    render: (section) => integer.format(section.unseen),
+                  },
+                  {
+                    label: "Porcentaje",
+                    value: (section) => section.unseen / section.inSitemap,
+                    render: (section) => (
+                      <span
+                        className={
+                          section.unseen / section.inSitemap > 0.5
+                            ? "font-semibold text-destructive"
+                            : ""
+                        }
                       >
                         {percent.format(section.unseen / section.inSitemap)}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                      </span>
+                    ),
+                  },
+                ]}
+              />
             </TableCard>
           ) : null}
 
@@ -469,30 +486,29 @@ export function IndexingPage({ projectId }: { projectId: string }) {
                   parámetros o duplicados, revisa su canónica.
                 </p>
               </div>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>URL</TableHead>
-                    <TableHead className="text-right">Impresiones</TableHead>
-                    <TableHead className="text-right">Clics</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {data.notInSitemap.map((item) => (
-                    <TableRow key={item.url}>
-                      <TableCell className="min-w-72">
-                        <PageLink url={item.url} />
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {integer.format(item.impressions)}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {integer.format(item.clicks)}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+              <DataTable
+                rows={data.notInSitemap}
+                rowKey={(item) => item.url}
+                columns={[
+                  {
+                    label: "URL",
+                    text: true,
+                    value: (item) => item.url,
+                    render: (item) => <PageLink url={item.url} />,
+                    className: "min-w-72",
+                  },
+                  {
+                    label: "Impresiones",
+                    value: (item) => item.impressions,
+                    render: (item) => integer.format(item.impressions),
+                  },
+                  {
+                    label: "Clics",
+                    value: (item) => item.clicks,
+                    render: (item) => integer.format(item.clicks),
+                  },
+                ]}
+              />
             </TableCard>
           ) : null}
         </>

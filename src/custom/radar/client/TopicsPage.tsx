@@ -14,6 +14,7 @@ import {
   ChartYAxis,
 } from "@/client/components/ChartAxes";
 import { PageHeader } from "@/client/components/PageHeader";
+import { SortableHead, useSort } from "@/custom/radar/client/sortable";
 import { QueryError } from "@/client/components/QueryState";
 import { Button } from "@/client/components/ui/button";
 import {
@@ -401,6 +402,19 @@ function TopicsTable({
   comparable: boolean;
 }) {
   const [open, setOpen] = useState<string | null>(null);
+  const sort = useSort(
+    topics,
+    (topic) => [
+      topic.label,
+      topic.queries,
+      topic.clicks,
+      topic.clicks - topic.prev.clicks,
+      topic.impressions,
+      topic.impressions > 0 ? topic.position : null,
+      topic.nearTopShare,
+    ],
+    { col: 2, dir: "desc" },
+  );
   return (
     <TableCard>
       <div className="border-b border-border p-4">
@@ -414,19 +428,39 @@ function TopicsTable({
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Tema</TableHead>
-            <TableHead className="text-right">Consultas</TableHead>
-            <TableHead className="text-right">Clics</TableHead>
+            <SortableHead
+              col={0}
+              state={sort.state}
+              onToggle={sort.toggle}
+              text
+              align="left"
+            >
+              Tema
+            </SortableHead>
+            <SortableHead col={1} state={sort.state} onToggle={sort.toggle}>
+              Consultas
+            </SortableHead>
+            <SortableHead col={2} state={sort.state} onToggle={sort.toggle}>
+              Clics
+            </SortableHead>
             {comparable ? (
-              <TableHead className="text-right">Cambio</TableHead>
+              <SortableHead col={3} state={sort.state} onToggle={sort.toggle}>
+                Cambio
+              </SortableHead>
             ) : null}
-            <TableHead className="text-right">Impresiones</TableHead>
-            <TableHead className="text-right">Posición</TableHead>
-            <TableHead className="text-right">Al alcance</TableHead>
+            <SortableHead col={4} state={sort.state} onToggle={sort.toggle}>
+              Impresiones
+            </SortableHead>
+            <SortableHead col={5} state={sort.state} onToggle={sort.toggle}>
+              Posición
+            </SortableHead>
+            <SortableHead col={6} state={sort.state} onToggle={sort.toggle}>
+              Al alcance
+            </SortableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {topics.map((topic) => {
+          {sort.rows.map((topic) => {
             const delta = topic.clicks - topic.prev.clicks;
             const isOpen = open === topic.id;
             return (
@@ -473,7 +507,7 @@ function TopicsTable({
                   </TableCell>
                   <TableCell className="text-right tabular-nums">
                     {topic.impressions > 0
-                      ? decimal.format(topic.position)
+                      ? integer.format(topic.position)
                       : "—"}
                   </TableCell>
                   <TableCell className="text-right tabular-nums">

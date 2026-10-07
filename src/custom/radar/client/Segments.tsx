@@ -30,13 +30,13 @@ import {
 } from "@/client/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/client/components/ui/tabs";
 import {
-  decimal,
   integer,
   percent,
   relativeChange,
   pathOf,
   signed,
 } from "@/custom/radar/format";
+import { SortableHead, useSort } from "@/custom/radar/client/sortable";
 import type { Segment, SegmentMember } from "@/custom/radar/radarSegments";
 
 const chartConfig = {
@@ -97,8 +97,21 @@ export function Segments({
   const [key, setKey] = useState(sets[0]?.key ?? "");
   const [openLabel, setOpenLabel] = useState<string | null>(null);
   const active = sets.find((set) => set.key === key) ?? sets[0];
+  const baseRows = active?.segments.slice(0, 8) ?? [];
+  const sort = useSort(
+    baseRows,
+    (segment) => [
+      segment.label,
+      segment.clicks,
+      segment.clicks - segment.prevClicks,
+      segment.impressions,
+      segment.ctr,
+      segment.position,
+    ],
+    { col: 1, dir: "desc" },
+  );
   if (!active) return null;
-  const rows = active.segments.slice(0, 8);
+  const rows = baseRows;
   const insight = segmentInsight(active.segments, comparable);
 
   return (
@@ -201,18 +214,56 @@ export function Segments({
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>{active.title}</TableHead>
-                  <TableHead className="text-right">Clics</TableHead>
+                  <SortableHead
+                    col={0}
+                    state={sort.state}
+                    onToggle={sort.toggle}
+                    text
+                    align="left"
+                  >
+                    {active.title}
+                  </SortableHead>
+                  <SortableHead
+                    col={1}
+                    state={sort.state}
+                    onToggle={sort.toggle}
+                  >
+                    Clics
+                  </SortableHead>
                   {comparable ? (
-                    <TableHead className="text-right">Cambio</TableHead>
+                    <SortableHead
+                      col={2}
+                      state={sort.state}
+                      onToggle={sort.toggle}
+                    >
+                      Cambio
+                    </SortableHead>
                   ) : null}
-                  <TableHead className="text-right">Impresiones</TableHead>
-                  <TableHead className="text-right">CTR</TableHead>
-                  <TableHead className="text-right">Posición</TableHead>
+                  <SortableHead
+                    col={3}
+                    state={sort.state}
+                    onToggle={sort.toggle}
+                  >
+                    Impresiones
+                  </SortableHead>
+                  <SortableHead
+                    col={4}
+                    state={sort.state}
+                    onToggle={sort.toggle}
+                  >
+                    CTR
+                  </SortableHead>
+                  <SortableHead
+                    col={5}
+                    state={sort.state}
+                    onToggle={sort.toggle}
+                  >
+                    Posición
+                  </SortableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rows.map((segment) => {
+                {sort.rows.map((segment) => {
                   const delta = segment.clicks - segment.prevClicks;
                   const isOpen = openLabel === segment.label;
                   return (
@@ -263,7 +314,7 @@ export function Segments({
                         <TableCell className="text-right whitespace-nowrap tabular-nums">
                           {segment.position === null
                             ? "—"
-                            : decimal.format(segment.position)}
+                            : integer.format(segment.position)}
                         </TableCell>
                       </TableRow>
                       {isOpen ? (
@@ -302,26 +353,81 @@ function MemberTable({
   total: number;
   comparable: boolean;
 }) {
+  const sort = useSort(
+    members,
+    (member) => [
+      member.key,
+      member.clicks,
+      member.clicks - member.prevClicks,
+      member.impressions,
+      member.ctr,
+      member.position,
+    ],
+    { col: 1, dir: "desc" },
+  );
+  const head = "h-7 px-2 text-xs font-medium";
   return (
     <div className="space-y-1 px-3 py-2">
       <div className="max-h-72 overflow-y-auto">
         <table className="w-full text-xs">
           <thead className="sticky top-0 bg-muted text-muted-foreground">
             <tr>
-              <th className="py-1 pr-2 text-left font-medium">
+              <SortableHead
+                col={0}
+                state={sort.state}
+                onToggle={sort.toggle}
+                text
+                align="left"
+                className={head}
+              >
                 Página o consulta
-              </th>
-              <th className="px-2 py-1 text-right font-medium">Clics</th>
+              </SortableHead>
+              <SortableHead
+                col={1}
+                state={sort.state}
+                onToggle={sort.toggle}
+                className={head}
+              >
+                Clics
+              </SortableHead>
               {comparable ? (
-                <th className="px-2 py-1 text-right font-medium">Cambio</th>
+                <SortableHead
+                  col={2}
+                  state={sort.state}
+                  onToggle={sort.toggle}
+                  className={head}
+                >
+                  Cambio
+                </SortableHead>
               ) : null}
-              <th className="px-2 py-1 text-right font-medium">Impresiones</th>
-              <th className="px-2 py-1 text-right font-medium">CTR</th>
-              <th className="py-1 pl-2 text-right font-medium">Posición</th>
+              <SortableHead
+                col={3}
+                state={sort.state}
+                onToggle={sort.toggle}
+                className={head}
+              >
+                Impresiones
+              </SortableHead>
+              <SortableHead
+                col={4}
+                state={sort.state}
+                onToggle={sort.toggle}
+                className={head}
+              >
+                CTR
+              </SortableHead>
+              <SortableHead
+                col={5}
+                state={sort.state}
+                onToggle={sort.toggle}
+                className={head}
+              >
+                Posición
+              </SortableHead>
             </tr>
           </thead>
           <tbody>
-            {members.map((member) => {
+            {sort.rows.map((member) => {
               const delta = member.clicks - member.prevClicks;
               const isUrl = /^https?:\/\//.test(member.key);
               return (
@@ -368,7 +474,7 @@ function MemberTable({
                   <td className="py-1 pl-2 text-right tabular-nums">
                     {member.position === null
                       ? "—"
-                      : decimal.format(member.position)}
+                      : integer.format(member.position)}
                   </td>
                 </tr>
               );

@@ -45,6 +45,13 @@ export const SOURCE_PATCHES = [
     to: "        <GoogleUpdateBanner ready={ready} />\n        {banner}",
   },
   {
+    // On the projects hub (no sidebar) the content reaches the top and the
+    // edges: no margin, rounded corner or border meant for the sidebar layout.
+    file: "src/client/layout/AppShell.tsx",
+    from: '<SidebarInset className="min-h-0 overflow-hidden md:!m-0 md:!mt-2 md:!rounded-none md:!rounded-tl-lg md:border-l md:border-t md:border-sidebar-border md:!shadow-none">',
+    to: '<SidebarInset className={location.pathname === "/" ? "min-h-0 overflow-hidden md:!m-0 md:!rounded-none md:!shadow-none" : "min-h-0 overflow-hidden md:!m-0 md:!mt-2 md:!rounded-none md:!rounded-tl-lg md:border-l md:border-t md:border-sidebar-border md:!shadow-none"}>',
+  },
+  {
     // The projects hub (the "/" page) has no project menu: no sidebar.
     file: "src/client/layout/AppShell.tsx",
     from: /<Sidebar\s+projectId=\{sidebarProjectId\}\s+projectPending=\{sidebarProjectPending\}\s+ready=\{ready\}\s+\/>/,

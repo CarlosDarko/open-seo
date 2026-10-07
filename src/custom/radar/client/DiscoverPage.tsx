@@ -33,6 +33,7 @@ import {
 } from "@/client/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/client/components/ui/tabs";
 import { DailyChart } from "@/custom/radar/client/DailyChart";
+import { SortableHead, useSort } from "@/custom/radar/client/sortable";
 import { RadarControls } from "@/custom/radar/client/RadarControls";
 import { PageLink } from "@/custom/radar/client/RadarLinks";
 import { Segments } from "@/custom/radar/client/Segments";
@@ -380,6 +381,17 @@ function TrendCard({ report }: { report: Report }) {
 
 function TopPages({ report }: { report: Report }) {
   const comparable = report.period.comparable;
+  const sort = useSort(
+    report.topPages,
+    (page) => [
+      page.url,
+      page.clicks,
+      page.clicks - page.prevClicks,
+      page.impressions,
+      page.ctr,
+    ],
+    { col: 1, dir: "desc" },
+  );
   return (
     <TableCard>
       <div className="border-b border-border p-4">
@@ -392,17 +404,33 @@ function TopPages({ report }: { report: Report }) {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Página</TableHead>
-            <TableHead className="text-right">Clics</TableHead>
+            <SortableHead
+              col={0}
+              state={sort.state}
+              onToggle={sort.toggle}
+              text
+              align="left"
+            >
+              Página
+            </SortableHead>
+            <SortableHead col={1} state={sort.state} onToggle={sort.toggle}>
+              Clics
+            </SortableHead>
             {comparable ? (
-              <TableHead className="text-right">Cambio</TableHead>
+              <SortableHead col={2} state={sort.state} onToggle={sort.toggle}>
+                Cambio
+              </SortableHead>
             ) : null}
-            <TableHead className="text-right">Impresiones</TableHead>
-            <TableHead className="text-right">CTR</TableHead>
+            <SortableHead col={3} state={sort.state} onToggle={sort.toggle}>
+              Impresiones
+            </SortableHead>
+            <SortableHead col={4} state={sort.state} onToggle={sort.toggle}>
+              CTR
+            </SortableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {report.topPages.map((page) => {
+          {sort.rows.map((page) => {
             const delta = page.clicks - page.prevClicks;
             return (
               <TableRow key={page.url}>
