@@ -1,16 +1,7 @@
 import { useMemo, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { Bar, BarChart } from "recharts";
-import {
-  ArrowDownRight,
-  ArrowUpRight,
-  Layers,
-  ListChecks,
-  Tag,
-  TrendingDown,
-  TrendingUp,
-  type LucideIcon,
-} from "lucide-react";
+import { TrendingDown, TrendingUp } from "lucide-react";
 import {
   ChartGrid,
   ChartXAxis,
@@ -38,7 +29,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/client/components/ui/tabs";
 import { buildActions, type RadarReport } from "@/custom/radar/actions";
 import { AlertsBanner } from "@/custom/radar/client/AlertsBanner";
 import { RadarControls } from "@/custom/radar/client/RadarControls";
-import { PageLink } from "@/custom/radar/client/RadarLinks";
+import { tileHeadline } from "@/custom/radar/client/ActionPlan";
 import { RadarTables } from "@/custom/radar/client/RadarTables";
 import { DailyChart } from "@/custom/radar/client/DailyChart";
 import { GainLoss } from "@/custom/radar/client/GainLoss";
@@ -51,8 +42,6 @@ import {
   relativeChange,
   signed,
 } from "@/custom/radar/format";
-import type { ChangeCause } from "@/custom/radar/radarAnalysis";
-import type { Segment } from "@/custom/radar/radarSegments";
 
 const shortDate = new Intl.DateTimeFormat("es-ES", {
   day: "2-digit",
@@ -74,15 +63,6 @@ const bandsConfig = {
   prevQueries: { label: "Periodo anterior", color: "var(--muted-foreground)" },
   queries: { label: "Este periodo", color: "var(--primary)" },
 } satisfies ChartConfig;
-
-const CAUSE_SHORT: Record<ChangeCause, string> = {
-  posicion: "por perder posición",
-  demanda: "porque se busca menos",
-  ctr: "por un CTR más bajo",
-  mixto: "por varias causas",
-  nueva: "página nueva",
-  perdida: "sin tráfico ahora",
-};
 
 export function RadarPage({ projectId }: { projectId: string }) {
   const { filters, update, query, report } = useRadarReport(projectId);
@@ -372,16 +352,9 @@ function Kpis({ report }: { report: RadarReport }) {
   );
 }
 
-function topShare(
-  segments: Segment[],
-): { label: string; share: number } | null {
-  const total = segments.reduce((sum, segment) => sum + segment.clicks, 0);
-  const top = segments[0];
-  return top && total > 0
-    ? { label: top.label, share: top.clicks / total }
-    : null;
-}
-
+/** The period in three columns, each with its own job and nothing repeated
+ *  from the figures above or from "what rises and what falls": how much the
+ *  clicks changed, which kinds of page explain it, and what to do first. */
 function Insights({
   projectId,
   report,
@@ -390,20 +363,23 @@ function Insights({
   report: RadarReport;
 }) {
   const comparable = report.period.comparable;
-  const clicksChange = comparable
-    ? relativeChange(report.totals.clicks, report.prevTotals.clicks)
+  const { totals, prevTotals, brand } = report;
+  const diff = totals.clicks - prevTotals.clicks;
+  const change = comparable
+    ? relativeChange(totals.clicks, prevTotals.clicks)
     : null;
-  const clicksDiff = report.totals.clicks - report.prevTotals.clicks;
-  const { brand } = report;
   const otherChange = comparable
     ? relativeChange(brand.otherClicks, brand.prevOtherClicks)
     : null;
-  const loser = comparable ? report.pageChanges.losers[0] : undefined;
-  const winner = comparable ? report.pageChanges.winners[0] : undefined;
-  const page = topShare(report.segments.pageType);
-  const intent = topShare(report.segments.intent);
+
   const plan = useMemo(() => buildActions(report), [report]);
-  const tasks =
+  const tasks = useMemo(() => {
+    const quick = [...plan.snippets, ...plan.pushes, ...plan.questions]
+      .sort((x, y) => (y.gain ?? 0) - (x.gain ?? 0))
+      .slice(0, 2);
+    return [...plan.losses.slice(0, 1), ...quick].slice(0, 3);
+  }, [plan]);
+  const totalTasks =
     plan.losses.length +
     plan.snippets.length +
     plan.pushes.length +
@@ -411,255 +387,210 @@ function Insights({
     plan.cannibals.length +
     plan.traction.length +
     plan.emerging.length;
-  const gain = [...plan.snippets, ...plan.pushes, ...plan.questions].reduce(
-    (sum, action) => sum + (action.gain ?? 0),
-    0,
-  );
 
-  const tiles: ReactNode[] = [];
-  if (!comparable) {
-    tiles.push(
-      <Tile
-        key="clicks"
-        tone="info"
-        icon={TrendingUp}
-        label="Clics del periodo"
-        value={integer.format(report.totals.clicks)}
-        detail={`${integer.format(report.totals.impressions)} impresiones`}
-      />,
-    );
-  }
-  if (clicksChange !== null) {
-    tiles.push(
-      <Tile
-        key="clicks"
-        tone={clicksDiff >= 0 ? "good" : "bad"}
-        icon={clicksDiff >= 0 ? TrendingUp : TrendingDown}
-        label={clicksDiff >= 0 ? "Clics al alza" : "Clics a la baja"}
-        value={`${clicksDiff >= 0 ? "+" : "−"}${percent.format(Math.abs(clicksChange))}`}
-        detail={`${signed(clicksDiff)} clics frente al periodo anterior`}
-      />,
-    );
-  }
-  if (brand.hasBrand) {
-    tiles.push(
-      <Tile
-        key="brand"
-        tone={otherChange !== null && otherChange < 0 ? "bad" : "info"}
-        icon={Tag}
-        label="Clics sin marca"
-        value={integer.format(brand.otherClicks)}
-        chip={
-          otherChange !== null
-            ? `${otherChange > 0 ? "+" : ""}${percent.format(otherChange)}`
-            : undefined
-        }
-        detail={`Con marca: ${integer.format(brand.clicks)} clics`}
-      />,
-    );
-  }
-  if (loser && loser.clicksDelta < 0) {
-    tiles.push(
-      <Tile
-        key="loser"
-        tone="bad"
-        icon={ArrowDownRight}
-        label="Mayor caída"
-        value={signed(loser.clicksDelta)}
-        chip={CAUSE_SHORT[loser.cause]}
-        detail={<PageRef url={loser.key} />}
-      />,
-    );
-  }
-  if (winner && winner.clicksDelta > 0) {
-    tiles.push(
-      <Tile
-        key="winner"
-        tone="good"
-        icon={ArrowUpRight}
-        label="Mayor subida"
-        value={signed(winner.clicksDelta)}
-        detail={<PageRef url={winner.key} />}
-      />,
-    );
-  }
-  if (page || intent) {
-    tiles.push(
-      <Tile
-        key="share"
-        tone="info"
-        icon={Layers}
-        label="Lo que más tráfico trae"
-        detail={
-          <span className="mt-1 block space-y-2">
-            {page ? <ShareBar kind="Páginas" item={page} /> : null}
-            {intent ? <ShareBar kind="Búsquedas" item={intent} /> : null}
-          </span>
-        }
-      />,
-    );
-  }
-  if (tasks > 0) {
-    tiles.push(
-      <Tile
-        key="plan"
-        tone="info"
-        icon={ListChecks}
-        label="Plan de acción"
-        value={`${tasks} tareas`}
-        detail={
-          <>
-            {gain > 0
-              ? `Unos +${integer.format(gain)} clics estimados en ${report.period.days} días. `
-              : ""}
-            <Link
-              to="/p/$projectId/action-plan"
-              params={{ projectId }}
-              className="font-semibold text-primary underline-offset-2 hover:underline"
-            >
-              Ver el plan →
-            </Link>
-          </>
-        }
-      />,
-    );
-  }
+  // Which kinds of page explain the change (or, without comparison, where the
+  // clicks arrive).
+  const sections = [...report.segments.pageType]
+    .map((segment) => ({
+      label: segment.label,
+      value: comparable ? segment.clicks - segment.prevClicks : segment.clicks,
+    }))
+    .filter((row) => row.value !== 0)
+    .sort((x, y) => Math.abs(y.value) - Math.abs(x.value))
+    .slice(0, 6);
+  const biggest = Math.max(1, ...sections.map((row) => Math.abs(row.value)));
+
+  const up = diff >= 0;
+  const Trend = up ? TrendingUp : TrendingDown;
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Lo importante</CardTitle>
+        <CardTitle>Resumen del periodo</CardTitle>
         <p className="text-xs text-muted-foreground">
-          Lo que más se ha movido en este periodo, de un vistazo.
+          Qué ha pasado, de dónde viene y qué hacer primero.
         </p>
       </CardHeader>
-      <CardContent>
-        {tiles.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            Aún no hay datos suficientes en este periodo.
-          </p>
-        ) : (
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {tiles}
-          </div>
-        )}
+      <CardContent className="grid gap-6 lg:grid-cols-3 lg:divide-x lg:divide-border">
+        <section className="space-y-3">
+          <ColumnTitle>
+            {comparable ? "Los clics" : "Clics del periodo"}
+          </ColumnTitle>
+          {comparable && change !== null ? (
+            <>
+              <p className="flex items-center gap-2">
+                <span
+                  className={`flex size-9 items-center justify-center rounded-full ${up ? "bg-success/15 text-success" : "bg-destructive/15 text-destructive"}`}
+                >
+                  <Trend className="size-5" aria-hidden />
+                </span>
+                <span
+                  className={`text-4xl leading-none font-bold tabular-nums ${up ? "text-success" : "text-destructive"}`}
+                >
+                  {up ? "+" : "−"}
+                  {percent.format(Math.abs(change))}
+                </span>
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {integer.format(prevTotals.clicks)} →{" "}
+                <strong className="text-foreground">
+                  {integer.format(totals.clicks)}
+                </strong>{" "}
+                clics ({signed(diff)})
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="text-4xl leading-none font-bold tabular-nums">
+                {integer.format(totals.clicks)}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {integer.format(totals.impressions)} impresiones
+              </p>
+            </>
+          )}
+          {brand.hasBrand ? (
+            <dl className="space-y-1.5 border-t border-border pt-3 text-sm">
+              <div className="flex items-baseline justify-between gap-2">
+                <dt className="text-muted-foreground">Sin marca</dt>
+                <dd className="tabular-nums">
+                  <strong>{integer.format(brand.otherClicks)}</strong>
+                  {otherChange !== null ? (
+                    <span
+                      className={`ml-1.5 text-xs font-semibold ${otherChange < 0 ? "text-destructive" : "text-success"}`}
+                    >
+                      {otherChange > 0 ? "+" : ""}
+                      {percent.format(otherChange)}
+                    </span>
+                  ) : null}
+                </dd>
+              </div>
+              <div className="flex items-baseline justify-between gap-2">
+                <dt className="text-muted-foreground">Con marca</dt>
+                <dd className="tabular-nums">
+                  <strong>{integer.format(brand.clicks)}</strong>
+                </dd>
+              </div>
+            </dl>
+          ) : null}
+        </section>
+
+        <section className="space-y-3 lg:pl-6">
+          <ColumnTitle>
+            {comparable ? "Dónde se mueve" : "Dónde llega el tráfico"}
+          </ColumnTitle>
+          {sections.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Aún no hay datos suficientes en este periodo.
+            </p>
+          ) : (
+            <ul className="space-y-2">
+              {sections.map((row) => (
+                <li key={row.label} className="space-y-0.5">
+                  <div className="flex items-baseline justify-between gap-2 text-sm">
+                    <span className="min-w-0 truncate" title={row.label}>
+                      {row.label}
+                    </span>
+                    <span
+                      className={`shrink-0 font-semibold tabular-nums ${!comparable ? "" : row.value < 0 ? "text-destructive" : "text-success"}`}
+                    >
+                      {comparable
+                        ? signed(row.value)
+                        : integer.format(row.value)}
+                    </span>
+                  </div>
+                  {comparable ? (
+                    <div className="flex h-1.5">
+                      <div className="flex w-1/2 justify-end rounded-l-full bg-muted">
+                        {row.value < 0 ? (
+                          <div
+                            className="h-full rounded-l-full bg-destructive"
+                            style={{
+                              width: `${(Math.abs(row.value) / biggest) * 100}%`,
+                            }}
+                          />
+                        ) : null}
+                      </div>
+                      <div className="flex w-1/2 rounded-r-full bg-muted">
+                        {row.value > 0 ? (
+                          <div
+                            className="h-full rounded-r-full bg-success"
+                            style={{
+                              width: `${(row.value / biggest) * 100}%`,
+                            }}
+                          />
+                        ) : null}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                      <div
+                        className="h-full rounded-full bg-primary"
+                        style={{ width: `${(row.value / biggest) * 100}%` }}
+                      />
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        <section className="space-y-3 lg:pl-6">
+          <ColumnTitle>Qué hacer primero</ColumnTitle>
+          {tasks.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No hay tareas claras en este periodo.
+            </p>
+          ) : (
+            <ul className="space-y-2.5">
+              {tasks.map((task) => {
+                const isLoss = task.kind === "loss";
+                return (
+                  <li key={task.id}>
+                    <a
+                      href={`/p/${projectId}/action-plan?task=${encodeURIComponent(task.id)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="group flex items-start justify-between gap-3"
+                    >
+                      <span className="line-clamp-2 min-w-0 text-sm leading-snug font-medium group-hover:underline">
+                        {tileHeadline(task)}
+                      </span>
+                      {task.gain !== null ? (
+                        <span
+                          className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-bold tabular-nums ${isLoss ? "bg-destructive/15 text-destructive" : "bg-success/15 text-success"}`}
+                        >
+                          {isLoss ? "−" : "+"}
+                          {integer.format(task.gain)}
+                        </span>
+                      ) : null}
+                    </a>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          {totalTasks > 0 ? (
+            <Link
+              to="/p/$projectId/action-plan"
+              params={{ projectId }}
+              className="inline-block text-sm font-semibold text-primary underline-offset-2 hover:underline"
+            >
+              Ver las {totalTasks} tareas →
+            </Link>
+          ) : null}
+        </section>
       </CardContent>
     </Card>
   );
 }
 
-const TILE_TONES = {
-  good: {
-    icon: "bg-success/15 text-success",
-    value: "text-success",
-    wash: "border-success/25 bg-success/5",
-  },
-  bad: {
-    icon: "bg-destructive/15 text-destructive",
-    value: "text-destructive",
-    wash: "border-destructive/25 bg-destructive/5",
-  },
-  info: {
-    icon: "bg-primary/10 text-primary",
-    value: "text-foreground",
-    wash: "border-border bg-card",
-  },
-} as const;
-
-/** One finding: icon, what it is, the figure and a line of detail. */
-function Tile({
-  tone,
-  icon: Icon,
-  label,
-  value,
-  chip,
-  detail,
-}: {
-  tone: keyof typeof TILE_TONES;
-  icon: LucideIcon;
-  label: string;
-  value?: string;
-  chip?: string;
-  detail: ReactNode;
-}) {
-  const style = TILE_TONES[tone];
+function ColumnTitle({ children }: { children: ReactNode }) {
   return (
-    <div className={`h-full rounded-xl border p-3.5 ${style.wash}`}>
-      <div className="flex items-center gap-2.5">
-        <span
-          className={`flex size-8 shrink-0 items-center justify-center rounded-lg ${style.icon}`}
-        >
-          <Icon className="size-4" aria-hidden />
-        </span>
-        <p className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
-          {label}
-        </p>
-      </div>
-      {value ? (
-        <p className="mt-2 flex flex-wrap items-baseline gap-2">
-          <span
-            className={`text-3xl leading-none font-bold tabular-nums ${style.value}`}
-          >
-            {value}
-          </span>
-          {chip ? (
-            <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground">
-              {chip}
-            </span>
-          ) : null}
-        </p>
-      ) : null}
-      <div className="mt-1.5 text-sm text-muted-foreground">{detail}</div>
-    </div>
-  );
-}
-
-/** A page of the site, as a link that opens in a new tab: its path alone, on
- *  one line (the query string with tracking parameters is left out). */
-function PageRef({ url }: { url: string }) {
-  let path = url;
-  try {
-    path = new URL(url).pathname || "/";
-  } catch {
-    // Not a full URL: show it as it is.
-  }
-  return (
-    <a
-      href={url}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="block truncate font-mono text-xs text-foreground hover:underline"
-      title={url}
-    >
-      {path}
-    </a>
-  );
-}
-
-function ShareBar({
-  kind,
-  item,
-}: {
-  kind: string;
-  item: { label: string; share: number };
-}) {
-  return (
-    <span className="block">
-      <span className="flex items-baseline justify-between gap-2 text-xs">
-        <span className="min-w-0 truncate text-foreground">
-          {kind} «{item.label}»
-        </span>
-        <strong className="shrink-0 tabular-nums text-foreground">
-          {percent.format(item.share)}
-        </strong>
-      </span>
-      <span className="mt-0.5 block h-1.5 overflow-hidden rounded-full bg-muted">
-        <span
-          className="block h-full rounded-full bg-primary"
-          style={{ width: `${Math.max(3, item.share * 100)}%` }}
-        />
-      </span>
-    </span>
+    <h3 className="text-[11px] font-bold tracking-wider text-muted-foreground uppercase">
+      {children}
+    </h3>
   );
 }
 
