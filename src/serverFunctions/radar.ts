@@ -279,7 +279,7 @@ export const getRadarReport = createServerFn({ method: "POST" })
 
 const signalsInputSchema = z.object({
   projectId: z.string().min(1),
-  urls: z.array(z.string().max(2000)).max(24),
+  urls: z.array(z.string().max(2000)).max(32),
 });
 
 /**

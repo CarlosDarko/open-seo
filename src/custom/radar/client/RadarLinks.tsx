@@ -5,7 +5,7 @@ const linkClass =
   "inline-flex max-w-full items-center gap-1 break-all text-primary underline-offset-2 hover:underline";
 
 /** A page of the site, opened in a new tab. */
-export function PageLink({ url }: { url: string }) {
+export function PageLink({ url, label }: { url: string; label?: string }) {
   return (
     <a
       href={url}
@@ -14,7 +14,9 @@ export function PageLink({ url }: { url: string }) {
       title={url}
       className={linkClass}
     >
-      <span>{pathOf(url) === "/" ? "Página de inicio (/)" : pathOf(url)}</span>
+      <span>
+        {label ?? (pathOf(url) === "/" ? "Página de inicio (/)" : pathOf(url))}
+      </span>
       <ExternalLink className="size-3 shrink-0" aria-hidden />
     </a>
   );

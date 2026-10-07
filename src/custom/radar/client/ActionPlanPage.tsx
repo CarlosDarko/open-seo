@@ -5,7 +5,12 @@ import { QueryError } from "@/client/components/QueryState";
 import { Button } from "@/client/components/ui/button";
 import { Card, CardContent } from "@/client/components/ui/card";
 import { Skeleton } from "@/client/components/ui/skeleton";
-import { buildActions, type ActionKind } from "@/custom/radar/actions";
+import {
+  buildActions,
+  type Action,
+  type ActionKind,
+  type Effort,
+} from "@/custom/radar/actions";
 import {
   ActionCard,
   KIND_META,
@@ -27,7 +32,10 @@ const TILE_TONE: Record<string, string> = {
 export function ActionPlanPage({ projectId }: { projectId: string }) {
   const { filters, update, query, report } = useRadarReport(projectId);
   const [filter, setFilter] = useState<ActionKind | "all">("all");
+  const [effort, setEffort] = useState<Effort | "all">("all");
   const [openIds, setOpenIds] = useState<Set<string>>(new Set());
+  const matches = (action: Action) =>
+    effort === "all" || action.effort === effort;
 
   const plan = useMemo(() => (report ? buildActions(report) : null), [report]);
   const empty = {
@@ -43,18 +51,30 @@ export function ActionPlanPage({ projectId }: { projectId: string }) {
 
   const counts = KIND_ORDER.map((kind) => ({
     kind,
-    count: plan ? plan[KIND_META[kind].planKey].length : 0,
+    count: plan ? plan[KIND_META[kind].planKey].filter(matches).length : 0,
+  }));
+  const effortCounts = (["bajo", "medio", "alto"] as const).map((level) => ({
+    level,
+    count: plan
+      ? KIND_ORDER.reduce(
+          (sum, kind) =>
+            sum +
+            plan[KIND_META[kind].planKey].filter((a) => a.effort === level)
+              .length,
+          0,
+        )
+      : 0,
   }));
   const total = counts.reduce((sum, item) => sum + item.count, 0);
   const quickGain = plan
-    ? [...plan.snippets, ...plan.pushes, ...plan.questions].reduce(
-        (sum, action) => sum + (action.gain ?? 0),
-        0,
-      )
+    ? [...plan.snippets, ...plan.pushes, ...plan.questions]
+        .filter(matches)
+        .reduce((sum, action) => sum + (action.gain ?? 0), 0)
     : 0;
   const visibleIds = plan
     ? KIND_ORDER.filter((kind) => filter === "all" || filter === kind).flatMap(
-        (kind) => plan[KIND_META[kind].planKey].map((action) => action.id),
+        (kind) =>
+          plan[KIND_META[kind].planKey].filter(matches).map((action) => action.id),
       )
     : [];
   const allOpen =
@@ -169,6 +189,31 @@ export function ActionPlanPage({ projectId }: { projectId: string }) {
                 );
               })}
             </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm font-medium">Esfuerzo:</span>
+              {(
+                [
+                  { value: "all", label: "Todos" },
+                  ...effortCounts.map((item) => ({
+                    value: item.level,
+                    label: `${item.level.charAt(0).toUpperCase()}${item.level.slice(1)} (${item.count})`,
+                  })),
+                ] as { value: Effort | "all"; label: string }[]
+              ).map((item) => (
+                <Button
+                  key={item.value}
+                  size="sm"
+                  variant={effort === item.value ? "default" : "outline"}
+                  onClick={() => setEffort(item.value)}
+                >
+                  {item.label}
+                </Button>
+              ))}
+              <span className="text-xs text-muted-foreground">
+                Bajo: unos minutos · Medio: una tarde · Alto: varias horas de
+                trabajo en contenido
+              </span>
+            </div>
             <div className="flex flex-wrap items-center justify-between gap-2">
               {quickGain > 0 ? (
                 <p className="text-sm text-muted-foreground">
@@ -208,7 +253,7 @@ export function ActionPlanPage({ projectId }: { projectId: string }) {
           {KIND_ORDER.filter((kind) => filter === "all" || filter === kind).map(
             (kind) => {
               const meta = KIND_META[kind];
-              const actions = plan[meta.planKey];
+              const actions = plan[meta.planKey].filter(matches);
               if (actions.length === 0) return null;
               return (
                 <section key={kind} className="space-y-3">

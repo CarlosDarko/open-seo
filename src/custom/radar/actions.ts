@@ -20,6 +20,10 @@ export type RadarReport = Extract<
   { connected: true }
 >;
 
+export type Effort = "bajo" | "medio" | "alto";
+
+export type Stat = { label: string; value: string };
+
 export type ActionKind =
   | "loss"
   | "snippet"
@@ -33,13 +37,17 @@ export type Action = {
   id: string;
   kind: ActionKind;
   headline: string;
+  /** One line under the page title: what to do and for which query. */
+  subtitle: string;
+  /** The key figures, shown as chips on the card. */
+  stats: Stat[];
   /** What the data says, one fact per line. */
   lines: string[];
   /** Steps that do not depend on reading the page. */
   steps: string[];
   /** Estimated clicks at stake, when it can be estimated. */
   gain: number | null;
-  effort: "bajo" | "medio";
+  effort: Effort;
   page: string | null;
   query: string | null;
   /** Why a page lost clicks (losses only). */
@@ -162,6 +170,21 @@ export function buildActions(report: RadarReport): ActionPlan {
       headline: `${pathOf(row.key)} pierde ${clicksText(-row.clicksDelta)}`,
       lines: lossLines(row),
       steps: lossSteps(row),
+      subtitle: `Ha perdido ${clicksText(-row.clicksDelta)} frente al periodo anterior`,
+      stats: [
+        {
+          label: "Clics",
+          value: `${integer.format(row.prevClicks)} → ${integer.format(row.clicks)}`,
+        },
+        {
+          label: "Posición",
+          value: `${position(row.prevPosition)} → ${position(row.position)}`,
+        },
+        {
+          label: "Impresiones",
+          value: `${integer.format(row.prevImpressions)} → ${integer.format(row.impressions)}`,
+        },
+      ],
       gain: -row.clicksDelta,
       effort: "medio",
       page: row.key,
@@ -189,6 +212,16 @@ export function buildActions(report: RadarReport): ActionPlan {
           : []),
       ],
       steps: [],
+      subtitle: `Consulta «${item.query}»: reescribe título y meta descripción`,
+      stats: [
+        { label: "Posición", value: decimal.format(item.position) },
+        { label: "Impresiones", value: integer.format(item.impressions) },
+        { label: "Clics", value: integer.format(item.clicks) },
+        {
+          label: "CTR",
+          value: `${percent.format(item.ctr)} (habitual ${percent.format(item.expectedCtr)})`,
+        },
+      ],
       gain: item.potentialClicks,
       effort: "bajo",
       page: item.page,
@@ -208,6 +241,12 @@ export function buildActions(report: RadarReport): ActionPlan {
     steps: [
       `Busca «${item.query}» en Google (enlace de abajo) y mira qué cubren las tres primeras páginas que tú no cubres.`,
       "Amplía o reordena el contenido para responder mejor; añade las preguntas y subtemas que aparecen en Google.",
+    ],
+    subtitle: `Consulta «${item.query}»: súbela al top 3`,
+    stats: [
+      { label: "Posición", value: decimal.format(item.position) },
+      { label: "Impresiones", value: integer.format(item.impressions) },
+      { label: "Clics", value: integer.format(item.clicks) },
     ],
     gain: item.potentialClicks,
     effort: "medio",
@@ -235,6 +274,12 @@ export function buildActions(report: RadarReport): ActionPlan {
         ),
         `Enlaza desde las secundarias a ${pathOf(owner.page)} con el texto «${item.query}», y no uses ese texto para enlazar a las secundarias.`,
       ],
+      subtitle: `${item.pages.length} páginas tuyas compiten por esta consulta`,
+      stats: [
+        { label: "Páginas", value: String(item.pages.length) },
+        { label: "Impresiones", value: integer.format(item.totalImpressions) },
+        { label: "Clics", value: integer.format(item.totalClicks) },
+      ],
       gain: null,
       effort: "medio",
       page: owner.page,
@@ -258,6 +303,12 @@ export function buildActions(report: RadarReport): ActionPlan {
       "Justo debajo, responde en 40-60 palabras, sin rodeos: es el formato que Google extrae.",
       "Después amplía con detalle, ejemplos y, si procede, una lista o una tabla.",
       "Si reúnes varias preguntas relacionadas, agrúpalas en una sección de preguntas frecuentes con datos estructurados FAQ.",
+    ],
+    subtitle: `Pregunta «${item.query}»: respóndela mejor`,
+    stats: [
+      { label: "Posición", value: decimal.format(item.position) },
+      { label: "Impresiones", value: integer.format(item.impressions) },
+      { label: "Clics", value: integer.format(item.clicks) },
     ],
     gain: Math.max(0, Math.round(item.impressions * topThree - item.clicks)) || null,
     effort: "bajo",
@@ -288,8 +339,16 @@ export function buildActions(report: RadarReport): ActionPlan {
         : "Enlázala desde 3-5 páginas con tráfico.",
       "Si no puedes mejorarla de forma realista, fusiónala con otra más fuerte y redirige con un 301.",
     ],
+    subtitle: item.topQuery
+      ? `Se muestra mucho pero muy abajo · «${item.topQuery}»`
+      : "Se muestra mucho pero muy abajo",
+    stats: [
+      { label: "Posición", value: decimal.format(item.position) },
+      { label: "Impresiones", value: integer.format(item.impressions) },
+      { label: "Clics", value: integer.format(item.clicks) },
+    ],
     gain: null,
-    effort: "medio",
+    effort: "alto",
     page: item.url,
     query: item.topQuery,
     linkSources: sources.filter((url) => url !== item.url).slice(0, 3),
@@ -312,6 +371,11 @@ export function buildActions(report: RadarReport): ActionPlan {
         : `Comprueba qué página debería responder a «${item.query}» y refuérzala.`,
       "Si no tienes contenido sobre esto y el volumen sigue creciendo, crea una página propia y enlázala desde las relacionadas.",
     ],
+    subtitle: `Consulta nueva «${item.query}»`,
+    stats: [
+      { label: "Posición", value: decimal.format(item.position) },
+      { label: "Impresiones", value: integer.format(item.impressions) },
+    ],
     gain: null,
     effort: "bajo",
     page: item.page,
@@ -327,6 +391,8 @@ export function buildActions(report: RadarReport): ActionPlan {
 export function signalUrls(plan: ActionPlan): string[] {
   const urls = new Set<string>();
   for (const action of [
+    ...plan.losses,
+    ...plan.emerging,
     ...plan.snippets,
     ...plan.pushes,
     ...plan.questions,
@@ -340,5 +406,5 @@ export function signalUrls(plan: ActionPlan): string[] {
     }
     for (const source of action.linkSources) urls.add(source);
   }
-  return [...urls].slice(0, 24);
+  return [...urls].slice(0, 32);
 }

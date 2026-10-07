@@ -6,6 +6,7 @@ import {
   CircleAlert,
   CircleCheck,
   CircleHelp,
+  ExternalLink,
   GitMerge,
   Layers,
   Lightbulb,
@@ -15,7 +16,6 @@ import {
   TrendingDown,
   type LucideIcon,
 } from "lucide-react";
-import { Badge } from "@/client/components/ui/badge";
 import { Card, CardContent } from "@/client/components/ui/card";
 import { Skeleton } from "@/client/components/ui/skeleton";
 import {
@@ -23,6 +23,7 @@ import {
   type Action,
   type ActionKind,
   type ActionPlan as Plan,
+  type Effort,
 } from "@/custom/radar/actions";
 import {
   missingLinkSources,
@@ -32,7 +33,7 @@ import {
   snippetFindings,
   type Finding,
 } from "@/custom/radar/diagnostics";
-import { clicksText, integer, pathOf } from "@/custom/radar/format";
+import { clicksText, decimal, integer, pathOf } from "@/custom/radar/format";
 import type { PageSignals } from "@/custom/radar/pageSignals";
 import { GoogleLink, PageLink } from "@/custom/radar/client/RadarLinks";
 import { getRadarPageSignals } from "@/serverFunctions/radar";
@@ -261,7 +262,10 @@ function diagnose(
                 <ul className="space-y-0.5 pl-4">
                   {missing.map((url) => (
                     <li key={url} className="list-disc">
-                      <PageLink url={url} />
+                      <PageLink
+                        url={url}
+                        label={signals.get(url)?.title ?? undefined}
+                      />
                     </li>
                   ))}
                 </ul>
@@ -360,6 +364,26 @@ function SectionLabel({ children }: { children: ReactNode }) {
   );
 }
 
+function EffortMeter({ effort }: { effort: Effort }) {
+  const level = effort === "bajo" ? 1 : effort === "medio" ? 2 : 3;
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 text-xs text-muted-foreground"
+      title={`Esfuerzo ${effort}`}
+    >
+      <span className="flex gap-0.5" aria-hidden>
+        {[1, 2, 3].map((bar) => (
+          <span
+            key={bar}
+            className={`h-1.5 w-4 rounded-full ${bar <= level ? "bg-foreground/70" : "bg-border"}`}
+          />
+        ))}
+      </span>
+      Esfuerzo {effort}
+    </span>
+  );
+}
+
 export function ActionCard({
   action,
   signals,
@@ -379,74 +403,168 @@ export function ActionCard({
   const needsPage = action.kind !== "loss" && action.kind !== "emerging";
   const diagnosis = needsPage ? diagnose(action, signals) : null;
   const verdict = verdictFor(action, diagnosis);
+  const isLoss = action.kind === "loss";
+
+  const linkedPage = action.kind === "cannibal" ? null : action.page;
+  const info = linkedPage ? signals.get(linkedPage) : undefined;
+  const pageTitle = info?.ok && info.title ? info.title : null;
+  const path = linkedPage ? pathOf(linkedPage) : null;
+  const mainTitle =
+    action.kind === "cannibal"
+      ? `«${action.query ?? ""}»`
+      : (pageTitle ??
+        (path === "/" ? "Página de inicio" : path) ??
+        `«${action.query ?? ""}»`);
 
   return (
-    <Card className={`border-l-4 ${tone.border}`}>
-      <CardContent className="space-y-4 py-1">
-        <button
-          type="button"
-          aria-expanded={open}
-          onClick={onToggle}
-          className="flex w-full items-start gap-3 rounded-md text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+    <Card className={`overflow-hidden border-l-4 ${tone.border}`}>
+      <CardContent className="p-0">
+        <div
+          className="flex cursor-pointer gap-4 p-4"
+          onClick={(event) => {
+            if ((event.target as HTMLElement).closest("a, button")) return;
+            onToggle();
+          }}
         >
           <span
-            className={`flex size-9 shrink-0 items-center justify-center rounded-full ${tone.soft} ${tone.text}`}
+            className={`flex size-10 shrink-0 items-center justify-center rounded-full ${tone.soft} ${tone.text}`}
           >
             <Icon className="size-5" aria-hidden />
           </span>
-          <span className="min-w-0 flex-1 space-y-2">
-            <span className="flex flex-wrap items-center gap-2">
-              <Badge className={`${tone.soft} ${tone.text} border-0`}>
-                {meta.label}
-              </Badge>
-              {action.gain !== null ? (
-                <Badge
-                  variant="outline"
-                  className={
-                    action.kind === "loss"
-                      ? "border-destructive/40 text-destructive"
-                      : "border-success/40 text-success"
-                  }
+
+          <div className="min-w-0 flex-1 space-y-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0 space-y-1">
+                <p
+                  className={`text-[11px] font-semibold tracking-wider uppercase ${tone.text}`}
                 >
-                  {action.kind === "loss" ? "−" : "≈ +"}
-                  {clicksText(action.gain)}
-                </Badge>
-              ) : null}
-              <Badge variant="outline" className="text-muted-foreground">
-                Esfuerzo {action.effort}
-              </Badge>
-            </span>
-            <span className="block leading-snug font-semibold">
-              {action.headline}
-            </span>
-            <span className="flex gap-2 text-sm">
+                  {meta.label}
+                </p>
+                {linkedPage ? (
+                  <a
+                    href={linkedPage}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group inline-flex items-start gap-1.5 leading-snug font-semibold text-foreground hover:text-primary"
+                  >
+                    <span className="break-words">{mainTitle}</span>
+                    <ExternalLink
+                      className="mt-1 size-3.5 shrink-0 text-muted-foreground group-hover:text-primary"
+                      aria-hidden
+                    />
+                  </a>
+                ) : (
+                  <p className="leading-snug font-semibold">{mainTitle}</p>
+                )}
+                {path ? (
+                  <p className="truncate text-xs text-muted-foreground">
+                    {path === "/" ? "Página de inicio (/)" : path}
+                  </p>
+                ) : null}
+                <p className="text-sm text-muted-foreground">
+                  {action.subtitle}
+                </p>
+              </div>
+
+              <div className="shrink-0 sm:text-right">
+                {action.gain !== null ? (
+                  <>
+                    <p
+                      className={`text-2xl leading-none font-semibold tabular-nums ${isLoss ? "text-destructive" : "text-success"}`}
+                    >
+                      {isLoss ? "−" : "+"}
+                      {integer.format(action.gain)}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {isLoss ? "clics perdidos" : "clics posibles"}
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    Impacto por medir
+                  </p>
+                )}
+                <div className="mt-2 sm:flex sm:justify-end">
+                  <EffortMeter effort={action.effort} />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-1.5">
+              {action.stats.map((stat) => (
+                <span
+                  key={stat.label}
+                  className="inline-flex items-baseline gap-1.5 rounded-md bg-muted px-2 py-1 text-xs"
+                >
+                  <span className="text-muted-foreground">{stat.label}</span>
+                  <span className="font-medium tabular-nums">{stat.value}</span>
+                </span>
+              ))}
+            </div>
+
+            <div className={`flex gap-2.5 rounded-lg px-3 py-2.5 text-sm ${tone.soft}`}>
               <Lightbulb
                 className={`mt-0.5 size-4 shrink-0 ${tone.text}`}
                 aria-hidden
               />
-              <span>
-                <strong>Qué hacer:</strong> {verdict}
-              </span>
-            </span>
-          </span>
-          <ChevronDown
-            className={`mt-2 size-5 shrink-0 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`}
-            aria-hidden
-          />
-        </button>
+              <p>
+                <strong className={tone.text}>Qué hacer: </strong>
+                {verdict}
+              </p>
+            </div>
+
+            <div className="flex justify-end">
+              <button
+                type="button"
+                aria-expanded={open}
+                onClick={onToggle}
+                className="inline-flex items-center gap-1 rounded-md text-xs font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
+              >
+                {open ? "Ocultar detalle" : "Ver detalle"}
+                <ChevronDown
+                  className={`size-4 transition-transform ${open ? "rotate-180" : ""}`}
+                  aria-hidden
+                />
+              </button>
+            </div>
+          </div>
+        </div>
 
         {open ? (
-          <div className="space-y-4 border-t border-border pt-4">
+          <div className="space-y-4 border-t border-border bg-muted/20 p-4 pl-18">
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
-              {action.kind === "cannibal" ? (
-                action.pages.map((item) => (
-                  <PageLink key={item.page} url={item.page} />
-                ))
-              ) : action.page ? (
-                <PageLink url={action.page} />
-              ) : null}
               {action.query ? <GoogleLink query={action.query} /> : null}
             </div>
+
+            {action.kind === "cannibal" ? (
+              <div className="space-y-1.5">
+                <SectionLabel>Páginas que compiten</SectionLabel>
+                <ul className="space-y-1.5 text-sm">
+                  {action.pages.map((item, index) => {
+                    const pageInfo = signals.get(item.page);
+                    return (
+                      <li key={item.page} className="space-y-0.5">
+                        <PageLink
+                          url={item.page}
+                          label={
+                            pageInfo?.ok && pageInfo.title
+                              ? pageInfo.title
+                              : undefined
+                          }
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          {pathOf(item.page)} ·{" "}
+                          {index === 0 ? "propuesta como principal · " : ""}
+                          posición {decimal.format(item.position)} ·{" "}
+                          {clicksText(item.clicks)} ·{" "}
+                          {integer.format(item.impressions)} impresiones
+                        </p>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ) : null}
 
             <div className="space-y-1.5">
               <SectionLabel>Qué dicen los datos</SectionLabel>
@@ -464,7 +582,7 @@ export function ActionCard({
             </div>
 
             {needsPage ? (
-              <div className="space-y-2 rounded-lg border border-border bg-muted/40 p-3">
+              <div className="space-y-2 rounded-lg border border-border bg-card p-3">
                 <SectionLabel>Qué hay en la página ahora</SectionLabel>
                 {diagnosis ? (
                   <ul className="space-y-1.5">
