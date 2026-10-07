@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
   Link2,
   MessageSquare,
+  Radar,
   Search,
   TrendingUp,
 } from "lucide-react";
@@ -38,6 +39,11 @@ const projectNavItems = [
     to: "/p/$projectId/rank-tracking" as const,
     label: "Rank Tracking",
     icon: TrendingUp,
+  },
+  {
+    to: "/p/$projectId/radar" as const,
+    label: "SEO Radar",
+    icon: Radar,
   },
   {
     to: "/p/$projectId/search-performance" as const,
@@ -143,6 +149,7 @@ export function getProjectNavGroups(projectId: string) {
     {
       label: "My Site",
       items: [
+        byPath("/p/$projectId/radar"),
         byPath("/p/$projectId/search-performance"),
         byPath("/p/$projectId/rank-tracking"),
         byPath("/p/$projectId/saved"),
