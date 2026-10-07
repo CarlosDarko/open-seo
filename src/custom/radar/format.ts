@@ -1,7 +1,11 @@
+// Spanish omits the thousands dot in four-digit numbers (1065); "always"
+// keeps every figure on screen written the same way (1.065).
 export const integer = new Intl.NumberFormat("es-ES", {
+  useGrouping: "always",
   maximumFractionDigits: 0,
 });
 export const decimal = new Intl.NumberFormat("es-ES", {
+  useGrouping: "always",
   minimumFractionDigits: 1,
   maximumFractionDigits: 1,
 });
