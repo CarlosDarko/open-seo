@@ -11,9 +11,10 @@ import type { Rule, Triggered } from "@/custom/radar/alertRules";
 
 // How alerts leave the tool. Webhooks (Slack, Discord, Teams or any URL) need
 // nothing else. E-mail goes through Resend: the user enters their Resend API
-// key and the sender address once per project (stored in KV, never shown
-// again). Nothing is sent unless a rule asks for it.
-const settingsKey = (projectId: string) => `radar:notify:${projectId}`;
+// key and the sender address ONCE for the whole tool (stored in KV, never
+// shown again), valid for every project and user. Nothing is sent unless a
+// rule asks for it.
+const SETTINGS_KEY = "radar:notify:global";
 const ORIGIN_KEY = "radar:origin";
 
 const settingsSchema = z.object({
@@ -23,9 +24,9 @@ const settingsSchema = z.object({
 
 type NotifySettings = z.infer<typeof settingsSchema>;
 
-async function readSettings(projectId: string): Promise<NotifySettings> {
+async function readSettings(): Promise<NotifySettings> {
   try {
-    const raw = await env.KV.get(settingsKey(projectId));
+    const raw = await env.KV.get(SETTINGS_KEY);
     if (!raw) return { fromEmail: null, resendKey: null };
     return settingsSchema.parse(JSON.parse(raw));
   } catch {
@@ -34,26 +35,26 @@ async function readSettings(projectId: string): Promise<NotifySettings> {
 }
 
 /** What the screen may know: the sender and whether a key is stored, never the key. */
-export async function getNotifyInfo(projectId: string) {
-  const settings = await readSettings(projectId);
+export async function getNotifyInfo() {
+  const settings = await readSettings();
   return { fromEmail: settings.fromEmail, hasKey: Boolean(settings.resendKey) };
 }
 
 /** `resendKey` undefined keeps the stored key; null removes it. */
-export async function saveNotifySettings(
-  projectId: string,
-  input: { fromEmail: string | null; resendKey?: string | null },
-): Promise<void> {
-  const current = await readSettings(projectId);
+export async function saveNotifySettings(input: {
+  fromEmail: string | null;
+  resendKey?: string | null;
+}): Promise<void> {
+  const current = await readSettings();
   const next: NotifySettings = {
     fromEmail: input.fromEmail?.trim() || null,
     resendKey:
       input.resendKey === undefined ? current.resendKey : input.resendKey?.trim() || null,
   };
   if (next.fromEmail === null && next.resendKey === null) {
-    await env.KV.delete(settingsKey(projectId));
+    await env.KV.delete(SETTINGS_KEY);
   } else {
-    await env.KV.put(settingsKey(projectId), JSON.stringify(next));
+    await env.KV.put(SETTINGS_KEY, JSON.stringify(next));
   }
 }
 
@@ -90,11 +91,10 @@ async function sendWebhook(url: string, message: AlertMessage): Promise<SendResu
 }
 
 async function sendEmail(
-  projectId: string,
   emails: string[],
   message: AlertMessage,
 ): Promise<SendResult> {
-  const settings = await readSettings(projectId);
+  const settings = await readSettings();
   if (!settings.resendKey || !settings.fromEmail) {
     return {
       channel: "correo",
@@ -150,7 +150,7 @@ export async function sendAlertNotifications(input: {
     link: await alertsLink(input.projectId),
   });
   const results: SendResult[] = [];
-  if (emails.length > 0) results.push(await sendEmail(input.projectId, emails, message));
+  if (emails.length > 0) results.push(await sendEmail(emails, message));
   for (const url of webhooks) results.push(await sendWebhook(url, message));
   return results;
 }
@@ -170,7 +170,7 @@ export async function sendTestNotification(input: {
     link: await alertsLink(input.projectId),
   });
   const results: SendResult[] = [];
-  if (input.emails.length > 0) results.push(await sendEmail(input.projectId, input.emails, message));
+  if (input.emails.length > 0) results.push(await sendEmail(input.emails, message));
   if (input.webhook) results.push(await sendWebhook(input.webhook, message));
   return results;
 }

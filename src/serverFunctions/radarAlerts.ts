@@ -35,6 +35,7 @@ import {
   markEventsSeen,
   setRuleEnabled,
 } from "@/custom/radar/server/radarDb";
+import { requireOrgPermission } from "@/server/auth/org-gate";
 import { GscService } from "@/server/features/gsc/services/GscService";
 import { AppError } from "@/server/lib/errors";
 import { getPublicOrigin } from "@/server/mcp/public-origin";
@@ -208,13 +209,15 @@ export const runAlertsNow = createServerFn({ method: "POST" })
     return { checked: rules.length, triggered: results.length, created };
   });
 
-/** The e-mail sender and whether a Resend key is stored (never the key). */
+/** The e-mail sender and whether a Resend key is stored (never the key). The
+ *  setting is shared by every project and user of the tool. */
 export const getAlertChannels = createServerFn({ method: "POST" })
   .middleware(requireProjectContext)
   .validator(project)
-  .handler(async ({ context }) => getNotifyInfo(context.projectId));
+  .handler(async () => getNotifyInfo());
 
-/** Saves the e-mail sender and, when given, the Resend key (null removes it). */
+/** Saves the e-mail sender and, when given, the Resend key (null removes it).
+ *  One setting for the whole tool; only who can manage integrations may change it. */
 export const saveAlertChannels = createServerFn({ method: "POST" })
   .middleware(requireProjectContext)
   .validator(
@@ -224,7 +227,8 @@ export const saveAlertChannels = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data, context }) => {
-    await saveNotifySettings(context.projectId, {
+    requireOrgPermission(context, { integration: ["manage"] });
+    await saveNotifySettings({
       fromEmail: data.fromEmail,
       resendKey: data.resendKey,
     });

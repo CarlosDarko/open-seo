@@ -957,9 +957,9 @@ function RuleDialog({ projectId }: { projectId: string }) {
                   </p>
                 ) : (
                   <p className="text-xs text-muted-foreground">
-                    Separados por comas. Hasta 10. Hay que configurar antes el
-                    envío de correo (botón «Canales de aviso» de la página de
-                    Alertas).
+                    Separados por comas. Hasta 10. Hay que configurar antes, una
+                    sola vez para toda la herramienta, el envío de correo
+                    (botón «Canales de aviso» de la página de Alertas).
                   </p>
                 )}
                 {emails.length > 0 && badEmails.length === 0 ? (
@@ -1140,7 +1140,9 @@ function ChannelsDialog({ projectId }: { projectId: string }) {
           <DialogDescription>
             Los webhooks (Slack, Discord, Teams) no necesitan configuración: se
             ponen en cada regla. Para enviar correos se usa{" "}
-            <strong>Resend</strong> (resend.com), que tiene plan gratuito.
+            <strong>Resend</strong> (resend.com), que tiene plan gratuito. Se
+            configura <strong>una sola vez para toda la herramienta</strong>:
+            vale para todos los proyectos y todos los usuarios.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 text-sm">
@@ -1170,8 +1172,10 @@ function ChannelsDialog({ projectId }: { projectId: string }) {
               placeholder={info.data?.hasKey ? "Ya hay una clave guardada" : "re_…"}
             />
             <p className="text-xs text-muted-foreground">
-              Se guarda en el servidor y no vuelve a mostrarse. Créala en
-              Resend → API Keys con permiso solo para enviar.
+              Se guarda una vez en el servidor, para toda la herramienta, y no
+              vuelve a mostrarse. Créala en Resend → API Keys con permiso solo
+              para enviar. Solo quien puede gestionar integraciones puede
+              cambiarla.
             </p>
           </div>
         </div>
@@ -1198,7 +1202,10 @@ function ChannelsDialog({ projectId }: { projectId: string }) {
           <p className="text-sm text-success">Guardado.</p>
         ) : null}
         {save.isError ? (
-          <p className="text-sm text-destructive">No se pudo guardar.</p>
+          <p className="text-sm text-destructive">
+            No se pudo guardar. Puede que tu rol no permita cambiar las
+            integraciones.
+          </p>
         ) : null}
       </DialogContent>
     </Dialog>
