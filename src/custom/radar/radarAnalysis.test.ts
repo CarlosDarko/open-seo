@@ -6,6 +6,7 @@ import {
   cannibalizedQueries,
   compareDimension,
   ctrOpportunities,
+  positionBands,
   winnersAndLosers,
 } from "@/custom/radar/radarAnalysis";
 
@@ -126,5 +127,34 @@ describe("page URL variants", () => {
         ),
       ),
     ).toHaveLength(0);
+  });
+});
+
+describe("positionBands", () => {
+  it("says which queries entered and left each band", () => {
+    const bands = positionBands(
+      [
+        row(["sube"], 5, 100, 2),
+        row(["igual"], 5, 100, 8),
+        row(["nueva"], 1, 50, 15),
+      ],
+      [
+        row(["sube"], 1, 100, 9),
+        row(["igual"], 4, 100, 7),
+        row(["pierde"], 2, 80, 12),
+      ],
+    );
+    // 1-3: "sube" arrives from 4-10.
+    expect(bands[0].entered.map((m) => m.query)).toEqual(["sube"]);
+    expect(bands[0].entered[0].prevPosition).toBe(9);
+    // 4-10: "sube" leaves, "igual" stays.
+    expect(bands[1].left.map((m) => m.query)).toEqual(["sube"]);
+    expect(bands[1].enteredCount).toBe(0);
+    // 11-20: "nueva" is new, "pierde" disappears.
+    expect(bands[2].entered[0]).toMatchObject({
+      query: "nueva",
+      prevPosition: null,
+    });
+    expect(bands[2].left[0]).toMatchObject({ query: "pierde", position: null });
   });
 });

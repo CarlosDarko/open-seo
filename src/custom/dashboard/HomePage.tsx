@@ -2,7 +2,18 @@ import { useMemo, useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Line, LineChart } from "recharts";
-import { ArrowRight, ExternalLink, RefreshCw } from "lucide-react";
+import {
+  ArrowRight,
+  BarChart3,
+  ChevronDown,
+  ExternalLink,
+  FileSearch,
+  Link2,
+  RefreshCw,
+  TrendingDown,
+  TrendingUp,
+  type LucideIcon,
+} from "lucide-react";
 import { PageHeader } from "@/client/components/PageHeader";
 import { QueryError } from "@/client/components/QueryState";
 import { Button } from "@/client/components/ui/button";
@@ -26,17 +37,17 @@ import {
 } from "@/custom/radar/client/ActionPlan";
 import { AlertsBanner } from "@/custom/radar/client/AlertsBanner";
 import { RadarControls } from "@/custom/radar/client/RadarControls";
-import { PageLink } from "@/custom/radar/client/RadarLinks";
 import { periodInput } from "@/custom/radar/client/useRadarFilters";
 import { useRadarReport } from "@/custom/radar/client/useRadarReport";
 import {
   decimal,
   integer,
+  pathOf,
   percent,
   relativeChange,
   signed,
 } from "@/custom/radar/format";
-import type { DailyPoint } from "@/custom/radar/radarAnalysis";
+import type { BandMove, DailyPoint } from "@/custom/radar/radarAnalysis";
 import type { Verdict } from "@/custom/radar/trackingImpact";
 import {
   getDashboardActivation,
@@ -376,28 +387,11 @@ export function HomePage({ projectId }: { projectId: string }) {
                 </CardContent>
               </Card>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle>Mayores cambios</CardTitle>
-                  <p className="text-xs text-muted-foreground">
-                    Páginas que más suben y más bajan en clics.
-                  </p>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <ChangeList
-                    title="Suben"
-                    tone="text-success"
-                    rows={report.pageChanges.winners.slice(0, 3)}
-                    signals={signals}
-                  />
-                  <ChangeList
-                    title="Bajan"
-                    tone="text-destructive"
-                    rows={report.pageChanges.losers.slice(0, 3)}
-                    signals={signals}
-                  />
-                </CardContent>
-              </Card>
+              <ChangesCard
+                winners={report.pageChanges.winners.slice(0, 3)}
+                losers={report.pageChanges.losers.slice(0, 3)}
+                signals={signals}
+              />
             </div>
 
             <div className="grid gap-4 lg:grid-cols-3">
@@ -554,54 +548,122 @@ function KpiRow({ report }: { report: Report }) {
   );
 }
 
-function ChangeList({
-  title,
-  tone,
+type ChangeRows = Report["pageChanges"]["winners"];
+type PageSignalsLite = Map<string, { title: string | null; ok: boolean }>;
+
+/** The pages that gained and lost the most clicks, side by side in colour:
+ *  who they are, how much they moved and how it compares to the others. */
+function ChangesCard({
+  winners,
+  losers,
+  signals,
+}: {
+  winners: ChangeRows;
+  losers: ChangeRows;
+  signals: PageSignalsLite;
+}) {
+  return (
+    <Card className="overflow-hidden">
+      <CardHeader>
+        <CardTitle>Mayores cambios</CardTitle>
+        <p className="text-xs text-muted-foreground">
+          Las páginas que más suben y más bajan en clics frente al periodo
+          anterior.
+        </p>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <ChangeGroup up rows={winners} signals={signals} />
+        <ChangeGroup rows={losers} signals={signals} />
+      </CardContent>
+    </Card>
+  );
+}
+
+function ChangeGroup({
+  up,
   rows,
   signals,
 }: {
-  title: string;
-  tone: string;
-  rows: Report["pageChanges"]["winners"];
-  signals: Map<string, { title: string | null; ok: boolean }>;
+  up?: boolean;
+  rows: ChangeRows;
+  signals: PageSignalsLite;
 }) {
+  const Icon = up ? TrendingUp : TrendingDown;
+  const total = rows.reduce((sum, row) => sum + row.clicksDelta, 0);
+  const biggest = Math.max(1, ...rows.map((row) => Math.abs(row.clicksDelta)));
+  const tone = up
+    ? {
+        wash: "bg-success/5 border-success/20",
+        chip: "bg-success/15 text-success",
+        bar: "bg-success",
+        text: "text-success",
+      }
+    : {
+        wash: "bg-destructive/5 border-destructive/20",
+        chip: "bg-destructive/15 text-destructive",
+        bar: "bg-destructive",
+        text: "text-destructive",
+      };
   return (
-    <div className="space-y-1">
-      <p className={`text-xs font-semibold tracking-wide uppercase ${tone}`}>
-        {title}
-      </p>
+    <section className={`rounded-xl border ${tone.wash}`}>
+      <header className="flex items-center justify-between gap-2 px-3 pt-2.5">
+        <span
+          className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold tracking-wide uppercase ${tone.chip}`}
+        >
+          <Icon className="size-3.5" aria-hidden />
+          {up ? "Suben" : "Bajan"}
+        </span>
+        {rows.length > 0 ? (
+          <span className={`text-sm font-bold tabular-nums ${tone.text}`}>
+            {signed(total)} clics
+          </span>
+        ) : null}
+      </header>
       {rows.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Sin cambios relevantes.</p>
+        <p className="px-3 py-3 text-sm text-muted-foreground">
+          Sin cambios relevantes.
+        </p>
       ) : (
-        <ul className="space-y-1 text-sm">
-          {rows.map((row, index) => (
-            <li
-              key={row.key}
-              className="flex items-baseline justify-between gap-2"
-            >
-              <span className="flex min-w-0 gap-1.5">
-                <span className="w-4 shrink-0 text-right text-xs font-semibold text-foreground tabular-nums">
-                  {index + 1}.
-                </span>
-                <span className="min-w-0">
-                  <PageLink
-                    url={row.key}
-                    label={
-                      signals.get(row.key)?.ok
-                        ? (signals.get(row.key)?.title ?? undefined)
-                        : undefined
-                    }
-                  />
-                </span>
-              </span>
-              <span className={`shrink-0 font-medium tabular-nums ${tone}`}>
-                {signed(row.clicksDelta)}
-              </span>
-            </li>
-          ))}
-        </ul>
+        <ol className="space-y-0.5 p-1.5">
+          {rows.map((row, index) => {
+            const info = signals.get(row.key);
+            const title = info?.ok && info.title ? info.title : pathOf(row.key);
+            return (
+              <li key={row.key}>
+                <a
+                  href={row.key}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group block rounded-lg px-2 py-1.5 hover:bg-card"
+                >
+                  <span className="flex items-start gap-2">
+                    <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-foreground text-[11px] font-bold text-background tabular-nums">
+                      {index + 1}
+                    </span>
+                    <span className="line-clamp-2 min-w-0 flex-1 text-sm leading-snug font-medium text-foreground group-hover:underline">
+                      {title}
+                    </span>
+                    <span
+                      className={`shrink-0 text-sm font-bold tabular-nums ${tone.text}`}
+                    >
+                      {signed(row.clicksDelta)}
+                    </span>
+                  </span>
+                  <span className="mt-1.5 ml-7 block h-1.5 overflow-hidden rounded-full bg-muted">
+                    <span
+                      className={`block h-full rounded-full ${tone.bar}`}
+                      style={{
+                        width: `${Math.max(6, (Math.abs(row.clicksDelta) / biggest) * 100)}%`,
+                      }}
+                    />
+                  </span>
+                </a>
+              </li>
+            );
+          })}
+        </ol>
       )}
-    </div>
+    </section>
   );
 }
 
@@ -661,6 +723,7 @@ function BandsCard({
   projectId: string;
   report: Report;
 }) {
+  const [open, setOpen] = useState<number | null>(null);
   const max = Math.max(1, ...report.bands.map((band) => band.queries));
   const reachGain = report.nearTop.reduce(
     (sum, item) => sum + item.potentialClicks,
@@ -671,35 +734,66 @@ function BandsCard({
       <CardHeader>
         <CardTitle>Dónde posicionan tus consultas</CardTitle>
         <p className="text-xs text-muted-foreground">
-          Cuántas consultas tienes en cada franja de posición (entre paréntesis,
-          el cambio).
+          Cuántas consultas tienes en cada franja de posición y cuántas han
+          entrado o salido. Pulsa una franja para ver cuáles.
         </p>
       </CardHeader>
       <CardContent className="space-y-3">
-        <ul className="space-y-2">
+        <ul className="space-y-1.5">
           {report.bands.map((band, index) => {
-            const delta = band.queries - band.prevQueries;
+            const isOpen = open === index;
+            const moved = band.enteredCount + band.leftCount > 0;
             return (
-              <li key={band.label} className="space-y-0.5">
-                <div className="flex items-baseline justify-between gap-2 text-sm">
-                  <span>{band.label}</span>
-                  <span className="tabular-nums">
-                    {integer.format(band.queries)}
-                    <span
-                      className={`ml-1.5 text-xs ${delta === 0 ? "text-muted-foreground" : (index === 0 ? delta > 0 : delta < 0) ? "text-success" : "text-destructive"}`}
-                    >
-                      ({signed(delta)})
+              <li key={band.label} className="rounded-lg border border-border">
+                <button
+                  type="button"
+                  aria-expanded={isOpen}
+                  disabled={!moved}
+                  onClick={() => setOpen(isOpen ? null : index)}
+                  className="w-full space-y-1.5 px-3 py-2 text-left disabled:cursor-default"
+                >
+                  <span className="flex items-baseline justify-between gap-2 text-sm">
+                    <span className="font-medium">{band.label}</span>
+                    <span className="flex items-baseline gap-2 tabular-nums">
+                      <strong>{integer.format(band.queries)}</strong>
+                      <span className="text-xs font-semibold text-success">
+                        +{integer.format(band.enteredCount)}
+                      </span>
+                      <span className="text-xs font-semibold text-destructive">
+                        −{integer.format(band.leftCount)}
+                      </span>
+                      {moved ? (
+                        <ChevronDown
+                          className={`size-3.5 self-center text-muted-foreground transition-transform ${isOpen ? "rotate-180" : ""}`}
+                          aria-hidden
+                        />
+                      ) : null}
                     </span>
                   </span>
-                </div>
-                <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-                  <div
-                    className="h-full rounded-full bg-primary"
-                    style={{
-                      width: `${Math.max(2, (band.queries / max) * 100)}%`,
-                    }}
-                  />
-                </div>
+                  <span className="block h-1.5 overflow-hidden rounded-full bg-muted">
+                    <span
+                      className="block h-full rounded-full bg-primary"
+                      style={{
+                        width: `${Math.max(2, (band.queries / max) * 100)}%`,
+                      }}
+                    />
+                  </span>
+                </button>
+                {isOpen ? (
+                  <div className="space-y-3 border-t border-border bg-muted/30 px-3 py-2.5">
+                    <MoveList
+                      title="Han entrado"
+                      total={band.enteredCount}
+                      moves={band.entered}
+                      up
+                    />
+                    <MoveList
+                      title="Han salido"
+                      total={band.leftCount}
+                      moves={band.left}
+                    />
+                  </div>
+                ) : null}
               </li>
             );
           })}
@@ -718,6 +812,56 @@ function BandsCard({
         ) : null}
       </CardContent>
     </Card>
+  );
+}
+
+/** The queries that moved into or out of a position band, biggest first. */
+function MoveList({
+  title,
+  total,
+  moves,
+  up,
+}: {
+  title: string;
+  total: number;
+  moves: BandMove[];
+  up?: boolean;
+}) {
+  if (total === 0) return null;
+  return (
+    <div className="space-y-1">
+      <p
+        className={`text-[11px] font-bold tracking-wide uppercase ${up ? "text-success" : "text-destructive"}`}
+      >
+        {title} ({integer.format(total)})
+      </p>
+      <ul className="space-y-1">
+        {moves.map((move) => (
+          <li
+            key={move.query}
+            className="flex items-baseline justify-between gap-2 text-xs"
+          >
+            <span className="min-w-0 truncate font-medium" title={move.query}>
+              {move.query}
+            </span>
+            <span className="shrink-0 text-muted-foreground tabular-nums">
+              {move.prevPosition === null
+                ? "nueva"
+                : `pos. ${decimal.format(move.prevPosition)}`}
+              {" → "}
+              {move.position === null
+                ? "ya no sale"
+                : `pos. ${decimal.format(move.position)}`}
+            </span>
+          </li>
+        ))}
+      </ul>
+      {total > moves.length ? (
+        <p className="text-[11px] text-muted-foreground">
+          y {integer.format(total - moves.length)} más, de menos impresiones
+        </p>
+      ) : null}
+    </div>
   );
 }
 
@@ -814,84 +958,205 @@ function HealthCard({
   refreshing: boolean;
   onRefresh: () => void;
 }) {
+  const number = (value: number | null) =>
+    value === null ? "—" : integer.format(value);
   return (
     <Card>
       <CardHeader>
         <CardTitle>Salud técnica</CardTitle>
         <p className="text-xs text-muted-foreground">
-          Backlinks, conexiones e indexación.
+          Tus enlaces entrantes, las conexiones y qué ve Google de tu web.
         </p>
       </CardHeader>
-      <CardContent className="space-y-3 text-sm">
+      <CardContent className="space-y-3">
         {loading ? (
-          <Skeleton className="h-32 w-full" />
+          <Skeleton className="h-40 w-full" />
         ) : (
           <>
             {showBacklinks ? (
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <p className="font-medium">Backlinks</p>
+              <HealthTile
+                icon={Link2}
+                tone="info"
+                title="Backlinks"
+                status={
+                  backlinks
+                    ? {
+                        text: backlinks.stale ? "Desactualizado" : "Al día",
+                        ok: !backlinks.stale,
+                      }
+                    : { text: "Sin datos", ok: false }
+                }
+                action={
+                  <Button
+                    size="xs"
+                    variant="outline"
+                    disabled={refreshing}
+                    onClick={onRefresh}
+                    title="Cuesta unos 0,02 €"
+                  >
+                    <RefreshCw
+                      className={`size-3 ${refreshing ? "animate-spin" : ""}`}
+                      aria-hidden
+                    />
+                    Actualizar
+                  </Button>
+                }
+              >
+                {backlinks ? (
+                  <div className="grid grid-cols-2 gap-2">
+                    <Figure
+                      label="Dominios que te enlazan"
+                      value={number(backlinks.referringDomains)}
+                      gained={backlinks.newReferringDomains}
+                      lost={backlinks.lostReferringDomains}
+                    />
+                    <Figure
+                      label="Enlaces totales"
+                      value={number(backlinks.backlinks)}
+                      gained={backlinks.newBacklinks}
+                      lost={backlinks.lostBacklinks}
+                    />
+                  </div>
+                ) : (
                   <p className="text-xs text-muted-foreground">
-                    {backlinks
-                      ? `${backlinks.referringDomains === null ? "—" : integer.format(backlinks.referringDomains)} dominios · ${backlinks.backlinks === null ? "—" : integer.format(backlinks.backlinks)} enlaces`
-                      : "Sin datos todavía."}
-                    {backlinks
-                      ? ` · ${backlinks.stale ? "desactualizado" : "al día"}`
-                      : ""}
+                    Pulsa «Actualizar» para traer el resumen de enlaces.
                   </p>
-                </div>
+                )}
+              </HealthTile>
+            ) : null}
+
+            <HealthTile
+              icon={BarChart3}
+              tone="warning"
+              title="Google Analytics"
+              status={
+                ga4Connected
+                  ? { text: "Conectado", ok: true }
+                  : { text: "Sin conectar", ok: false }
+              }
+              action={
+                <Button
+                  size="xs"
+                  variant={ga4Connected ? "outline" : "default"}
+                  render={
+                    <Link to="/p/$projectId/settings" params={{ projectId }} />
+                  }
+                >
+                  {ga4Connected ? "Ajustes" : "Conectar"}
+                </Button>
+              }
+            >
+              <p className="text-xs text-muted-foreground">
+                {ga4Connected
+                  ? "Cruzas visitas reales con lo que ves en Search Console."
+                  : "Conéctalo para cruzar las visitas reales con Search Console."}
+              </p>
+            </HealthTile>
+
+            <HealthTile
+              icon={FileSearch}
+              tone="success"
+              title="Indexación y sitemap"
+              action={
                 <Button
                   size="xs"
                   variant="outline"
-                  disabled={refreshing}
-                  onClick={onRefresh}
-                  title="Cuesta unos 0,02 €"
+                  render={
+                    <Link to="/p/$projectId/indexing" params={{ projectId }} />
+                  }
                 >
-                  <RefreshCw
-                    className={`size-3 ${refreshing ? "animate-spin" : ""}`}
-                    aria-hidden
-                  />
-                  Actualizar
+                  Revisar
                 </Button>
-              </div>
-            ) : null}
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <p className="font-medium">Google Analytics</p>
-                <p className="text-xs text-muted-foreground">
-                  {ga4Connected ? "Conectado." : "Sin conectar."}
-                </p>
-              </div>
-              <Button
-                size="xs"
-                variant="outline"
-                render={
-                  <Link to="/p/$projectId/settings" params={{ projectId }} />
-                }
-              >
-                {ga4Connected ? "Ajustes" : "Conectar"}
-              </Button>
-            </div>
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <p className="font-medium">Indexación y sitemap</p>
-                <p className="text-xs text-muted-foreground">
-                  Qué ve Google de tu sitemap.
-                </p>
-              </div>
-              <Button
-                size="xs"
-                variant="outline"
-                render={
-                  <Link to="/p/$projectId/indexing" params={{ projectId }} />
-                }
-              >
-                Revisar
-              </Button>
-            </div>
+              }
+            >
+              <p className="text-xs text-muted-foreground">
+                Comprueba qué páginas de tu sitemap tiene Google indexadas.
+              </p>
+            </HealthTile>
           </>
         )}
       </CardContent>
     </Card>
+  );
+}
+
+const TILE_TONES = {
+  info: "bg-info/10 text-info",
+  warning: "bg-warning/10 text-warning",
+  success: "bg-success/10 text-success",
+} as const;
+
+/** One row of the technical health card: icon, name, status and action. */
+function HealthTile({
+  icon: Icon,
+  tone,
+  title,
+  status,
+  action,
+  children,
+}: {
+  icon: LucideIcon;
+  tone: keyof typeof TILE_TONES;
+  title: string;
+  status?: { text: string; ok: boolean };
+  action: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <div className="space-y-2.5 rounded-xl border border-border bg-muted/30 p-3">
+      <div className="flex items-center gap-2.5">
+        <span
+          className={`flex size-8 shrink-0 items-center justify-center rounded-lg ${TILE_TONES[tone]}`}
+        >
+          <Icon className="size-4" aria-hidden />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm leading-tight font-semibold">{title}</p>
+          {status ? (
+            <span
+              className={`mt-0.5 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${status.ok ? "bg-success/10 text-success" : "bg-warning/10 text-warning"}`}
+            >
+              <span
+                className={`size-1.5 rounded-full ${status.ok ? "bg-success" : "bg-warning"}`}
+                aria-hidden
+              />
+              {status.text}
+            </span>
+          ) : null}
+        </div>
+        {action}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+/** A headline number with what was gained and lost since the last summary. */
+function Figure({
+  label,
+  value,
+  gained,
+  lost,
+}: {
+  label: string;
+  value: string;
+  gained: number | null;
+  lost: number | null;
+}) {
+  return (
+    <div className="rounded-lg bg-card px-3 py-2">
+      <p className="text-[11px] leading-tight text-muted-foreground">{label}</p>
+      <p className="text-xl leading-tight font-bold tabular-nums">{value}</p>
+      {gained !== null || lost !== null ? (
+        <p className="mt-0.5 flex gap-2 text-[11px] font-semibold tabular-nums">
+          {gained !== null ? (
+            <span className="text-success">+{integer.format(gained)}</span>
+          ) : null}
+          {lost !== null ? (
+            <span className="text-destructive">−{integer.format(lost)}</span>
+          ) : null}
+        </p>
+      ) : null}
+    </div>
   );
 }

@@ -668,12 +668,27 @@ export function cannibalizedQueries(
 
 // ------------------------------------------------------- positions mix
 
+/** A query that moved into or out of a position band between periods. */
+export type BandMove = {
+  query: string;
+  /** Average position now, or null when it no longer shows. */
+  position: number | null;
+  /** Average position before, or null when it is new. */
+  prevPosition: number | null;
+  impressions: number;
+};
+
 export type PositionBand = {
   label: string;
   queries: number;
   clicks: number;
   prevQueries: number;
   prevClicks: number;
+  /** How many queries entered / left the band, and the biggest of each. */
+  enteredCount: number;
+  leftCount: number;
+  entered: BandMove[];
+  left: BandMove[];
 };
 
 const BANDS = [
@@ -694,7 +709,53 @@ export function positionBands(
     clicks: 0,
     prevQueries: 0,
     prevClicks: 0,
+    enteredCount: 0,
+    leftCount: 0,
+    entered: [],
+    left: [],
   }));
+  const bandOf = (position: number) =>
+    BANDS.findIndex((band) => position <= band.max);
+  const now = new Map<string, GscSearchAnalyticsRow>();
+  for (const row of current) {
+    if (row.keys?.[0]) now.set(row.keys[0], row);
+  }
+  const before = new Map<string, GscSearchAnalyticsRow>();
+  for (const row of previous) {
+    if (row.keys?.[0]) before.set(row.keys[0], row);
+  }
+  const moves = (index: number) => {
+    const entered: BandMove[] = [];
+    const left: BandMove[] = [];
+    for (const [query, row] of now) {
+      if (bandOf(row.position) !== index) continue;
+      const old = before.get(query);
+      if (old && bandOf(old.position) === index) continue;
+      entered.push({
+        query,
+        position: row.position,
+        prevPosition: old?.position ?? null,
+        impressions: row.impressions,
+      });
+    }
+    for (const [query, old] of before) {
+      if (bandOf(old.position) !== index) continue;
+      const row = now.get(query);
+      if (row && bandOf(row.position) === index) continue;
+      left.push({
+        query,
+        position: row?.position ?? null,
+        prevPosition: old.position,
+        impressions: old.impressions,
+      });
+    }
+    const byImpressions = (a: BandMove, b: BandMove) =>
+      b.impressions - a.impressions;
+    return {
+      entered: entered.sort(byImpressions),
+      left: left.sort(byImpressions),
+    };
+  };
   const place = (rows: GscSearchAnalyticsRow[], prev: boolean) => {
     for (const row of rows) {
       const index = BANDS.findIndex((band) => row.position <= band.max);
@@ -710,6 +771,13 @@ export function positionBands(
   };
   place(current, false);
   place(previous, true);
+  bands.forEach((band, index) => {
+    const { entered, left } = moves(index);
+    band.enteredCount = entered.length;
+    band.leftCount = left.length;
+    band.entered = entered.slice(0, 5);
+    band.left = left.slice(0, 5);
+  });
   return bands;
 }
 
