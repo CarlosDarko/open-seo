@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { Coins } from "lucide-react";
+import { Progress } from "@/client/components/ui/progress";
 import { costSummaryQuery } from "@/custom/costs/client/queries";
 import { useRefreshCostsAfterActivity } from "@/custom/costs/client/useRefreshCostsAfterActivity";
 import { formatEur } from "@/custom/costs/shared";
@@ -10,43 +11,53 @@ import { formatEur } from "@/custom/costs/shared";
  * month's spend against the budget and the DataForSEO balance, always in
  * euros, and links to the full Costes page.
  */
-export function SidebarCostMeter({ onNavigate }: { onNavigate?: () => void }) {
-  const { data } = useQuery(costSummaryQuery());
+export function SidebarCostMeter({
+  ready,
+  onNavigate,
+}: {
+  ready: boolean;
+  onNavigate?: () => void;
+}) {
+  const { data } = useQuery({ ...costSummaryQuery(), enabled: ready });
   useRefreshCostsAfterActivity();
   if (!data) return null;
 
   const budget = data.settings.monthlyBudgetEur;
-  const pct = budget > 0 ? (data.monthEur / budget) * 100 : 0;
+  const pct = budget > 0 ? Math.min((data.monthEur / budget) * 100, 100) : 0;
   const hasError = data.alerts.some((alert) => alert.level === "error");
   const hasWarning = data.alerts.length > 0;
-  const barClass = hasError
-    ? "progress-error"
+  const indicator = hasError
+    ? "[&_[data-slot=progress-indicator]]:bg-destructive"
     : hasWarning
-      ? "progress-warning"
-      : "progress-primary";
+      ? "[&_[data-slot=progress-indicator]]:bg-warning"
+      : "";
 
   return (
     <Link
       to="/costs"
       onClick={onNavigate}
-      className="mb-1 block rounded-lg border border-base-300 bg-base-100 px-3 py-2 text-xs transition-colors hover:border-primary/60"
+      className="mb-1 block rounded-lg border border-sidebar-border bg-card px-3 py-2 text-xs transition-colors hover:border-primary/60"
     >
       <div className="flex items-center justify-between gap-2">
-        <span className="flex items-center gap-1.5 font-medium text-base-content/80">
+        <span className="flex items-center gap-1.5 font-medium text-foreground/80">
           <Coins className="size-3.5" />
           Gasto del mes
         </span>
-        <span className="tabular-nums font-semibold">{formatEur(data.monthEur)}</span>
+        <span className="font-semibold tabular-nums">
+          {formatEur(data.monthEur)}
+        </span>
       </div>
       {budget > 0 ? (
-        <progress
-          className={`progress ${barClass} mt-1.5 h-1.5 w-full`}
-          value={Math.min(pct, 100)}
-          max={100}
+        <Progress
+          value={pct}
+          aria-label="Gasto del mes frente al presupuesto"
+          className={`mt-1.5 gap-0 [&_[data-slot=progress-track]]:h-1.5 ${indicator}`}
         />
       ) : null}
-      <div className="mt-1 flex justify-between text-base-content/50">
-        <span>{budget > 0 ? `de ${formatEur(budget)}` : "sin presupuesto"}</span>
+      <div className="mt-1 flex justify-between text-muted-foreground">
+        <span>
+          {budget > 0 ? `de ${formatEur(budget)}` : "sin presupuesto"}
+        </span>
         {data.balanceEur !== null ? (
           <span>Saldo {formatEur(data.balanceEur)}</span>
         ) : null}

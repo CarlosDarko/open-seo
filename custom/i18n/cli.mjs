@@ -28,7 +28,10 @@ for (const dir of ["src/client", "src/routes"]) {
 
 const dictionary = loadDictionary(here);
 const missing = [...found].filter((key) => !dictionary.has(key)).sort();
-const unknown = dictionary.keys().filter((key) => !foundAll.has(key)).sort();
+const unknown = dictionary
+  .keys()
+  .filter((key) => !foundAll.has(key))
+  .sort();
 const command = process.argv[2] ?? "check";
 
 if (command === "missing") {
@@ -37,9 +40,13 @@ if (command === "missing") {
   console.log(`Textos en la interfaz: ${found.size}`);
   console.log(`Traducidos: ${found.size - missing.length}`);
   console.log(`Sin traducir: ${missing.length}`);
-  console.log(`Entradas del diccionario que ya no aparecen en el código: ${unknown.length}`);
+  console.log(
+    `Entradas del diccionario que ya no aparecen en el código: ${unknown.length}`,
+  );
   if (unknown.length > 0) {
-    console.log("\n-- Entradas sin coincidencia (¿errata o texto que cambió?) --");
+    console.log(
+      "\n-- Entradas sin coincidencia (¿errata o texto que cambió?) --",
+    );
     console.log(unknown.join("\n"));
   }
 }

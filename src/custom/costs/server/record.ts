@@ -26,7 +26,12 @@ export async function runAndRecordCost<T>(
     return result.data;
   } catch (error) {
     if (error instanceof DataforseoChargedTaskError) {
-      await safeRecord(customer, error.billing, creditFeature, "failed_charged");
+      await safeRecord(
+        customer,
+        error.billing,
+        creditFeature,
+        "failed_charged",
+      );
     }
     throw error;
   }

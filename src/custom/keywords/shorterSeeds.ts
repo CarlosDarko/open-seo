@@ -4,10 +4,47 @@
 // versions.
 
 const STOPWORDS = new Set([
-  "a", "al", "ante", "con", "de", "del", "el", "en", "es", "la", "las", "lo",
-  "los", "para", "por", "sin", "sobre", "un", "una", "unos", "unas", "y", "o",
-  "e", "u", "que", "se", "su", "sus", "mi", "tu", "the", "of", "and", "for",
-  "to", "in", "on", "with", "a", "an",
+  "a",
+  "al",
+  "ante",
+  "con",
+  "de",
+  "del",
+  "el",
+  "en",
+  "es",
+  "la",
+  "las",
+  "lo",
+  "los",
+  "para",
+  "por",
+  "sin",
+  "sobre",
+  "un",
+  "una",
+  "unos",
+  "unas",
+  "y",
+  "o",
+  "e",
+  "u",
+  "que",
+  "se",
+  "su",
+  "sus",
+  "mi",
+  "tu",
+  "the",
+  "of",
+  "and",
+  "for",
+  "to",
+  "in",
+  "on",
+  "with",
+  "a",
+  "an",
 ]);
 
 const MIN_VARIANT_LENGTH = 8;
@@ -46,18 +83,22 @@ export function shorterSearchVariants(seed: string): string[] {
 }
 
 /**
- * True when Auto mode had to fall back to the broad "ideas" source (related
- * keywords and suggestions were empty) and the searched phrase is not among the
- * results: the phrase has no data of its own.
+ * True when Auto mode ("blended" source) returned results but the searched
+ * phrase is not among them: DataForSEO has no data of its own for it, so the
+ * results are category-level ideas that may be unrelated to the phrase. Not
+ * applicable when term filters are active, because they can exclude the phrase
+ * itself.
  */
 export function seedHasNoData(input: {
-  source: string;
-  usedFallback: boolean;
+  source: string | undefined;
+  filtering: boolean;
   searchedKeyword: string;
   rowKeywords: readonly string[];
 }): boolean {
   const seed = input.searchedKeyword.trim().toLowerCase();
   if (!seed || input.rowKeywords.length === 0) return false;
-  if (input.source !== "ideas" || !input.usedFallback) return false;
-  return !input.rowKeywords.some((keyword) => keyword.trim().toLowerCase() === seed);
+  if (input.source !== "blended" || input.filtering) return false;
+  return !input.rowKeywords.some(
+    (keyword) => keyword.trim().toLowerCase() === seed,
+  );
 }

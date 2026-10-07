@@ -1,10 +1,12 @@
 import { useRef, useState, type FormEvent } from "react";
-import { Search } from "lucide-react";
 import { isHostedClientAuthMode } from "@/lib/auth-mode";
+import { applyBillingMarkupUsd } from "@/shared/billing";
 import { CostConfirmModal } from "@/custom/costs/client/CostConfirmModal";
 import { useEuros } from "@/custom/costs/client/eur";
-import { applyBillingMarkupUsd } from "@/shared/billing";
 import { ResearchScopeSelect } from "@/client/components/ResearchScopeSelect";
+import { SearchCard, SearchInput } from "@/client/components/SearchCard";
+import { Field, FieldDescription } from "@/client/components/ui/field";
+import { Input } from "@/client/components/ui/input";
 import type { ResearchScope } from "@/shared/researchScope";
 import { BRAND_LOOKUP_MAX_INPUT_LENGTH } from "@/types/schemas/ai-search";
 
@@ -86,7 +88,7 @@ export function BrandLookupSearchCard({
   }
 
   return (
-    <div className="card border border-base-300 bg-base-100">
+    <>
       {confirming ? (
         <CostConfirmModal
           title="Búsqueda de marca en IA"
@@ -94,7 +96,7 @@ export function BrandLookupSearchCard({
           details={
             hasCompetitors
               ? "Consulta ChatGPT y Google AI Overview e incluye la comparación con competidores."
-              : "Consulta ChatGPT y Google AI Overview (6 consultas de pago). Repetir la misma búsqueda no vuelve a cobrar."
+              : "Consulta ChatGPT y Google AI Overview. Repetir la misma búsqueda no vuelve a cobrar."
           }
           confirmLabel="Buscar"
           onCancel={() => setConfirming(false)}
@@ -104,92 +106,69 @@ export function BrandLookupSearchCard({
           }}
         />
       ) : null}
-      <div className="card-body gap-4">
-        <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-            <label
-              className={`input input-bordered flex flex-1 items-center gap-2 ${
-                queryError ? "input-error" : ""
-              }`}
-            >
-              <Search className="size-4 text-base-content/60" />
-              <input
-                type="text"
-                placeholder="Enter a brand name or domain"
-                value={query}
-                maxLength={BRAND_LOOKUP_MAX_INPUT_LENGTH}
-                onChange={(event) => onQueryChange(event.target.value)}
-                aria-invalid={queryError || undefined}
-                aria-describedby={
-                  queryError ? "brand-lookup-input-error" : undefined
-                }
+      <SearchCard
+        onSubmit={handleSubmit}
+        pending={isLoading}
+        error={validationError?.message}
+        errorId="brand-lookup-input-error"
+        secondRow={
+          <>
+            <Field>
+              <Input
+                placeholder="Add competitors (comma-separated)"
+                value={competitors}
+                onChange={(event) => onCompetitorsChange(event.target.value)}
                 autoComplete="off"
                 spellCheck={false}
-                className="grow"
+                aria-label="Competitors"
+                aria-invalid={competitorsError || undefined}
+                aria-describedby={
+                  competitorsError ? "brand-lookup-input-error" : undefined
+                }
               />
-            </label>
-
-            <ResearchScopeSelect
-              value={scope}
-              onChange={onScopeChange}
-              disabledReason={scopeDisabledReason}
-            />
-
-            <button
-              type="submit"
-              className="btn btn-primary shrink-0 px-6"
-              disabled={isLoading}
-            >
-              {isLoading ? "Looking up..." : "Look up"}
-            </button>
-          </div>
-
-          <div className="flex flex-col gap-1">
-            <input
-              type="text"
-              placeholder="Add competitors (comma-separated)"
-              value={competitors}
-              onChange={(event) => onCompetitorsChange(event.target.value)}
-              autoComplete="off"
-              spellCheck={false}
-              className={`input input-bordered w-full ${
-                competitorsError ? "input-error" : ""
-              }`}
-              aria-label="Competitors"
-              aria-invalid={competitorsError || undefined}
-              aria-describedby={
-                competitorsError ? "brand-lookup-input-error" : undefined
-              }
-            />
-            <p className="text-xs text-base-content/60">
-              Add up to 5 competitor brands or domains to see your Share of
-              Voice.
-            </p>
-          </div>
-        </form>
-
-        {validationError ? (
-          <p id="brand-lookup-input-error" className="text-sm text-error">
-            {validationError.message}
-          </p>
-        ) : null}
-
-        <div className="flex flex-wrap items-center gap-3 text-xs text-base-content/60">
-          <p className="tabular-nums">
-            Est.{" "}
-            <span className="font-medium text-base-content/80">
-              {euros.fromUsd(BRAND_LOOKUP_DISPLAYED_COST_USD)}
-            </span>
-            {hasCompetitors ? (
-              <span>
-                {" "}
-                más ~{euros.fromUsd(BRAND_LOOKUP_COMPETITOR_DISPLAYED_COST_USD)}{" "}
-                por comparar competidores
+              <FieldDescription>
+                Add up to 5 competitor brands or domains to see your Share of
+                Voice.
+              </FieldDescription>
+            </Field>
+            <p className="text-xs text-muted-foreground tabular-nums">
+              Est.{" "}
+              <span className="font-medium text-foreground">
+                {euros.fromUsd(BRAND_LOOKUP_DISPLAYED_COST_USD)}
               </span>
-            ) : null}
-          </p>
-        </div>
-      </div>
-    </div>
+              {hasCompetitors ? (
+                <span>
+                  {" "}
+                  más ~
+                  {euros.fromUsd(
+                    BRAND_LOOKUP_COMPETITOR_DISPLAYED_COST_USD,
+                  )}{" "}
+                  por comparar competidores
+                </span>
+              ) : null}
+            </p>
+          </>
+        }
+      >
+        <SearchInput
+          placeholder="Enter a brand name or domain"
+          aria-label="Brand name or domain"
+          value={query}
+          maxLength={BRAND_LOOKUP_MAX_INPUT_LENGTH}
+          onChange={(event) => onQueryChange(event.target.value)}
+          aria-invalid={queryError || undefined}
+          aria-describedby={queryError ? "brand-lookup-input-error" : undefined}
+          autoComplete="off"
+          spellCheck={false}
+        />
+
+        <ResearchScopeSelect
+          value={scope}
+          className="w-full lg:w-40"
+          onChange={onScopeChange}
+          disabledReason={scopeDisabledReason}
+        />
+      </SearchCard>
+    </>
   );
 }

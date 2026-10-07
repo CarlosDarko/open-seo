@@ -40,7 +40,9 @@ export function translateEs() {
     const found = new Set();
     for (const dir of ["src/client", "src/routes"]) {
       for (const file of listFiles(path.join(root, dir))) {
-        collectDataStrings(parse(file, fs.readFileSync(file, "utf8")), (key) => found.add(key));
+        collectDataStrings(parse(file, fs.readFileSync(file, "utf8")), (key) =>
+          found.add(key),
+        );
       }
     }
     return found;
@@ -68,7 +70,11 @@ export function translateEs() {
           const body = /[{}<>]/.test(translated)
             ? `{${JSON.stringify(translated)}}`
             : translated;
-          edits.push({ start: node.pos, end: node.end, text: lead + body + trail });
+          edits.push({
+            start: node.pos,
+            end: node.end,
+            text: lead + body + trail,
+          });
           return;
         }
 
@@ -77,7 +83,8 @@ export function translateEs() {
         edits.push({
           start: node.getStart(sf),
           end: node.end,
-          text: kind === "attr" || kind === "attr-any" ? `{${literal}}` : literal,
+          text:
+            kind === "attr" || kind === "attr-any" ? `{${literal}}` : literal,
         });
       });
 

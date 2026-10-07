@@ -47,9 +47,7 @@ export const getCostSummary = createServerFn({ method: "GET" })
 export const listCostEvents = createServerFn({ method: "POST" })
   .middleware(requireAuthenticatedContext)
   .validator(eventsSchema)
-  .handler(({ data, context }) =>
-    loadCostEvents(context.organizationId, data),
-  );
+  .handler(({ data, context }) => loadCostEvents(context.organizationId, data));
 
 export const exportCostEvents = createServerFn({ method: "POST" })
   .middleware(requireAuthenticatedContext)

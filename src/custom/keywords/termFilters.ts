@@ -101,7 +101,9 @@ function join(
   operator: "and" | "or",
 ): LabsCondition | LabsGroup {
   if (items.length === 1) return items[0];
-  return items.flatMap((item, index) => (index === 0 ? [item] : [operator, item]));
+  return items.flatMap((item, index) =>
+    index === 0 ? [item] : [operator, item],
+  );
 }
 
 /**
@@ -123,16 +125,28 @@ export function buildLabsTermFilters(
   if (include.length > 0) {
     groups.push(
       join(
-        include.map((term): LabsCondition => [field, "like", `%${normalizeTerm(term)}%`]),
-        (filters.includeMatch ?? DEFAULT_INCLUDE_MATCH) === "any" ? "or" : "and",
+        include.map(
+          (term): LabsCondition => [field, "like", `%${normalizeTerm(term)}%`],
+        ),
+        (filters.includeMatch ?? DEFAULT_INCLUDE_MATCH) === "any"
+          ? "or"
+          : "and",
       ),
     );
   }
   if (exclude.length > 0) {
     groups.push(
       join(
-        exclude.map((term): LabsCondition => [field, "not_like", `%${normalizeTerm(term)}%`]),
-        (filters.excludeMatch ?? DEFAULT_EXCLUDE_MATCH) === "all" ? "or" : "and",
+        exclude.map(
+          (term): LabsCondition => [
+            field,
+            "not_like",
+            `%${normalizeTerm(term)}%`,
+          ],
+        ),
+        (filters.excludeMatch ?? DEFAULT_EXCLUDE_MATCH) === "all"
+          ? "or"
+          : "and",
       ),
     );
   }
@@ -141,7 +155,9 @@ export function buildLabsTermFilters(
   if (groups.length === 2) return [groups[0], "and", groups[1]];
   const only = groups[0];
   // A lone condition goes in a list; a lone group already is the list.
-  return typeof only[0] === "string" ? [only as LabsCondition] : (only as LabsGroup);
+  return typeof only[0] === "string"
+    ? [only as LabsCondition]
+    : (only as LabsGroup);
 }
 
 /** Same rule applied in code, for data sources that cannot filter remotely. */
@@ -178,4 +194,96 @@ export function termsCacheKey(filters: Partial<TermFilters>): string | null {
     includeMatch: filters.includeMatch ?? DEFAULT_INCLUDE_MATCH,
     excludeMatch: filters.excludeMatch ?? DEFAULT_EXCLUDE_MATCH,
   });
+}
+
+// ---------------------------------------------------------------------------
+// Whole-filter helpers. The research code carries the four values as one
+// `TermFilters` object, which keeps the edits in upstream files small.
+// ---------------------------------------------------------------------------
+
+export function normalizeTermFilters(input: Partial<TermFilters>): TermFilters {
+  return {
+    includeTerms: sanitizeTerms(input.includeTerms ?? []),
+    excludeTerms: sanitizeTerms(input.excludeTerms ?? []),
+    includeMatch: input.includeMatch === "any" ? "any" : DEFAULT_INCLUDE_MATCH,
+    excludeMatch: input.excludeMatch === "all" ? "all" : DEFAULT_EXCLUDE_MATCH,
+  };
+}
+
+export function hasTermFilters(filters: TermFilters): boolean {
+  return filters.includeTerms.length > 0 || filters.excludeTerms.length > 0;
+}
+
+export function termFilterCount(filters: TermFilters): number {
+  return filters.includeTerms.length + filters.excludeTerms.length;
+}
+
+/** The URL search params of a set of filters (only non-default values). */
+export function termFiltersToParams(filters: TermFilters): {
+  must: string | undefined;
+  not: string | undefined;
+  mm: "any" | undefined;
+  nm: "all" | undefined;
+} {
+  return {
+    must: termsToParam(filters.includeTerms),
+    not: termsToParam(filters.excludeTerms),
+    mm:
+      filters.includeTerms.length > 1
+        ? includeMatchToParam(filters.includeMatch)
+        : undefined,
+    nm:
+      filters.excludeTerms.length > 1
+        ? excludeMatchToParam(filters.excludeMatch)
+        : undefined,
+  };
+}
+
+export function termFiltersFromParams(params: {
+  must?: string;
+  not?: string;
+  mm?: string;
+  nm?: string;
+}): TermFilters {
+  return normalizeTermFilters({
+    includeTerms: termsFromParam(params.must),
+    excludeTerms: termsFromParam(params.not),
+    includeMatch: includeMatchFromParam(params.mm),
+    excludeMatch: excludeMatchFromParam(params.nm),
+  });
+}
+
+/** Reads filters back from storage (tabs saved before filters existed have none). */
+export function parseStoredTermFilters(value: unknown): TermFilters {
+  if (typeof value !== "object" || value === null) return EMPTY_TERM_FILTERS;
+  const record = value as Record<string, unknown>;
+  const strings = (raw: unknown) =>
+    Array.isArray(raw)
+      ? raw.filter((item): item is string => typeof item === "string")
+      : [];
+  return normalizeTermFilters({
+    includeTerms: strings(record.includeTerms),
+    excludeTerms: strings(record.excludeTerms),
+    includeMatch: record.includeMatch === "any" ? "any" : "all",
+    excludeMatch: record.excludeMatch === "all" ? "all" : "any",
+  });
+}
+
+/** The research request fields for a set of filters (omitted when empty). */
+export function termFiltersToResearchInput(filters: TermFilters): {
+  includeTerms?: string[];
+  excludeTerms?: string[];
+  includeMatch?: TermMatch;
+  excludeMatch?: TermMatch;
+} {
+  return {
+    includeTerms:
+      filters.includeTerms.length > 0 ? filters.includeTerms : undefined,
+    excludeTerms:
+      filters.excludeTerms.length > 0 ? filters.excludeTerms : undefined,
+    includeMatch:
+      filters.includeTerms.length > 0 ? filters.includeMatch : undefined,
+    excludeMatch:
+      filters.excludeTerms.length > 0 ? filters.excludeMatch : undefined,
+  };
 }

@@ -7,9 +7,11 @@ import type {
 type KeywordSearchParams = {
   q?: string;
   loc?: number;
+  locName?: string;
   kLimit?: ResultLimit;
   mode?: KeywordMode;
   cs?: boolean;
+  grp?: boolean;
   must?: string;
   not?: string;
   mm?: "any";
@@ -34,9 +36,11 @@ export function normalizeLegacyKeywordSearch(search: KeywordSearchParams): {
     ...search,
     q: search.q === "" ? undefined : search.q,
     loc: search.loc,
+    locName: search.locName === "" ? undefined : search.locName,
     kLimit: search.kLimit === 150 ? undefined : search.kLimit,
     mode: search.mode === "auto" ? undefined : search.mode,
     cs: search.cs === true ? true : undefined,
+    grp: search.grp === true ? true : undefined,
     must: search.must === "" ? undefined : search.must,
     not: search.not === "" ? undefined : search.not,
     mm: search.mm,
@@ -56,9 +60,11 @@ export function normalizeLegacyKeywordSearch(search: KeywordSearchParams): {
   const keys: Array<keyof KeywordSearchParams> = [
     "q",
     "loc",
+    "locName",
     "kLimit",
     "mode",
     "cs",
+    "grp",
     "must",
     "not",
     "mm",

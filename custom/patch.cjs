@@ -6,7 +6,8 @@ module.exports = (file, pairs) => {
   const crlf = s.includes("\r\n");
   if (crlf) s = s.split("\r\n").join("\n");
   for (const [from, to] of pairs) {
-    if (!s.includes(from)) throw new Error(file + ": no encontrado: " + from.slice(0, 80));
+    if (!s.includes(from))
+      throw new Error(file + ": no encontrado: " + from.slice(0, 80));
     s = s.replace(from, () => to);
   }
   if (crlf) s = s.split("\n").join("\r\n");

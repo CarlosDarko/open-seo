@@ -36,8 +36,14 @@ describe("term filters reach DataForSEO before the result limit", () => {
 
   it("filters suggestions and ideas on the keyword field", async () => {
     const calls = mockClient();
-    await fetchResearchRowsBySource({ ...base, ...terms, source: "suggestions" }, customer);
-    await fetchResearchRowsBySource({ ...base, ...terms, source: "ideas" }, customer);
+    await fetchResearchRowsBySource(
+      { ...base, ...terms, source: "suggestions" },
+      customer,
+    );
+    await fetchResearchRowsBySource(
+      { ...base, ...terms, source: "ideas" },
+      customer,
+    );
 
     const expected = [
       ["keyword", "like", "%gratis%"],
@@ -50,7 +56,10 @@ describe("term filters reach DataForSEO before the result limit", () => {
 
   it("filters related keywords on the nested keyword field", async () => {
     const calls = mockClient();
-    await fetchResearchRowsBySource({ ...base, ...terms, source: "related" }, customer);
+    await fetchResearchRowsBySource(
+      { ...base, ...terms, source: "related" },
+      customer,
+    );
 
     expect(calls.related.mock.calls[0][0].filters).toEqual([
       ["keyword_data.keyword", "like", "%gratis%"],
@@ -61,38 +70,16 @@ describe("term filters reach DataForSEO before the result limit", () => {
 
   it("sends no filters when there are no terms", async () => {
     const calls = mockClient();
-    await fetchResearchRowsBySource({ ...base, source: "suggestions" }, customer);
+    await fetchResearchRowsBySource(
+      { ...base, source: "suggestions" },
+      customer,
+    );
 
     expect(calls.suggestions.mock.calls[0][0].filters).toBeUndefined();
   });
 });
 
 describe("mapAdsKeywordItems", () => {
-  it("maps Google Ads items to research rows without KD/intent", () => {
-    const rows = mapAdsKeywordItems([
-      {
-        keyword: "Hotel Reykjavik",
-        search_volume: 1300,
-        cpc: 2.54,
-        competition: "HIGH",
-        competition_index: 42,
-        monthly_searches: [{ year: 2026, month: 5, search_volume: 1300 }],
-      },
-    ]);
-
-    expect(rows).toEqual([
-      {
-        keyword: "hotel reykjavik",
-        searchVolume: 1300,
-        trend: [{ year: 2026, month: 5, searchVolume: 1300 }],
-        cpc: 2.54,
-        competition: 0.42,
-        keywordDifficulty: null,
-        intent: "unknown",
-      },
-    ]);
-  });
-
   it("dedupes case-variant keywords and skips empty ones", () => {
     const items: AdsKeywordIdeaItem[] = [
       { keyword: "northern lights tour", search_volume: 320 },

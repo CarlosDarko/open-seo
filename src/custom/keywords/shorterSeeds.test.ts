@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { seedHasNoData, shorterSearchVariants } from "@/custom/keywords/shorterSeeds";
+import {
+  seedHasNoData,
+  shorterSearchVariants,
+} from "@/custom/keywords/shorterSeeds";
 
 describe("shorterSearchVariants", () => {
   it("drops the first word and trims trailing connectors", () => {
@@ -32,29 +35,33 @@ describe("shorterSearchVariants", () => {
 
 describe("seedHasNoData", () => {
   const base = {
-    source: "ideas",
-    usedFallback: true,
+    source: "blended",
+    filtering: false,
     searchedKeyword: "proveedor fruta al por mayor",
     rowKeywords: ["proveedor ropa vintage", "proveedor carrefour"],
   };
 
-  it("detects the broad fallback without the searched phrase", () => {
+  it("detects an Auto search whose phrase is missing from the results", () => {
     expect(seedHasNoData(base)).toBe(true);
   });
 
   it("is false when the phrase itself is in the results", () => {
     expect(
-      seedHasNoData({ ...base, rowKeywords: ["Proveedor fruta al por mayor", "x"] }),
+      seedHasNoData({
+        ...base,
+        rowKeywords: ["Proveedor fruta al por mayor", "x"],
+      }),
     ).toBe(false);
   });
 
-  it("is false when the user picked the Ideas mode on purpose (no fallback)", () => {
-    expect(seedHasNoData({ ...base, usedFallback: false })).toBe(false);
+  it("is false when term filters may have removed the phrase", () => {
+    expect(seedHasNoData({ ...base, filtering: true })).toBe(false);
   });
 
-  it("is false for the related and suggestions sources", () => {
-    expect(seedHasNoData({ ...base, source: "related" })).toBe(false);
+  it("is false for a source the user picked on purpose", () => {
+    expect(seedHasNoData({ ...base, source: "ideas" })).toBe(false);
     expect(seedHasNoData({ ...base, source: "suggestions" })).toBe(false);
+    expect(seedHasNoData({ ...base, source: undefined })).toBe(false);
   });
 
   it("is false without results or without a searched phrase", () => {

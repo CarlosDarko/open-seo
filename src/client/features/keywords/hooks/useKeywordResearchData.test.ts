@@ -4,76 +4,73 @@ import { describe, expect, it, vi } from "vitest";
 // Workers-only bindings that don't resolve outside workerd.
 vi.mock("cloudflare:workers", () => ({ env: {} }));
 
+import { EMPTY_TERM_FILTERS } from "@/custom/keywords/termFilters";
 import {
-  buildKeywordResearchQueryKey,
   buildKeywordResearchRequest,
+  buildKeywordResearchQueryKey,
 } from "./useKeywordResearchData";
 
 const baseInput = {
   projectId: "project_1",
   keywordInput: "technical seo",
   locationCode: 2704,
+  locationName: undefined,
   resultLimit: 150 as const,
   mode: "auto" as const,
   clickstream: false,
-  includeTerms: [] as string[],
-  excludeTerms: [] as string[],
-  includeMatch: "all" as const,
-  excludeMatch: "any" as const,
+  groupKeywords: false,
+  termFilters: EMPTY_TERM_FILTERS,
 };
 
 describe("buildKeywordResearchRequest", () => {
-  it("carries an explicitly selected location without a language", () => {
-    const request = buildKeywordResearchRequest(baseInput);
-
-    expect(request).toMatchObject({ locationCode: 2704 });
-    expect(request).not.toHaveProperty("languageCode");
-  });
-
-  it("leaves the location undefined for the server to resolve", () => {
-    const request = buildKeywordResearchRequest({
+  it("never serves a national or ungrouped result for a local or grouped search", () => {
+    const national = buildKeywordResearchRequest(baseInput);
+    const local = buildKeywordResearchRequest({
       ...baseInput,
-      locationCode: undefined,
+      locationName: "Hanoi,Hanoi,Vietnam",
     });
-
-    expect(request).toMatchObject({ locationCode: undefined });
-    expect(request).not.toHaveProperty("languageCode");
-  });
-
-  it("carries the must-contain and exclude terms", () => {
-    const request = buildKeywordResearchRequest({
+    const grouped = buildKeywordResearchRequest({
       ...baseInput,
-      includeTerms: ["gratis"],
-      excludeTerms: ["madrid", "barcelona"],
+      groupKeywords: true,
     });
 
-    expect(request).toMatchObject({
-      includeTerms: ["gratis"],
-      excludeTerms: ["madrid", "barcelona"],
+    expect(local).toMatchObject({ locationName: "Hanoi,Hanoi,Vietnam" });
+    expect(buildKeywordResearchQueryKey(local)).not.toEqual(
+      buildKeywordResearchQueryKey(national),
+    );
+    expect(buildKeywordResearchQueryKey(grouped)).not.toEqual(
+      buildKeywordResearchQueryKey(national),
+    );
+  });
+
+  it("never serves an unfiltered result for a filtered search, or one filter mode for the other", () => {
+    const plain = buildKeywordResearchRequest(baseInput);
+    const excluded = buildKeywordResearchRequest({
+      ...baseInput,
+      termFilters: { ...EMPTY_TERM_FILTERS, excludeTerms: ["madrid"] },
     });
-  });
-
-  it("keys the query on the terms so a filtered search is a separate result", () => {
-    const plain = buildKeywordResearchQueryKey(buildKeywordResearchRequest(baseInput));
-    const filtered = buildKeywordResearchQueryKey(
-      buildKeywordResearchRequest({ ...baseInput, excludeTerms: ["madrid"] }),
-    );
-
-    expect(filtered).not.toEqual(plain);
-  });
-
-  it("keys the query on Y/O so the same terms combined differently do not share a result", () => {
-    const all = buildKeywordResearchQueryKey(
-      buildKeywordResearchRequest({ ...baseInput, includeTerms: ["barcelona", "madrid"] }),
-    );
-    const any = buildKeywordResearchQueryKey(
-      buildKeywordResearchRequest({
-        ...baseInput,
+    const any = buildKeywordResearchRequest({
+      ...baseInput,
+      termFilters: {
+        ...EMPTY_TERM_FILTERS,
         includeTerms: ["barcelona", "madrid"],
         includeMatch: "any",
-      }),
-    );
+      },
+    });
+    const all = buildKeywordResearchRequest({
+      ...baseInput,
+      termFilters: {
+        ...EMPTY_TERM_FILTERS,
+        includeTerms: ["barcelona", "madrid"],
+        includeMatch: "all",
+      },
+    });
 
-    expect(any).not.toEqual(all);
+    expect(buildKeywordResearchQueryKey(excluded)).not.toEqual(
+      buildKeywordResearchQueryKey(plain),
+    );
+    expect(buildKeywordResearchQueryKey(any)).not.toEqual(
+      buildKeywordResearchQueryKey(all),
+    );
   });
 });

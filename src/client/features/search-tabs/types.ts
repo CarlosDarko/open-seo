@@ -1,9 +1,10 @@
+import type { TermFilters } from "@/custom/keywords/termFilters";
 import type {
   KeywordMode,
   ResultLimit,
 } from "@/client/features/keywords/keywordResearchTypes";
+import type { PromptExplorerSearch } from "@/client/features/ai-search/promptExplorerQuery";
 import type { ResearchScope } from "@/shared/researchScope";
-import type { TermMatch } from "@/custom/keywords/termFilters";
 
 export type BacklinksSearchTabInput = {
   type: "backlinks";
@@ -22,19 +23,22 @@ export type KeywordSearchTabInput = {
   type: "keyword";
   keyword: string;
   locationCode?: number;
+  /** City, county, or region for local volume; absent for national. */
+  locationName?: string;
   resultLimit: ResultLimit;
   mode: KeywordMode;
   clickstream: boolean;
-  includeTerms: string[];
-  excludeTerms: string[];
-  includeMatch: TermMatch;
-  excludeMatch: TermMatch;
+  groupKeywords: boolean;
+  termFilters: TermFilters;
 };
+
+export type PromptSearchTabInput = { type: "prompt" } & PromptExplorerSearch;
 
 export type SearchTabInput =
   | BacklinksSearchTabInput
   | DomainSearchTabInput
-  | KeywordSearchTabInput;
+  | KeywordSearchTabInput
+  | PromptSearchTabInput;
 
 export type SearchTab = {
   id: string;

@@ -1,12 +1,14 @@
 import { useId, useRef, useState, type KeyboardEvent } from "react";
 import { Minus, Plus, X } from "lucide-react";
-import type { TermMatch } from "@/custom/keywords/termFilters";
+import { Badge } from "@/client/components/ui/badge";
+import { Button } from "@/client/components/ui/button";
 import {
   MAX_TERMS_PER_KIND,
   MAX_TERM_LENGTH,
   MIN_TERM_LENGTH,
   normalizeTerm,
   sanitizeTerms,
+  type TermMatch,
 } from "@/custom/keywords/termFilters";
 
 type Props = {
@@ -18,15 +20,16 @@ type Props = {
   /** "include" terms are required; "exclude" terms are discarded. */
   tone: "include" | "exclude";
   /** How several terms combine: all together (Y) or any one of them (O). */
-  match?: TermMatch;
-  onMatchChange?: (next: TermMatch) => void;
-  matchTitles?: Record<TermMatch, string>;
+  match: TermMatch;
+  onMatchChange: (next: TermMatch) => void;
+  matchTitles: Record<TermMatch, string>;
 };
 
 /**
  * Tag input for the keyword term filters: type a word and press Enter or a
  * comma to turn it into a chip; click a chip's × (or Backspace on an empty
- * field) to remove it. Pasting "a, b, c" adds three chips.
+ * field) to remove it. Pasting "a, b, c" adds three chips. From two chips on,
+ * a Y | O switch chooses how they combine.
  */
 export function TermChipsField({
   label,
@@ -69,7 +72,9 @@ export function TermChipsField({
       return;
     }
     setMessage(
-      pieces.length > added ? `Se añadieron ${added} de ${pieces.length}.` : null,
+      pieces.length > added
+        ? `Se añadieron ${added} de ${pieces.length}.`
+        : null,
     );
     setDraft("");
     onChange(next);
@@ -85,55 +90,50 @@ export function TermChipsField({
     }
   }
 
-  const chipClass =
-    tone === "include"
-      ? "border-base-300 bg-base-200 text-base-content"
-      : "border-error/30 bg-error/10 text-error";
-
   return (
     <div className="flex min-w-0 flex-col gap-1.5">
       <div className="flex items-center justify-between gap-2">
         <label
           htmlFor={inputId}
-          className="flex items-center gap-1.5 text-sm font-medium text-base-content/80"
+          className="flex items-center gap-1.5 text-sm font-medium"
         >
           <span
-            className={`flex size-4 items-center justify-center rounded-full ${
-              tone === "include" ? "bg-base-300" : "bg-error/15 text-error"
-            }`}
             aria-hidden
+            className={`flex size-4 items-center justify-center rounded-full ${
+              tone === "include"
+                ? "bg-foreground/10"
+                : "bg-destructive/15 text-destructive"
+            }`}
           >
             <Icon className="size-3" strokeWidth={3} />
           </span>
           {label}
         </label>
         <div className="flex items-center gap-2">
-          {onMatchChange && match && value.length > 1 ? (
+          {value.length > 1 ? (
             <div
               role="group"
               aria-label={`Cómo se combinan las palabras de «${label}»`}
-              className="join"
+              className="flex items-center gap-1"
             >
               {(["all", "any"] as const).map((mode) => (
-                <button
+                <Button
                   key={mode}
                   type="button"
+                  size="xs"
+                  variant={match === mode ? "default" : "outline"}
                   aria-pressed={match === mode}
-                  title={matchTitles?.[mode]}
-                  className={`btn btn-xs join-item min-w-8 ${
-                    match === mode
-                      ? "btn-neutral"
-                      : "btn-ghost border border-base-300"
-                  }`}
+                  title={matchTitles[mode]}
+                  className="min-w-7"
                   onClick={() => onMatchChange(mode)}
                 >
                   {mode === "all" ? "Y" : "O"}
-                </button>
+                </Button>
               ))}
             </div>
           ) : null}
           <span
-            className="text-xs tabular-nums text-base-content/50"
+            className="text-xs tabular-nums text-muted-foreground"
             title={`Máximo ${MAX_TERMS_PER_KIND} palabras en este campo (DataForSEO admite 8 condiciones por búsqueda entre los dos campos).`}
           >
             {value.length} de {MAX_TERMS_PER_KIND}
@@ -141,19 +141,21 @@ export function TermChipsField({
         </div>
       </div>
 
+      {/* A click anywhere in the box focuses the input. */}
       <div
-        className="flex min-h-11 flex-wrap items-center gap-1.5 rounded-lg border border-base-300 bg-base-100 px-2.5 py-1.5 transition-colors focus-within:border-primary"
+        className="flex min-h-10 flex-wrap items-center gap-1.5 rounded-lg border border-input bg-card px-2.5 py-1.5 transition-colors focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50"
         onClick={() => inputRef.current?.focus()}
       >
         {value.map((term) => (
-          <span
+          <Badge
             key={term}
-            className={`inline-flex max-w-full items-center gap-1 rounded-md border py-0.5 pl-2 pr-1 text-sm ${chipClass}`}
+            variant={tone === "include" ? "secondary" : "destructive"}
+            className="h-6 max-w-full gap-1 pr-1 text-sm"
           >
             <span className="truncate">{term}</span>
             <button
               type="button"
-              className="flex size-5 shrink-0 items-center justify-center rounded hover:bg-base-content/10"
+              className="flex size-4 shrink-0 items-center justify-center rounded hover:bg-foreground/10"
               aria-label={`Quitar ${term}`}
               onClick={(event) => {
                 event.stopPropagation();
@@ -163,7 +165,7 @@ export function TermChipsField({
             >
               <X className="size-3" />
             </button>
-          </span>
+          </Badge>
         ))}
         <input
           ref={inputRef}
@@ -182,7 +184,7 @@ export function TermChipsField({
                 ? placeholder
                 : "Añadir otra…"
           }
-          className="min-w-24 flex-1 bg-transparent text-sm outline-none placeholder:text-base-content/40 disabled:cursor-not-allowed"
+          className="min-w-24 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed"
           onChange={(event) => {
             setDraft(event.target.value);
             if (message) setMessage(null);
@@ -201,7 +203,7 @@ export function TermChipsField({
 
       <p
         id={helpId}
-        className={`text-xs ${message ? "font-medium text-base-content/90" : "text-base-content/55"}`}
+        className={`text-xs ${message ? "font-medium text-foreground" : "text-muted-foreground"}`}
         role={message ? "status" : undefined}
       >
         {message ?? help}

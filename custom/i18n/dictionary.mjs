@@ -44,7 +44,8 @@ export function loadDictionary(dir) {
         .join(brand);
       if (key.startsWith("@ ")) {
         const bar = key.indexOf(" | ");
-        if (bar < 0) throw new Error(`${file}:${index + 1}: falta " | " en el ámbito`);
+        if (bar < 0)
+          throw new Error(`${file}:${index + 1}: falta " | " en el ámbito`);
         const scope = key.slice(2, bar).trim();
         key = key.slice(bar + 3).trim();
         const list = scoped.get(key) ?? [];
@@ -60,7 +61,9 @@ export function loadDictionary(dir) {
     has: (key) => general.has(key) || scoped.has(key),
     keys: () => [...new Set([...general.keys(), ...scoped.keys()])],
     get(key, file) {
-      const match = scoped.get(key)?.find((entry) => file.includes(entry.scope));
+      const match = scoped
+        .get(key)
+        ?.find((entry) => file.includes(entry.scope));
       return match ? match.value : general.get(key);
     },
   };

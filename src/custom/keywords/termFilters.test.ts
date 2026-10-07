@@ -18,7 +18,9 @@ describe("sanitizeTerms", () => {
   });
 
   it("removes duplicates, too-short terms and terms without letters", () => {
-    expect(sanitizeTerms(["madrid", "MADRID", "a", "123", ""])).toEqual(["madrid"]);
+    expect(sanitizeTerms(["madrid", "MADRID", "a", "123", ""])).toEqual([
+      "madrid",
+    ]);
   });
 
   it("caps the list at four terms", () => {
@@ -51,7 +53,10 @@ describe("URL param round trip", () => {
 describe("buildLabsTermFilters", () => {
   it("chains conditions with and", () => {
     expect(
-      buildLabsTermFilters("keyword", { includeTerms: ["gratis"], excludeTerms: ["madrid"] }),
+      buildLabsTermFilters("keyword", {
+        includeTerms: ["gratis"],
+        excludeTerms: ["madrid"],
+      }),
     ).toEqual([
       ["keyword", "like", "%gratis%"],
       "and",
@@ -64,16 +69,21 @@ describe("buildLabsTermFilters", () => {
   });
 
   it("uses the field it is given", () => {
-    expect(buildLabsTermFilters("keyword_data.keyword", { excludeTerms: ["madrid"] })).toEqual([
-      ["keyword_data.keyword", "not_like", "%madrid%"],
-    ]);
+    expect(
+      buildLabsTermFilters("keyword_data.keyword", {
+        excludeTerms: ["madrid"],
+      }),
+    ).toEqual([["keyword_data.keyword", "not_like", "%madrid%"]]);
   });
 });
 
 describe("Y/O in the DataForSEO filter", () => {
   it("joins required terms with or when any one is enough (O)", () => {
     expect(
-      buildLabsTermFilters("keyword", { includeTerms: ["barcelona", "madrid"], includeMatch: "any" }),
+      buildLabsTermFilters("keyword", {
+        includeTerms: ["barcelona", "madrid"],
+        includeMatch: "any",
+      }),
     ).toEqual([
       ["keyword", "like", "%barcelona%"],
       "or",
@@ -89,7 +99,11 @@ describe("Y/O in the DataForSEO filter", () => {
         excludeTerms: ["gratis"],
       }),
     ).toEqual([
-      [["keyword", "like", "%barcelona%"], "or", ["keyword", "like", "%madrid%"]],
+      [
+        ["keyword", "like", "%barcelona%"],
+        "or",
+        ["keyword", "like", "%madrid%"],
+      ],
       "and",
       ["keyword", "not_like", "%gratis%"],
     ]);
@@ -97,7 +111,10 @@ describe("Y/O in the DataForSEO filter", () => {
 
   it("drops a keyword only when all excluded terms appear together (Y)", () => {
     expect(
-      buildLabsTermFilters("keyword", { excludeTerms: ["barcelona", "seo"], excludeMatch: "all" }),
+      buildLabsTermFilters("keyword", {
+        excludeTerms: ["barcelona", "seo"],
+        excludeMatch: "all",
+      }),
     ).toEqual([
       ["keyword", "not_like", "%barcelona%"],
       "or",
@@ -123,13 +140,19 @@ describe("Y/O in the DataForSEO filter", () => {
 
 describe("Y/O in the local rule", () => {
   it("accepts any required term when the match is O", () => {
-    const filters = { includeTerms: ["barcelona", "madrid"], includeMatch: "any" as const };
+    const filters = {
+      includeTerms: ["barcelona", "madrid"],
+      includeMatch: "any" as const,
+    };
     expect(keywordMatchesTerms("seo madrid", filters)).toBe(true);
     expect(keywordMatchesTerms("seo valencia", filters)).toBe(false);
   });
 
   it("drops only keywords with every excluded term when the exclude match is Y", () => {
-    const filters = { excludeTerms: ["barcelona", "seo"], excludeMatch: "all" as const };
+    const filters = {
+      excludeTerms: ["barcelona", "seo"],
+      excludeMatch: "all" as const,
+    };
     expect(keywordMatchesTerms("agencia seo barcelona", filters)).toBe(false);
     expect(keywordMatchesTerms("agencia seo madrid", filters)).toBe(true);
   });
@@ -166,7 +189,9 @@ describe("termsCacheKey", () => {
     expect(termsCacheKey({ excludeTerms: ["b", "a"] })).toBe(
       termsCacheKey({ excludeTerms: ["a", "b"] }),
     );
-    expect(termsCacheKey({ includeTerms: ["a", "b"], includeMatch: "any" })).not.toBe(
+    expect(
+      termsCacheKey({ includeTerms: ["a", "b"], includeMatch: "any" }),
+    ).not.toBe(
       termsCacheKey({ includeTerms: ["a", "b"], includeMatch: "all" }),
     );
   });

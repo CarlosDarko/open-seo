@@ -1,13 +1,14 @@
+import { parseStoredTermFilters } from "@/custom/keywords/termFilters";
 import { useCallback, useMemo, useSyncExternalStore } from "react";
+import { z } from "zod";
 import {
   researchScopeSchema,
   type ResearchScope,
 } from "@/shared/researchScope";
 import {
-  excludeMatchFromParam,
-  includeMatchFromParam,
-  sanitizeTerms,
-} from "@/custom/keywords/termFilters";
+  promptExplorerModelSchema,
+  webSearchCountrySelectionSchema,
+} from "@/types/schemas/ai-search";
 import type { SearchTab, SearchTabInput } from "./types";
 
 type TabsState = {
@@ -28,6 +29,15 @@ const EMPTY_STATE: TabsState = {
 const CHANGE_EVENT = "search-tabs-change";
 const stateCache = new Map<string, TabsState>();
 const SEARCH_TABS_LIMIT = 20;
+
+const promptTabInputSchema = z.object({
+  type: z.literal("prompt"),
+  prompt: z.string().min(1),
+  highlightBrand: z.string(),
+  models: z.array(promptExplorerModelSchema).min(1),
+  webSearch: z.boolean(),
+  webSearchCountryCode: webSearchCountrySelectionSchema,
+});
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -111,29 +121,24 @@ function parseTabInput(value: unknown): SearchTabInput | null {
       keyword: value.keyword,
       locationCode:
         typeof value.locationCode === "number" ? value.locationCode : undefined,
+      locationName:
+        typeof value.locationName === "string" ? value.locationName : undefined,
       resultLimit: value.resultLimit,
       mode: value.mode,
       // Tabs persisted before the clickstream toggle existed default to off.
       clickstream: value.clickstream === true,
+      // Tabs persisted before per-search grouping existed default to off.
+      groupKeywords: value.groupKeywords === true,
       // Tabs persisted before the term filters existed have none.
-      includeTerms: sanitizeTerms(readStrings(value.includeTerms)),
-      excludeTerms: sanitizeTerms(readStrings(value.excludeTerms)),
-      includeMatch: includeMatchFromParam(
-        typeof value.includeMatch === "string" ? value.includeMatch : undefined,
-      ),
-      excludeMatch: excludeMatchFromParam(
-        typeof value.excludeMatch === "string" ? value.excludeMatch : undefined,
-      ),
+      termFilters: parseStoredTermFilters(value.termFilters),
     };
   }
 
-  return null;
-}
+  if (value.type === "prompt") {
+    return promptTabInputSchema.safeParse(value).data ?? null;
+  }
 
-function readStrings(value: unknown): string[] {
-  return Array.isArray(value)
-    ? value.filter((item): item is string => typeof item === "string")
-    : [];
+  return null;
 }
 
 function storageKey(key: string) {

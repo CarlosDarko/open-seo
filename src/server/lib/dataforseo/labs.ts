@@ -151,6 +151,7 @@ export async function fetchRelatedKeywords(input: {
   limit: number;
   depth?: number;
   includeClickstreamData?: boolean;
+  ignoreSynonyms?: boolean;
   /** DataForSEO Labs filters (applied before the limit). */
   filters?: unknown[];
 }): Promise<DataforseoApiResponse<RelatedKeywordItem[]>> {
@@ -162,10 +163,11 @@ export async function fetchRelatedKeywords(input: {
       location_code: input.locationCode,
       language_code: input.languageCode,
       limit: input.limit,
-      ...(input.filters ? { filters: input.filters } : {}),
       depth: input.depth ?? 3,
+      ...(input.filters ? { filters: input.filters } : {}),
+      ignore_synonyms: input.ignoreSynonyms ?? false,
       // Clickstream-refined volumes DOUBLE the request cost, so they are
-      // opt-in — see specs/0004-keyword-data-source-routing.md.
+      // opt-in — see docs/maintainers/specs/0004-keyword-data-source-routing.md.
       include_clickstream_data: input.includeClickstreamData ?? false,
       include_serp_info: false,
     },
@@ -183,6 +185,7 @@ export async function fetchKeywordSuggestions(input: {
   languageCode: string;
   limit: number;
   includeClickstreamData?: boolean;
+  ignoreSynonyms?: boolean;
   /** DataForSEO Labs filters (applied before the limit). */
   filters?: unknown[];
 }): Promise<DataforseoApiResponse<LabsKeywordDataItem[]>> {
@@ -198,7 +201,7 @@ export async function fetchKeywordSuggestions(input: {
       include_serp_info: false,
       ...(input.filters ? { filters: input.filters } : {}),
       include_seed_keyword: true,
-      ignore_synonyms: false,
+      ignore_synonyms: input.ignoreSynonyms ?? false,
       exact_match: false,
     },
   ]);
@@ -215,6 +218,7 @@ export async function fetchKeywordIdeas(input: {
   languageCode: string;
   limit: number;
   includeClickstreamData?: boolean;
+  ignoreSynonyms?: boolean;
   /** DataForSEO Labs filters (applied before the limit). */
   filters?: unknown[];
 }): Promise<DataforseoApiResponse<LabsKeywordDataItem[]>> {
@@ -228,7 +232,7 @@ export async function fetchKeywordIdeas(input: {
       limit: input.limit,
       include_clickstream_data: input.includeClickstreamData ?? false,
       include_serp_info: false,
-      ignore_synonyms: false,
+      ignore_synonyms: input.ignoreSynonyms ?? false,
       ...(input.filters ? { filters: input.filters } : {}),
       closely_variants: false,
     },

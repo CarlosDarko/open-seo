@@ -2,6 +2,13 @@ import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle, X, XCircle } from "lucide-react";
+import {
+  Alert,
+  AlertAction,
+  AlertDescription,
+  AlertTitle,
+} from "@/client/components/ui/alert";
+import { Button } from "@/client/components/ui/button";
 import { costSummaryQuery } from "@/custom/costs/client/queries";
 import { madridDay } from "@/custom/costs/shared";
 
@@ -26,8 +33,8 @@ function writeDismissed(value: Record<string, string>) {
   }
 }
 
-export function CostAlertBanner() {
-  const { data } = useQuery(costSummaryQuery());
+export function CostAlertBanner({ ready }: { ready: boolean }) {
+  const { data } = useQuery({ ...costSummaryQuery(), enabled: ready });
   const [dismissed, setDismissed] = useState<Record<string, string>>(() =>
     readDismissed(),
   );
@@ -45,36 +52,39 @@ export function CostAlertBanner() {
   }
 
   return (
-    <div className="shrink-0 space-y-2 px-4 py-2.5 md:px-6">
-      <div className="mx-auto max-w-7xl space-y-2">
-        {visible.map((alert) => {
-          const Icon = alert.level === "error" ? XCircle : AlertTriangle;
-          return (
-            <div
-              key={alert.id}
-              className={`alert ${alert.level === "error" ? "alert-error" : "alert-warning"}`}
-            >
-              <Icon className="size-4 shrink-0" />
-              <span className="text-sm">
-                <span className="font-medium">{alert.title}.</span> {alert.detail}{" "}
-                <Link to="/costs" className="link font-medium">
-                  Ver costes
-                </Link>
-              </span>
-              {alert.level !== "error" ? (
-                <button
-                  type="button"
-                  className="btn btn-ghost btn-xs btn-circle"
+    <>
+      {visible.map((alert) => {
+        const isError = alert.level === "error";
+        const Icon = isError ? XCircle : AlertTriangle;
+        return (
+          <Alert
+            key={alert.id}
+            banner
+            variant={isError ? "destructive" : "warning"}
+          >
+            <Icon />
+            <AlertTitle>{alert.title}</AlertTitle>
+            <AlertDescription className="text-foreground/80">
+              {alert.detail}{" "}
+              <Link to="/costs" className="font-medium">
+                Ver costes
+              </Link>
+            </AlertDescription>
+            {isError ? null : (
+              <AlertAction>
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
                   aria-label="Ocultar hasta mañana"
                   onClick={() => dismiss(alert.id)}
                 >
-                  <X className="size-3.5" />
-                </button>
-              ) : null}
-            </div>
-          );
-        })}
-      </div>
-    </div>
+                  <X />
+                </Button>
+              </AlertAction>
+            )}
+          </Alert>
+        );
+      })}
+    </>
   );
 }
