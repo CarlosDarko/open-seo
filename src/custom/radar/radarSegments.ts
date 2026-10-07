@@ -82,17 +82,63 @@ function pathParts(url: string): string[] {
 
 const OTHER_PAGES = "Otras páginas";
 
-/** Page type from the URL structure: the first folder when several pages
- *  share it ("/blog/"), the home page, pages directly in the root, or other.
- *  The folders come from the site itself, so any site gets its own types. */
+// Two-letter language codes that sites use as the first folder of the URL
+// (/es/, /fr/…). Matching a known list avoids mistaking "/us/" or "/me/" for
+// a language.
+const LANGUAGES = new Set([
+  "es", "en", "fr", "de", "it", "pt", "ca", "eu", "gl", "nl", "pl", "ru", "tr",
+  "ar", "zh", "ja", "ko", "sv", "da", "no", "nb", "fi", "cs", "el", "he", "hi",
+  "id", "ro", "hu", "uk", "bg", "hr", "sk", "sl", "sr", "lt", "lv", "et", "vi",
+  "th", "ms", "fa",
+]);
+
+/** The language folder of a URL path ("es", "pt-br"), if it starts with one. */
+function languageFolder(parts: string[]): string | null {
+  const first = parts[0]?.toLowerCase();
+  if (!first) return null;
+  if (LANGUAGES.has(first)) return first;
+  const [language, region] = first.split(/[-_]/);
+  return region?.length === 2 && LANGUAGES.has(language) ? first : null;
+}
+
+/** Page parts once the language folder is removed. */
+function withoutLanguage(parts: string[]): string[] {
+  return languageFolder(parts) ? parts.slice(1) : parts;
+}
+
+/** Language of the pages, from the first folder of the URL. Returns the
+ *  classifier and how many different languages were found; with fewer than
+ *  two, a language split says nothing. */
+export function languageClassifier(urls: string[]): {
+  classify: (url: string) => string;
+  count: number;
+} {
+  const found = new Set<string>();
+  for (const url of urls) {
+    const language = languageFolder(pathParts(url));
+    if (language) found.add(language);
+  }
+  return {
+    count: found.size,
+    classify: (url) => {
+      const language = languageFolder(pathParts(url));
+      return language ? `/${language}/` : "Sin prefijo de idioma";
+    },
+  };
+}
+
+/** Page type from the URL structure, ignoring the language folder: the first
+ *  folder when several pages share it ("/blog/"), the home page (of any
+ *  language), pages directly in the root, or other. The folders come from the
+ *  site itself, so any site gets its own types. */
 export function pageTypeClassifier(urls: string[]): (url: string) => string {
   const folders = new Map<string, number>();
   for (const url of urls) {
-    const parts = pathParts(url);
+    const parts = withoutLanguage(pathParts(url));
     if (parts.length >= 2) folders.set(parts[0], (folders.get(parts[0]) ?? 0) + 1);
   }
   return (url) => {
-    const parts = pathParts(url);
+    const parts = withoutLanguage(pathParts(url));
     if (parts.length === 0) return "Inicio";
     if (parts.length === 1) return "Páginas en la raíz";
     return (folders.get(parts[0]) ?? 0) >= 2 ? `/${parts[0]}/` : OTHER_PAGES;
@@ -124,7 +170,37 @@ export function isQuestionQuery(query: string): boolean {
 }
 
 /** What the searcher is after, from the wording of the query. */
-export function queryIntent(query: string, brand: string[]): string {
+const CONTENT_FOLDERS = new Set([
+  "blog", "noticias", "news", "articulos", "articles", "guia", "guias", "guides",
+  "recursos", "resources", "wiki", "faq", "preguntas", "ayuda", "help", "aprende",
+  "learn", "actualidad", "consejos", "tips",
+]);
+const SERVICE_FOLDERS = new Set([
+  "servicios", "servicio", "services", "service", "productos", "producto",
+  "products", "product", "tienda", "shop", "store", "comprar", "precios",
+  "tarifas", "contacto", "contact", "presupuesto", "reservar", "booking",
+  "catalogo", "catalog",
+]);
+
+/** What kind of page a query lands on, from the first folder of its URL
+ *  ("content", "service") or null when the folder says nothing. Used to place
+ *  queries that carry no intent words of their own. */
+export function pageKindOf(url: string | null | undefined): "content" | "service" | null {
+  if (!url) return null;
+  const parts = withoutLanguage(pathParts(url));
+  const folder = parts[0]?.toLowerCase().split("-")[0];
+  if (!folder || parts.length < 2) return null;
+  const whole = parts[0].toLowerCase();
+  if (CONTENT_FOLDERS.has(whole) || CONTENT_FOLDERS.has(folder)) return "content";
+  if (SERVICE_FOLDERS.has(whole) || SERVICE_FOLDERS.has(folder)) return "service";
+  return null;
+}
+
+export function queryIntent(
+  query: string,
+  brand: string[],
+  landingPage?: string | null,
+): string {
   if (isBrandQuery(query, brand)) return "Marca";
   const text = plain(query);
   if (TRANSACTIONAL.test(text)) return "Quieren comprar o contratar";
@@ -133,7 +209,11 @@ export function queryIntent(query: string, brand: string[]): string {
   if (QUESTION_START.test(text) || INFORMATIONAL.test(text) || text.includes("?")) {
     return "Quieren informarse";
   }
-  return "Otras búsquedas";
+  // No intent words in the query: the page it lands on is the best clue.
+  const kind = pageKindOf(landingPage);
+  if (kind === "content") return "Quieren informarse";
+  if (kind === "service") return "Quieren comprar o contratar";
+  return "Sin intención clara";
 }
 
 // ------------------------------------------------- extra opportunities

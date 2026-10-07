@@ -151,7 +151,7 @@ function segmentSets(report: RadarReport): SegmentSet[] {
       key: "intent",
       tab: "Intención",
       title: "Intención de búsqueda",
-      help: "Qué busca la gente, deducido de cómo escribe la consulta. Es una clasificación automática por palabras: orientativa.",
+      help: "Qué busca la gente, deducido de las palabras de la consulta (preguntas, «precio», «mejor»…) y, si no tiene ninguna, de la sección de tu web a la que llega (blog = informarse, servicios o productos = contratar o comprar). «Sin intención clara» son consultas temáticas sin ninguna de esas señales. Es una clasificación automática: orientativa.",
       segments: report.segments.intent,
     },
     {
@@ -162,6 +162,15 @@ function segmentSets(report: RadarReport): SegmentSet[] {
       segments: report.segments.device,
     },
   ];
+  if (report.segments.language.length > 1) {
+    sets.splice(1, 0, {
+      key: "language",
+      tab: "Idioma",
+      title: "Idioma / mercado",
+      help: "La carpeta de idioma de la URL (/es/, /fr/…). Muestra qué mercados crecen o caen. En «Tipo de página» se ignora el idioma para no mezclarlo con las secciones.",
+      segments: report.segments.language,
+    });
+  }
   if (report.brand.hasBrand) {
     sets.push({
       key: "brand",

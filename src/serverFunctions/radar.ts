@@ -30,6 +30,7 @@ import {
 } from "@/custom/radar/radarAnalysis";
 import {
   emergingQueries,
+  languageClassifier,
   lowTractionPages,
   pageTypeClassifier,
   queryIntent,
@@ -177,6 +178,14 @@ export const getRadarReport = createServerFn({ method: "POST" })
           )
         : sumSearchTotals(prevDaily.rows);
 
+      const allPageUrls = [...pageRows, ...prevPageRows].flatMap(
+        (row) => row.keys?.[0] ?? [],
+      );
+      const languages = languageClassifier(allPageUrls);
+      // Where each query lands, brand included: used to place queries that
+      // carry no intent words of their own.
+      const landing = bestPageByQuery(mergedQueryPages);
+
       const classifyPage = pageTypeClassifier(
         [...pageRows, ...prevPageRows].flatMap((row) => row.keys?.[0] ?? []),
       );
@@ -232,9 +241,16 @@ export const getRadarReport = createServerFn({ method: "POST" })
           pageType: segmentRows(pageRows, prevPageRows, (row) =>
             classifyPage(row.keys?.[0] ?? ""),
           ),
-          intent: segmentRows(queries.rows, prevQueries.rows, (row) =>
-            queryIntent(row.keys?.[0] ?? "", tokens),
-          ),
+          language:
+            languages.count >= 2
+              ? segmentRows(pageRows, prevPageRows, (row) =>
+                  languages.classify(row.keys?.[0] ?? ""),
+                )
+              : [],
+          intent: segmentRows(queries.rows, prevQueries.rows, (row) => {
+            const query = row.keys?.[0] ?? "";
+            return queryIntent(query, tokens, landing.get(query));
+          }),
           device: segmentRows(
             devices.rows,
             prevDevices.rows,
