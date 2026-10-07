@@ -536,15 +536,22 @@ function ChangeList({
         <p className="text-sm text-muted-foreground">Sin cambios relevantes.</p>
       ) : (
         <ul className="space-y-1 text-sm">
-          {rows.map((row) => (
+          {rows.map((row, index) => (
             <li key={row.key} className="flex items-baseline justify-between gap-2">
-              <span className="min-w-0">
+              <span className="flex min-w-0 gap-1.5">
+                <span
+                  className={`w-4 shrink-0 text-right text-xs font-semibold tabular-nums ${tone}`}
+                >
+                  {index + 1}.
+                </span>
+                <span className="min-w-0">
                 <PageLink
                   url={row.key}
                   label={
                     signals.get(row.key)?.ok ? (signals.get(row.key)?.title ?? undefined) : undefined
                   }
                 />
+                </span>
               </span>
               <span className={`shrink-0 font-medium tabular-nums ${tone}`}>
                 {signed(row.clicksDelta)}
