@@ -1,8 +1,8 @@
-import { useMemo, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Line, LineChart } from "recharts";
-import { ArrowRight, RefreshCw } from "lucide-react";
+import { ArrowRight, ExternalLink, RefreshCw } from "lucide-react";
 import { PageHeader } from "@/client/components/PageHeader";
 import { QueryError } from "@/client/components/QueryState";
 import { Button } from "@/client/components/ui/button";
@@ -14,13 +14,9 @@ import {
 } from "@/client/components/ui/card";
 import { ChartContainer, type ChartConfig } from "@/client/components/ui/chart";
 import { Skeleton } from "@/client/components/ui/skeleton";
-import {
-  AuditHealthCard,
-  BacklinkPulseCard,
-  GscCard,
-} from "@/client/features/dashboard/DashboardCards";
+import { Tabs, TabsList, TabsTrigger } from "@/client/components/ui/tabs";
+import { GscCard } from "@/client/features/dashboard/DashboardCards";
 import { DashboardOnboarding } from "@/client/features/dashboard/DashboardOnboarding";
-import { Ga4Card } from "@/client/features/dashboard/Ga4Card";
 import { WorkspaceMergeBanner } from "@/client/features/dashboard/WorkspaceMergeBanner";
 import { buildActions } from "@/custom/radar/actions";
 import { KIND_META } from "@/custom/radar/client/ActionPlan";
@@ -55,16 +51,23 @@ const VERDICT_LABEL: Record<Verdict, { text: string; className: string }> = {
   pocos_datos: { text: "Pocos datos", className: "bg-warning/10 text-warning" },
 };
 
+/** A task of the action plan, opened on its own card in a new tab. */
+function taskHref(projectId: string, id: string): string {
+  return `/p/${projectId}/action-plan?task=${encodeURIComponent(id)}`;
+}
+
 /**
  * The project's home: what is happening (figures, changes, alerts), what to do
  * about it (the best tasks of the action plan), how earlier improvements
- * worked, and the technical health from OpenSEO's own audit and backlinks.
- * It replaces OpenSEO's dashboard route at build time (custom/i18n/patches.mjs)
- * and reuses its onboarding and cards.
+ * worked, where the queries stand and the technical health. It replaces
+ * OpenSEO's dashboard route at build time (custom/i18n/patches.mjs) and reuses
+ * its onboarding and Search Console connection card. Kept compact on purpose:
+ * everything fits in about one screen.
  */
 export function HomePage({ projectId }: { projectId: string }) {
   const queryClient = useQueryClient();
   const { filters, update, query, report } = useRadarReport(projectId);
+  const [tasksTab, setTasksTab] = useState<"todo" | "done">("todo");
 
   const activation = useQuery({
     queryKey: ["dashboardActivation", projectId],
@@ -75,18 +78,16 @@ export function HomePage({ projectId }: { projectId: string }) {
     queryFn: () => getDashboardOverview({ data: { projectId } }),
     refetchInterval: (q) => (q.state.data?.audit?.status === "running" ? 3000 : false),
   });
+  const topicInput = { ...periodInput(filters), includeBrand: filters.includeBrand };
   const topics = useQuery({
-    queryKey: ["radar-topics", projectId, { ...periodInput(filters), includeBrand: filters.includeBrand }],
-    queryFn: () =>
-      getTopicsReport({
-        data: { projectId, ...periodInput(filters), includeBrand: filters.includeBrand },
-      }),
+    queryKey: ["radar-topics", projectId, topicInput],
+    queryFn: () => getTopicsReport({ data: { projectId, ...topicInput } }),
     enabled: report !== null,
     staleTime: 5 * 60_000,
   });
   const tracked = useQuery({
     queryKey: ["radar-tracked-home", projectId],
-    queryFn: () => listTrackedActions({ data: { projectId, limit: 3 } }),
+    queryFn: () => listTrackedActions({ data: { projectId, limit: 4 } }),
     staleTime: 5 * 60_000,
   });
 
@@ -115,6 +116,7 @@ export function HomePage({ projectId }: { projectId: string }) {
       plan.traction.length +
       plan.emerging.length
     : 0;
+  const doneItems = tracked.data ?? [];
 
   if (activation.isError && !activation.data) {
     return (
@@ -131,11 +133,11 @@ export function HomePage({ projectId }: { projectId: string }) {
   if (!activation.data) {
     return (
       <div className="px-4 py-4 md:px-6 md:py-6" aria-busy>
-        <div className="mx-auto flex max-w-7xl flex-col gap-5">
+        <div className="mx-auto flex max-w-7xl flex-col gap-4">
           <Skeleton className="h-8 w-52" />
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {Array.from({ length: 4 }, (_, index) => (
-              <Skeleton key={index} className="h-28" />
+              <Skeleton key={index} className="h-24" />
             ))}
           </div>
           <Skeleton className="h-64" />
@@ -145,12 +147,10 @@ export function HomePage({ projectId }: { projectId: string }) {
   }
 
   const gscConnected = activation.data.gsc.connected;
-  const ga4 = activation.data.ga4;
-  const showGa4 = ga4.connected || !ga4.cardDismissedAt;
 
   return (
-    <div className="px-4 py-4 pb-24 md:px-6 md:py-6 md:pb-8">
-      <div className="mx-auto flex max-w-7xl flex-col gap-5">
+    <div className="px-4 py-4 pb-24 md:px-6 md:py-5 md:pb-8">
+      <div className="mx-auto flex max-w-7xl flex-col gap-4">
         <PageHeader
           title="Panel"
           description={
@@ -190,10 +190,10 @@ export function HomePage({ projectId }: { projectId: string }) {
             isRetrying={query.isFetching}
           />
         ) : query.isPending ? (
-          <div className="space-y-5">
+          <div className="space-y-4">
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               {Array.from({ length: 4 }, (_, index) => (
-                <Skeleton key={index} className="h-28" />
+                <Skeleton key={index} className="h-24" />
               ))}
             </div>
             <Skeleton className="h-64" />
@@ -218,71 +218,111 @@ export function HomePage({ projectId }: { projectId: string }) {
           </Card>
         ) : report ? (
           <div
-            className={`flex flex-col gap-5 ${query.isPlaceholderData ? "opacity-60 transition-opacity" : ""}`}
+            className={`flex flex-col gap-4 ${query.isPlaceholderData ? "opacity-60 transition-opacity" : ""}`}
           >
             <KpiRow report={report} />
 
-            <div className="grid gap-5 lg:grid-cols-3">
+            <div className="grid gap-4 lg:grid-cols-3">
               <Card className="lg:col-span-2">
-                <CardHeader className="flex flex-row items-center justify-between gap-2">
-                  <div>
+                <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-2">
+                  <div className="space-y-0.5">
                     <CardTitle>Qué hacer ahora</CardTitle>
                     <p className="text-xs text-muted-foreground">
-                      {totalTasks === 0
-                        ? "No hay tareas claras en este periodo."
-                        : `Las mejores de las ${totalTasks} tareas del plan: lo que se pierde primero y lo más rápido de ganar.`}
+                      {tasksTab === "todo"
+                        ? totalTasks === 0
+                          ? "No hay tareas claras en este periodo."
+                          : `Las tareas con más impacto de tu plan (${totalTasks} en total): primero lo que se pierde, luego lo más rápido de ganar. Cada una se abre en una pestaña nueva.`
+                        : "Qué pasó con las tareas que marcaste como hechas."}
                     </p>
                   </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    render={<Link to="/p/$projectId/action-plan" params={{ projectId }} />}
-                  >
-                    Abrir el plan
-                    <ArrowRight className="size-3.5" aria-hidden />
-                  </Button>
+                  {doneItems.length > 0 ? (
+                    <Tabs
+                      value={tasksTab}
+                      onValueChange={(value) => setTasksTab(value as typeof tasksTab)}
+                    >
+                      <TabsList>
+                        <TabsTrigger value="todo">Por hacer</TabsTrigger>
+                        <TabsTrigger value="done">Hechas</TabsTrigger>
+                      </TabsList>
+                    </Tabs>
+                  ) : null}
                 </CardHeader>
                 <CardContent>
-                  {nextActions.length === 0 ? (
+                  {tasksTab === "done" ? (
+                    <DoneList items={doneItems} />
+                  ) : nextActions.length === 0 ? (
                     <p className="text-sm text-muted-foreground">
                       Prueba con un periodo más largo para ver oportunidades.
                     </p>
                   ) : (
-                    <ul className="divide-y divide-border">
-                      {nextActions.map((action) => {
-                        const meta = KIND_META[action.kind];
-                        const Icon = meta.icon;
-                        return (
-                          <li key={action.id}>
-                            <Link
-                              to="/p/$projectId/action-plan"
-                              params={{ projectId }}
-                              className="flex items-start gap-3 py-3 first:pt-0 last:pb-0 hover:bg-muted/40"
-                            >
-                              <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full bg-muted">
-                                <Icon className="size-4" aria-hidden />
-                              </span>
-                              <span className="min-w-0 flex-1">
-                                <span className="block text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
-                                  {meta.label}
+                    <>
+                      <ul className="space-y-1">
+                        {nextActions.map((action) => {
+                          const meta = KIND_META[action.kind];
+                          const Icon = meta.icon;
+                          const isLoss = action.kind === "loss";
+                          return (
+                            <li key={action.id}>
+                              <a
+                                href={taskHref(projectId, action.id)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="group flex items-center gap-3 rounded-md px-2 py-2 hover:bg-muted/50"
+                              >
+                                <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted">
+                                  <Icon className="size-4" aria-hidden />
                                 </span>
-                                <span className="block text-sm leading-snug font-medium">
-                                  {action.headline}
+                                <span className="min-w-0 flex-1">
+                                  <span className="line-clamp-2 block text-sm leading-snug font-medium">
+                                    {action.headline}
+                                  </span>
+                                  <span className="block truncate text-xs text-muted-foreground">
+                                    {meta.label} ·{" "}
+                                    {action.stats
+                                      .slice(0, 3)
+                                      .map((stat) => `${stat.label} ${stat.value}`)
+                                      .join(" · ")}
+                                  </span>
                                 </span>
-                              </span>
-                              {action.gain !== null ? (
-                                <span
-                                  className={`shrink-0 text-sm font-semibold tabular-nums ${action.kind === "loss" ? "text-destructive" : "text-success"}`}
-                                >
-                                  {action.kind === "loss" ? "−" : "+"}
-                                  {integer.format(action.gain)}
-                                </span>
-                              ) : null}
-                            </Link>
-                          </li>
-                        );
-                      })}
-                    </ul>
+                                {action.gain !== null ? (
+                                  <span className="shrink-0 text-right">
+                                    <span
+                                      className={`block text-base leading-tight font-semibold tabular-nums ${isLoss ? "text-destructive" : "text-success"}`}
+                                    >
+                                      {isLoss ? "−" : "+"}
+                                      {integer.format(action.gain)}
+                                    </span>
+                                    <span className="block text-[11px] text-muted-foreground">
+                                      {isLoss ? "clics perdidos" : "clics posibles"}
+                                    </span>
+                                  </span>
+                                ) : null}
+                                <ExternalLink
+                                  className="size-3.5 shrink-0 text-muted-foreground group-hover:text-foreground"
+                                  aria-hidden
+                                />
+                              </a>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                      <div className="mt-2 flex justify-end">
+                        <Button
+                          size="xs"
+                          variant="ghost"
+                          render={
+                            <a
+                              href={`/p/${projectId}/action-plan`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            />
+                          }
+                        >
+                          Ver las {totalTasks} tareas
+                          <ExternalLink className="size-3" aria-hidden />
+                        </Button>
+                      </div>
+                    </>
                   )}
                 </CardContent>
               </Card>
@@ -294,7 +334,7 @@ export function HomePage({ projectId }: { projectId: string }) {
                     Páginas que más suben y más bajan en clics.
                   </p>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="space-y-3">
                   <ChangeList
                     title="Suben"
                     tone="text-success"
@@ -309,60 +349,22 @@ export function HomePage({ projectId }: { projectId: string }) {
               </Card>
             </div>
 
-            <div className="grid gap-5 lg:grid-cols-2">
-              <TrendCard projectId={projectId} daily={report.daily} />
+            <div className="grid gap-4 lg:grid-cols-3">
+              <BandsCard projectId={projectId} report={report} />
               <TopicsCard projectId={projectId} topics={topics.data} loading={topics.isPending} />
+              <HealthCard
+                projectId={projectId}
+                audit={overview.data?.audit ?? null}
+                backlinks={overview.data?.backlinks ?? null}
+                showBacklinks={activation.data.domain !== null}
+                ga4Connected={activation.data.ga4.connected}
+                loading={overview.isPending}
+                refreshing={refreshBacklinks.isPending}
+                onRefresh={() => refreshBacklinks.mutate()}
+              />
             </div>
-
-            {(tracked.data ?? []).length > 0 ? (
-              <TrackedCard projectId={projectId} items={tracked.data ?? []} />
-            ) : null}
           </div>
         ) : null}
-
-        <div className="grid gap-5 lg:grid-cols-2">
-          {overview.data ? (
-            <AuditHealthCard projectId={projectId} audit={overview.data.audit} />
-          ) : overview.isError ? (
-            <QueryError
-              error={overview.error}
-              fallback="No se pudo cargar la auditoría"
-              onRetry={() => void overview.refetch()}
-              isRetrying={overview.isFetching}
-            />
-          ) : (
-            <Skeleton className="h-44" />
-          )}
-          {overview.data && activation.data.domain !== null ? (
-            <div className="flex flex-col gap-2">
-              <BacklinkPulseCard
-                projectId={projectId}
-                backlinks={overview.data.backlinks}
-                refreshing={refreshBacklinks.isPending}
-              />
-              <div className="flex items-center justify-between gap-2 px-1">
-                <p className="text-xs text-muted-foreground">
-                  Se actualiza solo cuando lo pides (cuesta unos 0,02 €).
-                </p>
-                <Button
-                  size="xs"
-                  variant="outline"
-                  disabled={refreshBacklinks.isPending}
-                  onClick={() => refreshBacklinks.mutate()}
-                >
-                  <RefreshCw
-                    className={`size-3 ${refreshBacklinks.isPending ? "animate-spin" : ""}`}
-                    aria-hidden
-                  />
-                  Actualizar backlinks
-                </Button>
-              </div>
-            </div>
-          ) : null}
-          {showGa4 ? (
-            <Ga4Card projectId={projectId} connected={ga4.connected} />
-          ) : null}
-        </div>
       </div>
     </div>
   );
@@ -400,7 +402,7 @@ function Delta({
             : "text-destructive"
       }`}
     >
-      {label} vs. periodo anterior
+      {label}
     </span>
   );
 }
@@ -418,7 +420,7 @@ function Spark({
   dataKey: "clicks" | "impressions";
 }) {
   return (
-    <ChartContainer config={sparkConfig} className="mt-1 h-10 w-full">
+    <ChartContainer config={sparkConfig} className="h-9 w-full">
       <LineChart data={data} margin={{ top: 3, right: 0, bottom: 3, left: 0 }}>
         <Line
           dataKey={dataKey}
@@ -464,14 +466,16 @@ function KpiRow({ report }: { report: Report }) {
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
       {cards.map((card) => (
         <Card key={card.label}>
-          <CardContent className="space-y-1">
+          <CardContent className="space-y-0.5 py-0.5">
             <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
               {card.label}
             </p>
-            <p className="text-2xl leading-tight font-semibold tabular-nums">
-              {card.value}
+            <p className="flex items-baseline gap-2">
+              <span className="text-2xl leading-tight font-semibold tabular-nums">
+                {card.value}
+              </span>
+              {card.delta}
             </p>
-            {card.delta}
             {card.spark}
           </CardContent>
         </Card>
@@ -490,12 +494,12 @@ function ChangeList({
   rows: Report["pageChanges"]["winners"];
 }) {
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-1">
       <p className={`text-xs font-semibold tracking-wide uppercase ${tone}`}>{title}</p>
       {rows.length === 0 ? (
         <p className="text-sm text-muted-foreground">Sin cambios relevantes.</p>
       ) : (
-        <ul className="space-y-1.5 text-sm">
+        <ul className="space-y-1 text-sm">
           {rows.map((row) => (
             <li key={row.key} className="flex items-baseline justify-between gap-2">
               <span className="min-w-0">
@@ -512,57 +516,103 @@ function ChangeList({
   );
 }
 
-const trendConfig = {
-  clicks: { label: "Este periodo", color: "var(--primary)" },
-  prevClicks: { label: "Periodo anterior", color: "var(--muted-foreground)" },
-} satisfies ChartConfig;
-
-function TrendCard({
-  projectId,
-  daily,
+function DoneList({
+  items,
 }: {
-  projectId: string;
-  daily: DailyPoint[];
+  items: Awaited<ReturnType<typeof listTrackedActions>>;
 }) {
+  return (
+    <ul className="divide-y divide-border">
+      {items.map((item) => {
+        const verdict = item.impact ? VERDICT_LABEL[item.impact.verdict] : null;
+        const clicks = item.impact?.clicks;
+        return (
+          <li
+            key={item.id}
+            className="flex items-center justify-between gap-3 py-2 first:pt-0 last:pb-0"
+          >
+            <span className="min-w-0 text-sm">
+              <span className="block truncate font-medium">
+                {item.title ?? item.query ?? item.page ?? KIND_META[item.kind].label}
+              </span>
+              <span className="block text-xs text-muted-foreground">
+                {KIND_META[item.kind].label} ·{" "}
+                {verdict
+                  ? clicks && clicks.changePct !== null
+                    ? `clics por día ${clicks.changePct > 0 ? "+" : ""}${percent.format(clicks.changePct)}`
+                    : "medido"
+                  : item.waitingDays > 0
+                    ? `midiendo, faltan ~${item.waitingDays} días`
+                    : "sin medir"}
+              </span>
+            </span>
+            {verdict ? (
+              <span
+                className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${verdict.className}`}
+              >
+                {verdict.text}
+              </span>
+            ) : null}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+/** How many queries sit in each position band, now and before: the shape of
+ *  the search presence, and how much of it is within reach. */
+function BandsCard({ projectId, report }: { projectId: string; report: Report }) {
+  const max = Math.max(1, ...report.bands.map((band) => band.queries));
+  const reachGain = report.nearTop.reduce((sum, item) => sum + item.potentialClicks, 0);
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Evolución de clics</CardTitle>
+        <CardTitle>Dónde posicionan tus consultas</CardTitle>
         <p className="text-xs text-muted-foreground">
-          Día a día, con el periodo anterior en línea discontinua.
+          Cuántas consultas tienes en cada franja de posición (entre paréntesis,
+          el cambio).
         </p>
       </CardHeader>
-      <CardContent>
-        <ChartContainer config={trendConfig} className="h-48 w-full">
-          <LineChart data={daily} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
-            <Line
-              dataKey="prevClicks"
-              stroke="var(--color-prevClicks)"
-              strokeDasharray="4 3"
-              strokeWidth={1.5}
-              dot={false}
-              connectNulls
-              isAnimationActive={false}
-            />
-            <Line
-              dataKey="clicks"
-              stroke="var(--color-clicks)"
-              strokeWidth={2}
-              dot={false}
-              isAnimationActive={false}
-            />
-          </LineChart>
-        </ChartContainer>
-        <div className="mt-2 flex justify-end">
-          <Button
-            size="xs"
-            variant="ghost"
-            render={<Link to="/p/$projectId/radar" params={{ projectId }} />}
+      <CardContent className="space-y-3">
+        <ul className="space-y-2">
+          {report.bands.map((band, index) => {
+            const delta = band.queries - band.prevQueries;
+            return (
+              <li key={band.label} className="space-y-0.5">
+                <div className="flex items-baseline justify-between gap-2 text-sm">
+                  <span>{band.label}</span>
+                  <span className="tabular-nums">
+                    {integer.format(band.queries)}
+                    <span
+                      className={`ml-1.5 text-xs ${delta === 0 ? "text-muted-foreground" : (index === 0 ? delta > 0 : delta < 0) ? "text-success" : "text-destructive"}`}
+                    >
+                      ({signed(delta)})
+                    </span>
+                  </span>
+                </div>
+                <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-full rounded-full bg-primary"
+                    style={{ width: `${Math.max(2, (band.queries / max) * 100)}%` }}
+                  />
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+        {report.nearTop.length > 0 ? (
+          <a
+            href={`/p/${projectId}/action-plan`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block rounded-md bg-muted/50 px-3 py-2 text-xs hover:bg-muted"
           >
-            Ver el Radar SEO
-            <ArrowRight className="size-3" aria-hidden />
-          </Button>
-        </div>
+            <strong>{report.nearTop.length} consultas</strong> están cerca del top
+            3: subirlas valdría hasta unos{" "}
+            <strong>+{integer.format(reachGain)} clics</strong>.
+          </a>
+        ) : null}
       </CardContent>
     </Card>
   );
@@ -579,46 +629,46 @@ function TopicsCard({
 }) {
   const rows =
     topics && topics.connected
-      ? topics.topics.filter((topic) => topic.label !== OTHERS).slice(0, 6)
+      ? topics.topics.filter((topic) => topic.label !== OTHERS).slice(0, 5)
       : [];
   const max = Math.max(1, ...rows.map((topic) => topic.clicks));
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between gap-2">
-        <div>
+      <CardHeader className="flex flex-row items-start justify-between gap-2">
+        <div className="space-y-0.5">
           <CardTitle>Temas que más tráfico traen</CardTitle>
           <p className="text-xs text-muted-foreground">
             Tus consultas agrupadas por tema, con su variación.
           </p>
         </div>
         <Button
-          size="sm"
-          variant="outline"
+          size="xs"
+          variant="ghost"
           render={<Link to="/p/$projectId/topics" params={{ projectId }} />}
         >
-          Ver temas
-          <ArrowRight className="size-3.5" aria-hidden />
+          Ver
+          <ArrowRight className="size-3" aria-hidden />
         </Button>
       </CardHeader>
       <CardContent>
         {loading ? (
-          <Skeleton className="h-40 w-full" />
+          <Skeleton className="h-32 w-full" />
         ) : rows.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             Aún no hay datos suficientes para agrupar por temas.
           </p>
         ) : (
-          <ul className="space-y-2.5">
+          <ul className="space-y-2">
             {rows.map((topic) => {
               const delta = topic.clicks - topic.prev.clicks;
               return (
-                <li key={topic.id} className="space-y-1">
+                <li key={topic.id} className="space-y-0.5">
                   <div className="flex items-baseline justify-between gap-2 text-sm">
                     <span className="min-w-0 truncate">{topic.label}</span>
                     <span className="shrink-0 tabular-nums">
                       {integer.format(topic.clicks)}
                       <span
-                        className={`ml-2 text-xs ${delta === 0 ? "text-muted-foreground" : delta > 0 ? "text-success" : "text-destructive"}`}
+                        className={`ml-1.5 text-xs ${delta === 0 ? "text-muted-foreground" : delta > 0 ? "text-success" : "text-destructive"}`}
                       >
                         {signed(delta)}
                       </span>
@@ -640,68 +690,112 @@ function TopicsCard({
   );
 }
 
-function TrackedCard({
+type Overview = Awaited<ReturnType<typeof getDashboardOverview>>;
+
+function HealthCard({
   projectId,
-  items,
+  audit,
+  backlinks,
+  showBacklinks,
+  ga4Connected,
+  loading,
+  refreshing,
+  onRefresh,
 }: {
   projectId: string;
-  items: Awaited<ReturnType<typeof listTrackedActions>>;
+  audit: Overview["audit"];
+  backlinks: Overview["backlinks"];
+  showBacklinks: boolean;
+  ga4Connected: boolean;
+  loading: boolean;
+  refreshing: boolean;
+  onRefresh: () => void;
 }) {
+  const critical = audit?.topIssues.filter((issue) => issue.severity === "critical").length ?? 0;
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between gap-2">
-        <div>
-          <CardTitle>Resultado de tus últimas mejoras</CardTitle>
-          <p className="text-xs text-muted-foreground">
-            Lo que pasó con las tareas que marcaste como hechas.
-          </p>
-        </div>
-        <Button
-          size="sm"
-          variant="outline"
-          render={<Link to="/p/$projectId/action-plan" params={{ projectId }} />}
-        >
-          Ver todas
-          <ArrowRight className="size-3.5" aria-hidden />
-        </Button>
-      </CardHeader>
-      <CardContent>
-        <ul className="divide-y divide-border">
-          {items.map((item) => {
-            const verdict = item.impact ? VERDICT_LABEL[item.impact.verdict] : null;
-            const clicks = item.impact?.clicks;
-            return (
-              <li key={item.id} className="flex items-center justify-between gap-3 py-2.5 first:pt-0 last:pb-0">
-                <span className="min-w-0 text-sm">
-                  <span className="block truncate font-medium">
-                    {item.title ?? item.query ?? item.page ?? KIND_META[item.kind].label}
-                  </span>
-                  <span className="block text-xs text-muted-foreground">
-                    {KIND_META[item.kind].label} ·{" "}
-                    {verdict
-                      ? clicks && clicks.changePct !== null
-                        ? `clics por día ${clicks.changePct > 0 ? "+" : ""}${percent.format(clicks.changePct)}`
-                        : "medido"
-                      : item.waitingDays > 0
-                        ? `midiendo, faltan ~${item.waitingDays} días`
-                        : "sin medir"}
-                  </span>
-                </span>
-                {verdict ? (
-                  <span
-                    className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${verdict.className}`}
-                  >
-                    {verdict.text}
-                  </span>
-                ) : null}
-              </li>
-            );
-          })}
-        </ul>
-        <p className="mt-2 text-xs text-muted-foreground">
-          {items.filter((item) => item.impact).length} de {items.length} ya
-          medidas.
+      <CardHeader>
+        <CardTitle>Salud técnica</CardTitle>
+        <p className="text-xs text-muted-foreground">
+          Auditoría del sitio, backlinks y conexiones.
         </p>
+      </CardHeader>
+      <CardContent className="space-y-3 text-sm">
+        {loading ? (
+          <Skeleton className="h-32 w-full" />
+        ) : (
+          <>
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <p className="font-medium">Auditoría del sitio</p>
+                <p className="text-xs text-muted-foreground">
+                  {!audit
+                    ? "Aún no has lanzado ninguna."
+                    : audit.status === "running"
+                      ? "En curso…"
+                      : `${integer.format(audit.pagesCrawled)} páginas · ${audit.totalIssueTypes} tipos de problema${critical > 0 ? ` (${critical} críticos)` : ""}`}
+                </p>
+              </div>
+              <Button
+                size="xs"
+                variant="outline"
+                render={<Link to="/p/$projectId/audit" params={{ projectId }} />}
+              >
+                {audit ? "Ver" : "Lanzar"}
+              </Button>
+            </div>
+            {showBacklinks ? (
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="font-medium">Backlinks</p>
+                  <p className="text-xs text-muted-foreground">
+                    {backlinks
+                      ? `${backlinks.referringDomains === null ? "—" : integer.format(backlinks.referringDomains)} dominios · ${backlinks.backlinks === null ? "—" : integer.format(backlinks.backlinks)} enlaces`
+                      : "Sin datos todavía."}
+                    {backlinks ? ` · ${backlinks.stale ? "desactualizado" : "al día"}` : ""}
+                  </p>
+                </div>
+                <Button size="xs" variant="outline" disabled={refreshing} onClick={onRefresh} title="Cuesta unos 0,02 €">
+                  <RefreshCw
+                    className={`size-3 ${refreshing ? "animate-spin" : ""}`}
+                    aria-hidden
+                  />
+                  Actualizar
+                </Button>
+              </div>
+            ) : null}
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <p className="font-medium">Google Analytics</p>
+                <p className="text-xs text-muted-foreground">
+                  {ga4Connected ? "Conectado." : "Sin conectar."}
+                </p>
+              </div>
+              <Button
+                size="xs"
+                variant="outline"
+                render={<Link to="/p/$projectId/settings" params={{ projectId }} />}
+              >
+                {ga4Connected ? "Ajustes" : "Conectar"}
+              </Button>
+            </div>
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <p className="font-medium">Indexación y sitemap</p>
+                <p className="text-xs text-muted-foreground">
+                  Qué ve Google de tu sitemap.
+                </p>
+              </div>
+              <Button
+                size="xs"
+                variant="outline"
+                render={<Link to="/p/$projectId/indexing" params={{ projectId }} />}
+              >
+                Revisar
+              </Button>
+            </div>
+          </>
+        )}
       </CardContent>
     </Card>
   );

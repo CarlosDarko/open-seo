@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { PageHeader } from "@/client/components/PageHeader";
@@ -118,6 +118,24 @@ export function ActionPlanPage({ projectId }: { projectId: string }) {
     : [];
   const allOpen =
     visibleIds.length > 0 && visibleIds.every((id) => openIds.has(id));
+
+  // A link from the Panel (?task=<id>) opens that task's card and scrolls to it.
+  useEffect(() => {
+    if (!plan) return;
+    const id = new URLSearchParams(window.location.search).get("task");
+    if (!id) return;
+    setView("todo");
+    setFilter("all");
+    setEffort("all");
+    setOpenIds((previous) => new Set(previous).add(id));
+    const timer = window.setTimeout(() => {
+      const card = Array.from(
+        document.querySelectorAll<HTMLElement>("[data-task-id]"),
+      ).find((element) => element.dataset.taskId === id);
+      card?.scrollIntoView({ block: "center", behavior: "smooth" });
+    }, 150);
+    return () => window.clearTimeout(timer);
+  }, [plan]);
 
   const toggle = (id: string) =>
     setOpenIds((previous) => {

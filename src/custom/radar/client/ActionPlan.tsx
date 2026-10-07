@@ -423,7 +423,10 @@ export function ActionCard({
         `«${action.query ?? ""}»`);
 
   return (
-    <Card className={`overflow-hidden border-l-4 ${tone.border}`}>
+    <Card
+      data-task-id={action.id}
+      className={`overflow-hidden border-l-4 ${tone.border}`}
+    >
       <CardContent className="p-0">
         <div
           className="flex cursor-pointer gap-4 p-4"
