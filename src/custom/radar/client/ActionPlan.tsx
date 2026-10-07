@@ -1,5 +1,5 @@
-import { useMemo, type ReactNode } from "react";
-import { useQueries } from "@tanstack/react-query";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   ArrowUpRight,
   ChevronDown,
@@ -198,35 +198,48 @@ export const KIND_ORDER: ActionKind[] = [
 
 /** Reads the on-page signals of every page the plan mentions, once. */
 export function usePlanSignals(projectId: string, plan: Plan) {
+  const queryClient = useQueryClient();
   const urls = useMemo(() => signalUrls(plan), [plan]);
-  // Read in small groups so the cards fill in as each group arrives, instead
-  // of waiting for the slowest page of all.
-  const chunks = useMemo(() => {
-    const groups: string[][] = [];
-    for (let i = 0; i < urls.length; i += 6) groups.push(urls.slice(i, i + 6));
-    return groups;
-  }, [urls]);
-  const results = useQueries({
-    queries: chunks.map((group) => ({
-      queryKey: ["radar-signals", projectId, group],
-      queryFn: () => getRadarPageSignals({ data: { projectId, urls: group } }),
-      staleTime: 10 * 60_000,
-    })),
-  });
-  const signals = useMemo(
-    () =>
-      new Map<string, PageSignals>(
-        results.flatMap((result) =>
-          (result.data?.signals ?? []).map((item): [string, PageSignals] => [
-            item.url,
-            item,
-          ]),
-        ),
-      ),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [results.map((result) => result.dataUpdatedAt).join(",")],
-  );
-  return { signals, loading: results.some((result) => result.isPending) };
+  const [signals, setSignals] = useState<Map<string, PageSignals>>(new Map());
+  const [loading, setLoading] = useState(false);
+
+  // The pages are read in small groups, one group at a time: the cards fill in
+  // as each arrives, and the site is not hit with dozens of requests at once
+  // (many of which would time out).
+  useEffect(() => {
+    if (urls.length === 0) {
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    void (async () => {
+      for (let i = 0; i < urls.length; i += 6) {
+        const group = urls.slice(i, i + 6);
+        try {
+          const data = await queryClient.fetchQuery({
+            queryKey: ["radar-signals", projectId, group],
+            queryFn: () => getRadarPageSignals({ data: { projectId, urls: group } }),
+            staleTime: 10 * 60_000,
+          });
+          if (cancelled) return;
+          setSignals((previous) => {
+            const next = new Map(previous);
+            for (const item of data.signals) next.set(item.url, item);
+            return next;
+          });
+        } catch {
+          // This group stays unread; the cards say so.
+        }
+      }
+      if (!cancelled) setLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [urls, projectId, queryClient]);
+
+  return { signals, loading };
 }
 
 function FindingRow({ finding }: { finding: Finding }) {

@@ -1,10 +1,15 @@
+import { env } from "cloudflare:workers";
 import {
   assertUrlInSite,
   parsePageSignals,
   type PageSignals,
 } from "@/custom/radar/pageSignals";
 
-const FETCH_TIMEOUT_MS = 7000;
+const FETCH_TIMEOUT_MS = 10_000;
+// Pages that were read stay in KV for a while: opening the plan again, or the
+// Panel, does not read the whole site again (and sites that throttle many
+// requests at once are asked far less).
+const CACHE_SECONDS = 6 * 60 * 60;
 const MAX_HTML_BYTES = 1_000_000;
 
 async function readLimited(response: Response): Promise<string> {
@@ -41,10 +46,7 @@ function failed(url: string, error: string): PageSignals {
 
 /** Fetches one page of the user's own site and extracts its on-page signals.
  *  Never throws: a page that cannot be read comes back with `ok: false`. */
-export async function fetchPageSignals(
-  url: string,
-  siteUrl: string,
-): Promise<PageSignals> {
+async function readPage(url: string, siteUrl: string): Promise<PageSignals> {
   try {
     assertUrlInSite(url, siteUrl);
     const response = await fetch(url, {
@@ -70,4 +72,44 @@ export async function fetchPageSignals(
         : "No se pudo leer la página",
     );
   }
+}
+
+const RETRYABLE = ["La web tardó demasiado en responder", "No se pudo leer la página"];
+
+async function cacheKey(url: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(url));
+  const hex = [...new Uint8Array(digest)]
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+  return `radar:page:${hex.slice(0, 32)}`;
+}
+
+/** Reads a page of the site, from KV when it was read recently, trying once
+ *  more when the first attempt timed out or failed. Never throws. */
+export async function fetchPageSignals(
+  url: string,
+  siteUrl: string,
+): Promise<PageSignals> {
+  let key: string | null = null;
+  try {
+    key = await cacheKey(url);
+    const cached = await env.KV.get(key);
+    if (cached) return JSON.parse(cached) as PageSignals;
+  } catch {
+    // No cache: read the page.
+  }
+  let result = await readPage(url, siteUrl);
+  if (!result.ok && RETRYABLE.includes(result.error ?? "")) {
+    result = await readPage(url, siteUrl);
+  }
+  if (result.ok && key) {
+    try {
+      await env.KV.put(key, JSON.stringify(result), {
+        expirationTtl: CACHE_SECONDS,
+      });
+    } catch {
+      // The page is still returned.
+    }
+  }
+  return result;
 }
