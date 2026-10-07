@@ -47,7 +47,7 @@ export async function saveNotifySettings(input: {
 }): Promise<void> {
   const current = await readSettings();
   const next: NotifySettings = {
-    fromEmail: input.fromEmail?.trim() || null,
+    fromEmail: normalizeFrom(input.fromEmail),
     resendKey:
       input.resendKey === undefined ? current.resendKey : input.resendKey?.trim() || null,
   };
@@ -112,7 +112,7 @@ async function sendEmail(
         "content-type": "application/json",
       },
       body: JSON.stringify({
-        from: settings.fromEmail,
+        from: normalizeFrom(settings.fromEmail) ?? settings.fromEmail,
         to,
         subject: message.subject,
         text: message.text,
@@ -173,4 +173,15 @@ export async function sendTestNotification(input: {
   if (input.emails.length > 0) results.push(await sendEmail(input.emails, message));
   if (input.webhook) results.push(await sendWebhook(input.webhook, message));
   return results;
+}
+
+const TEST_ADDRESS = "onboarding@resend.dev";
+
+/** Resend wants `email@dominio.com` or `Nombre <email@dominio.com>`. A bare
+ *  name ("Alerta SEO") gets Resend's test address, which only delivers to the
+ *  account that registered in Resend: enough to try the alerts out. */
+export function normalizeFrom(value: string | null | undefined): string | null {
+  const text = value?.trim();
+  if (!text) return null;
+  return text.includes("@") ? text : `${text} <${TEST_ADDRESS}>`;
 }

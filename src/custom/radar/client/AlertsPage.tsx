@@ -1155,10 +1155,12 @@ function ChannelsDialog({ projectId }: { projectId: string }) {
               placeholder="Alertas SEO <alertas@tudominio.com>"
             />
             <p className="text-xs text-muted-foreground">
-              Para escribir a cualquier persona necesitas verificar tu dominio
-              en Resend y usar una dirección de ese dominio. Mientras pruebas,
-              puedes usar <code>onboarding@resend.dev</code>, que solo llega a
-              la cuenta de correo con la que te registraste en Resend.
+              Si escribes solo un nombre (por ejemplo «Alerta SEO») uso
+              <code> onboarding@resend.dev</code>, que solo llega a la cuenta
+              con la que te registraste en Resend: vale para probar. Para
+              escribir a cualquier persona, verifica tu dominio en Resend y
+              escribe una dirección suya con este formato:{" "}
+              <code>Alerta SEO &lt;alertas@tudominio.com&gt;</code>.
             </p>
           </div>
           <div className="space-y-1.5">
