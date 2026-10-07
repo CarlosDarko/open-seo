@@ -5,6 +5,7 @@ import {
   buildPageTypes,
   pageTypeClassifier,
   queryIntent,
+  segmentRows,
 } from "@/custom/radar/radarSegments";
 
 const urls = [
@@ -126,5 +127,42 @@ describe("queryIntent", () => {
       pageKindOf("https://x.com/servicios-para-particulares/familia"),
     ).toBe("service");
     expect(pageKindOf("https://x.com/precios")).toBeNull();
+  });
+});
+
+describe("segmentRows members", () => {
+  it("lists the pages of each segment with their figures and changes", () => {
+    const row = (
+      key: string,
+      clicks: number,
+      impressions: number,
+      position: number,
+    ) => ({
+      keys: [key],
+      clicks,
+      impressions,
+      ctr: clicks / impressions,
+      position,
+    });
+    const segments = segmentRows(
+      [
+        row("https://x.com/blog/a", 10, 100, 3),
+        row("https://x.com/blog/b", 4, 80, 6),
+      ],
+      [
+        row("https://x.com/blog/a", 6, 90, 4),
+        row("https://x.com/blog/lost", 5, 50, 8),
+      ],
+      () => "/blog/",
+    );
+    const [blog] = segments;
+    expect(blog.members.map((m) => m.key)).toEqual([
+      "https://x.com/blog/a",
+      "https://x.com/blog/b",
+      "https://x.com/blog/lost",
+    ]);
+    expect(blog.members[0]).toMatchObject({ clicks: 10, prevClicks: 6 });
+    // A page that no longer brings clicks still shows what it lost.
+    expect(blog.members[2]).toMatchObject({ clicks: 0, prevClicks: 5 });
   });
 });

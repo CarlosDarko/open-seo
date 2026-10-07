@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Info } from "lucide-react";
+import { Fragment, useState } from "react";
+import { ChevronDown, Info } from "lucide-react";
 import { Bar, BarChart } from "recharts";
 import {
   ChartGrid,
@@ -34,9 +34,10 @@ import {
   integer,
   percent,
   relativeChange,
+  pathOf,
   signed,
 } from "@/custom/radar/format";
-import type { Segment } from "@/custom/radar/radarSegments";
+import type { Segment, SegmentMember } from "@/custom/radar/radarSegments";
 
 const chartConfig = {
   prevClicks: { label: "Periodo anterior", color: "var(--muted-foreground)" },
@@ -83,6 +84,7 @@ export function segmentInsight(segments: Segment[]): string | null {
  *  device or brand. */
 export function Segments({ sets }: { sets: SegmentSet[] }) {
   const [key, setKey] = useState(sets[0]?.key ?? "");
+  const [openLabel, setOpenLabel] = useState<string | null>(null);
   const active = sets.find((set) => set.key === key) ?? sets[0];
   if (!active) return null;
   const rows = active.segments.slice(0, 8);
@@ -93,7 +95,13 @@ export function Segments({ sets }: { sets: SegmentSet[] }) {
       <CardHeader className="space-y-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <CardTitle>Tráfico por tipología</CardTitle>
-          <Tabs value={active.key} onValueChange={setKey}>
+          <Tabs
+            value={active.key}
+            onValueChange={(value) => {
+              setKey(value);
+              setOpenLabel(null);
+            }}
+          >
             <TabsList>
               {sets.map((set) => (
                 <TabsTrigger key={set.key} value={set.key}>
@@ -191,37 +199,67 @@ export function Segments({ sets }: { sets: SegmentSet[] }) {
               <TableBody>
                 {rows.map((segment) => {
                   const delta = segment.clicks - segment.prevClicks;
+                  const isOpen = openLabel === segment.label;
                   return (
-                    <TableRow key={segment.label}>
-                      <TableCell className="max-w-56 truncate">
-                        {segment.label}
-                      </TableCell>
-                      <TableCell className="text-right whitespace-nowrap tabular-nums">
-                        {integer.format(segment.clicks)}
-                      </TableCell>
-                      <TableCell
-                        className={`text-right whitespace-nowrap tabular-nums ${
-                          delta === 0
-                            ? "text-muted-foreground"
-                            : delta > 0
-                              ? "text-success"
-                              : "text-destructive"
-                        }`}
+                    <Fragment key={segment.label}>
+                      <TableRow
+                        className={
+                          segment.members.length > 0 ? "cursor-pointer" : ""
+                        }
+                        onClick={() =>
+                          segment.members.length > 0
+                            ? setOpenLabel(isOpen ? null : segment.label)
+                            : undefined
+                        }
                       >
-                        {signed(delta)}
-                      </TableCell>
-                      <TableCell className="text-right whitespace-nowrap tabular-nums">
-                        {integer.format(segment.impressions)}
-                      </TableCell>
-                      <TableCell className="text-right whitespace-nowrap tabular-nums">
-                        {percent.format(segment.ctr)}
-                      </TableCell>
-                      <TableCell className="text-right whitespace-nowrap tabular-nums">
-                        {segment.position === null
-                          ? "—"
-                          : decimal.format(segment.position)}
-                      </TableCell>
-                    </TableRow>
+                        <TableCell className="max-w-56 truncate">
+                          <span className="inline-flex items-center gap-1.5">
+                            {segment.members.length > 0 ? (
+                              <ChevronDown
+                                className={`size-3.5 shrink-0 text-muted-foreground transition-transform ${isOpen ? "" : "-rotate-90"}`}
+                                aria-hidden
+                              />
+                            ) : null}
+                            {segment.label}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right whitespace-nowrap tabular-nums">
+                          {integer.format(segment.clicks)}
+                        </TableCell>
+                        <TableCell
+                          className={`text-right whitespace-nowrap tabular-nums ${
+                            delta === 0
+                              ? "text-muted-foreground"
+                              : delta > 0
+                                ? "text-success"
+                                : "text-destructive"
+                          }`}
+                        >
+                          {signed(delta)}
+                        </TableCell>
+                        <TableCell className="text-right whitespace-nowrap tabular-nums">
+                          {integer.format(segment.impressions)}
+                        </TableCell>
+                        <TableCell className="text-right whitespace-nowrap tabular-nums">
+                          {percent.format(segment.ctr)}
+                        </TableCell>
+                        <TableCell className="text-right whitespace-nowrap tabular-nums">
+                          {segment.position === null
+                            ? "—"
+                            : decimal.format(segment.position)}
+                        </TableCell>
+                      </TableRow>
+                      {isOpen ? (
+                        <TableRow className="hover:bg-transparent">
+                          <TableCell colSpan={6} className="bg-muted/30 p-0">
+                            <MemberTable
+                              members={segment.members}
+                              total={segment.items}
+                            />
+                          </TableCell>
+                        </TableRow>
+                      ) : null}
+                    </Fragment>
                   );
                 })}
               </TableBody>
@@ -230,5 +268,93 @@ export function Segments({ sets }: { sets: SegmentSet[] }) {
         )}
       </CardContent>
     </Card>
+  );
+}
+
+/** The pages (or queries) a segment holds, with their own figures. */
+function MemberTable({
+  members,
+  total,
+}: {
+  members: SegmentMember[];
+  total: number;
+}) {
+  return (
+    <div className="space-y-1 px-3 py-2">
+      <div className="max-h-72 overflow-y-auto">
+        <table className="w-full text-xs">
+          <thead className="sticky top-0 bg-muted text-muted-foreground">
+            <tr>
+              <th className="py-1 pr-2 text-left font-medium">
+                Página o consulta
+              </th>
+              <th className="px-2 py-1 text-right font-medium">Clics</th>
+              <th className="px-2 py-1 text-right font-medium">Cambio</th>
+              <th className="px-2 py-1 text-right font-medium">Impresiones</th>
+              <th className="px-2 py-1 text-right font-medium">CTR</th>
+              <th className="py-1 pl-2 text-right font-medium">Posición</th>
+            </tr>
+          </thead>
+          <tbody>
+            {members.map((member) => {
+              const delta = member.clicks - member.prevClicks;
+              const isUrl = /^https?:\/\//.test(member.key);
+              return (
+                <tr key={member.key} className="border-t border-border">
+                  <td
+                    className="max-w-64 truncate py-1 pr-2"
+                    title={member.key}
+                  >
+                    {isUrl ? (
+                      <a
+                        href={member.key}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-medium hover:underline"
+                      >
+                        {pathOf(member.key)}
+                      </a>
+                    ) : (
+                      <span className="font-medium">{member.key}</span>
+                    )}
+                  </td>
+                  <td className="px-2 py-1 text-right tabular-nums">
+                    {integer.format(member.clicks)}
+                  </td>
+                  <td
+                    className={`px-2 py-1 text-right tabular-nums ${
+                      delta === 0
+                        ? "text-muted-foreground"
+                        : delta > 0
+                          ? "text-success"
+                          : "text-destructive"
+                    }`}
+                  >
+                    {signed(delta)}
+                  </td>
+                  <td className="px-2 py-1 text-right tabular-nums">
+                    {integer.format(member.impressions)}
+                  </td>
+                  <td className="px-2 py-1 text-right tabular-nums">
+                    {percent.format(member.ctr)}
+                  </td>
+                  <td className="py-1 pl-2 text-right tabular-nums">
+                    {member.position === null
+                      ? "—"
+                      : decimal.format(member.position)}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      {total > members.length ? (
+        <p className="text-[11px] text-muted-foreground">
+          Mostrando las {integer.format(members.length)} con más clics de{" "}
+          {integer.format(total)}
+        </p>
+      ) : null}
+    </div>
   );
 }

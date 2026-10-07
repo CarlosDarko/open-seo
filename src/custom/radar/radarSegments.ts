@@ -7,6 +7,19 @@ import { isBrandQuery } from "@/custom/radar/radarAnalysis";
 
 // ------------------------------------------------------------- segments
 
+/** One page (or query) inside a segment, with its own figures. */
+export type SegmentMember = {
+  key: string;
+  clicks: number;
+  prevClicks: number;
+  impressions: number;
+  ctr: number;
+  position: number | null;
+};
+
+/** The members kept per segment (most clicks first). */
+const MAX_SEGMENT_MEMBERS = 50;
+
 export type Segment = {
   label: string;
   clicks: number;
@@ -17,6 +30,8 @@ export type Segment = {
   position: number | null;
   /** How many queries / pages fall in the segment. */
   items: number;
+  /** The biggest members of the segment: which pages or queries it holds. */
+  members: SegmentMember[];
 };
 
 /** Groups rows with `classify` and totals each group against the previous
@@ -26,7 +41,27 @@ export function segmentRows(
   previous: GscSearchAnalyticsRow[],
   classify: (row: GscSearchAnalyticsRow) => string,
 ): Segment[] {
-  const map = new Map<string, Segment & { weighted: number }>();
+  const map = new Map<
+    string,
+    Segment & { weighted: number; all: Map<string, SegmentMember> }
+  >();
+  const memberOf = (
+    segment: { all: Map<string, SegmentMember> },
+    key: string,
+  ) => {
+    const existing = segment.all.get(key);
+    if (existing) return existing;
+    const created: SegmentMember = {
+      key,
+      clicks: 0,
+      prevClicks: 0,
+      impressions: 0,
+      ctr: 0,
+      position: null,
+    };
+    segment.all.set(key, created);
+    return created;
+  };
   const slot = (label: string) => {
     const existing = map.get(label);
     if (existing) return existing;
@@ -39,7 +74,9 @@ export function segmentRows(
       ctr: 0,
       position: null,
       items: 0,
+      members: [],
       weighted: 0,
+      all: new Map<string, SegmentMember>(),
     };
     map.set(label, created);
     return created;
@@ -50,15 +87,30 @@ export function segmentRows(
     segment.impressions += row.impressions;
     segment.weighted += row.position * row.impressions;
     segment.items += 1;
+    const member = memberOf(segment, row.keys?.[0] ?? "");
+    member.clicks += row.clicks;
+    member.impressions += row.impressions;
+    member.ctr =
+      member.impressions > 0 ? member.clicks / member.impressions : 0;
+    member.position = row.position;
   }
   for (const row of previous) {
     const segment = slot(classify(row));
     segment.prevClicks += row.clicks;
     segment.prevImpressions += row.impressions;
+    memberOf(segment, row.keys?.[0] ?? "").prevClicks += row.clicks;
   }
   return [...map.values()]
-    .map(({ weighted, ...segment }) => ({
+    .map(({ weighted, all, ...segment }) => ({
       ...segment,
+      members: [...all.values()]
+        .sort(
+          (a, b) =>
+            b.clicks - a.clicks ||
+            b.prevClicks - a.prevClicks ||
+            b.impressions - a.impressions,
+        )
+        .slice(0, MAX_SEGMENT_MEMBERS),
       ctr: segment.impressions > 0 ? segment.clicks / segment.impressions : 0,
       position: segment.impressions > 0 ? weighted / segment.impressions : null,
     }))
