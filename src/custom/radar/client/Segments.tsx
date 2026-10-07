@@ -56,7 +56,10 @@ export type SegmentSet = {
 
 /** A sentence that says what the segments show: who brings the clicks and
  *  what moved most. */
-export function segmentInsight(segments: Segment[]): string | null {
+export function segmentInsight(
+  segments: Segment[],
+  comparable = true,
+): string | null {
   const total = segments.reduce((sum, segment) => sum + segment.clicks, 0);
   if (segments.length === 0 || total === 0) return null;
   const top = segments[0];
@@ -67,13 +70,15 @@ export function segmentInsight(segments: Segment[]): string | null {
       (a, b) =>
         Math.abs(b.clicks - b.prevClicks) - Math.abs(a.clicks - a.prevClicks),
     )[0];
-  const topChange = relativeChange(top.clicks, top.prevClicks);
+  const topChange = comparable
+    ? relativeChange(top.clicks, top.prevClicks)
+    : null;
   let text = `«${top.label}» aporta el ${share} de los clics${
     topChange === null
       ? ""
       : ` (${topChange > 0 ? "+" : ""}${percent.format(topChange)} frente al periodo anterior)`
   }.`;
-  if (mover && Math.abs(mover.clicks - mover.prevClicks) > 0) {
+  if (comparable && mover && Math.abs(mover.clicks - mover.prevClicks) > 0) {
     const delta = mover.clicks - mover.prevClicks;
     text += ` El mayor movimiento fuera de ahí es «${mover.label}»: ${signed(delta)} clics.`;
   }
@@ -82,13 +87,19 @@ export function segmentInsight(segments: Segment[]): string | null {
 
 /** Charts and tables of the traffic split by page type, search intent,
  *  device or brand. */
-export function Segments({ sets }: { sets: SegmentSet[] }) {
+export function Segments({
+  sets,
+  comparable = true,
+}: {
+  sets: SegmentSet[];
+  comparable?: boolean;
+}) {
   const [key, setKey] = useState(sets[0]?.key ?? "");
   const [openLabel, setOpenLabel] = useState<string | null>(null);
   const active = sets.find((set) => set.key === key) ?? sets[0];
   if (!active) return null;
   const rows = active.segments.slice(0, 8);
-  const insight = segmentInsight(active.segments);
+  const insight = segmentInsight(active.segments, comparable);
 
   return (
     <Card>
@@ -170,12 +181,14 @@ export function Segments({ sets }: { sets: SegmentSet[] }) {
                   }
                 />
                 <ChartLegend content={<ChartLegendContent />} />
-                <Bar
-                  dataKey="prevClicks"
-                  fill="var(--color-prevClicks)"
-                  radius={[0, 2, 2, 0]}
-                  maxBarSize={16}
-                />
+                {comparable ? (
+                  <Bar
+                    dataKey="prevClicks"
+                    fill="var(--color-prevClicks)"
+                    radius={[0, 2, 2, 0]}
+                    maxBarSize={16}
+                  />
+                ) : null}
                 <Bar
                   dataKey="clicks"
                   fill="var(--color-clicks)"
@@ -190,7 +203,9 @@ export function Segments({ sets }: { sets: SegmentSet[] }) {
                 <TableRow>
                   <TableHead>{active.title}</TableHead>
                   <TableHead className="text-right">Clics</TableHead>
-                  <TableHead className="text-right">Cambio</TableHead>
+                  {comparable ? (
+                    <TableHead className="text-right">Cambio</TableHead>
+                  ) : null}
                   <TableHead className="text-right">Impresiones</TableHead>
                   <TableHead className="text-right">CTR</TableHead>
                   <TableHead className="text-right">Posición</TableHead>
@@ -226,17 +241,19 @@ export function Segments({ sets }: { sets: SegmentSet[] }) {
                         <TableCell className="text-right whitespace-nowrap tabular-nums">
                           {integer.format(segment.clicks)}
                         </TableCell>
-                        <TableCell
-                          className={`text-right whitespace-nowrap tabular-nums ${
-                            delta === 0
-                              ? "text-muted-foreground"
-                              : delta > 0
-                                ? "text-success"
-                                : "text-destructive"
-                          }`}
-                        >
-                          {signed(delta)}
-                        </TableCell>
+                        {comparable ? (
+                          <TableCell
+                            className={`text-right whitespace-nowrap tabular-nums ${
+                              delta === 0
+                                ? "text-muted-foreground"
+                                : delta > 0
+                                  ? "text-success"
+                                  : "text-destructive"
+                            }`}
+                          >
+                            {signed(delta)}
+                          </TableCell>
+                        ) : null}
                         <TableCell className="text-right whitespace-nowrap tabular-nums">
                           {integer.format(segment.impressions)}
                         </TableCell>
@@ -251,10 +268,14 @@ export function Segments({ sets }: { sets: SegmentSet[] }) {
                       </TableRow>
                       {isOpen ? (
                         <TableRow className="hover:bg-transparent">
-                          <TableCell colSpan={6} className="bg-muted/30 p-0">
+                          <TableCell
+                            colSpan={comparable ? 6 : 5}
+                            className="bg-muted/30 p-0"
+                          >
                             <MemberTable
                               members={segment.members}
                               total={segment.items}
+                              comparable={comparable}
                             />
                           </TableCell>
                         </TableRow>
@@ -275,9 +296,11 @@ export function Segments({ sets }: { sets: SegmentSet[] }) {
 function MemberTable({
   members,
   total,
+  comparable,
 }: {
   members: SegmentMember[];
   total: number;
+  comparable: boolean;
 }) {
   return (
     <div className="space-y-1 px-3 py-2">
@@ -289,7 +312,9 @@ function MemberTable({
                 Página o consulta
               </th>
               <th className="px-2 py-1 text-right font-medium">Clics</th>
-              <th className="px-2 py-1 text-right font-medium">Cambio</th>
+              {comparable ? (
+                <th className="px-2 py-1 text-right font-medium">Cambio</th>
+              ) : null}
               <th className="px-2 py-1 text-right font-medium">Impresiones</th>
               <th className="px-2 py-1 text-right font-medium">CTR</th>
               <th className="py-1 pl-2 text-right font-medium">Posición</th>
@@ -321,17 +346,19 @@ function MemberTable({
                   <td className="px-2 py-1 text-right tabular-nums">
                     {integer.format(member.clicks)}
                   </td>
-                  <td
-                    className={`px-2 py-1 text-right tabular-nums ${
-                      delta === 0
-                        ? "text-muted-foreground"
-                        : delta > 0
-                          ? "text-success"
-                          : "text-destructive"
-                    }`}
-                  >
-                    {signed(delta)}
-                  </td>
+                  {comparable ? (
+                    <td
+                      className={`px-2 py-1 text-right tabular-nums ${
+                        delta === 0
+                          ? "text-muted-foreground"
+                          : delta > 0
+                            ? "text-success"
+                            : "text-destructive"
+                      }`}
+                    >
+                      {signed(delta)}
+                    </td>
+                  ) : null}
                   <td className="px-2 py-1 text-right tabular-nums">
                     {integer.format(member.impressions)}
                   </td>

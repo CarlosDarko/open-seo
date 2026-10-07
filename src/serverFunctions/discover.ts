@@ -59,6 +59,14 @@ export const getDiscoverReport = createServerFn({ method: "POST" })
         type,
       });
 
+    const comparable = periods.comparable;
+    const NO_ROWS = {
+      rows: [],
+      siteUrl: "",
+    } as unknown as Awaited<ReturnType<typeof fetchRows>>;
+    const fetchPrev: typeof fetchRows = (...args) =>
+      comparable ? fetchRows(...args) : Promise.resolve(NO_ROWS);
+
     try {
       const [
         daily,
@@ -70,11 +78,11 @@ export const getDiscoverReport = createServerFn({ method: "POST" })
         web,
       ] = await Promise.all([
         fetchRows(["date"], now, DAILY_ROW_LIMIT),
-        fetchRows(["date"], prev, DAILY_ROW_LIMIT),
+        fetchPrev(["date"], prev, DAILY_ROW_LIMIT),
         fetchRows(["page"], now, PAGE_ROW_LIMIT),
-        fetchRows(["page"], prev, PAGE_ROW_LIMIT),
+        fetchPrev(["page"], prev, PAGE_ROW_LIMIT),
         fetchRows(["country"], now, COUNTRY_ROW_LIMIT),
-        fetchRows(["country"], prev, COUNTRY_ROW_LIMIT),
+        fetchPrev(["country"], prev, COUNTRY_ROW_LIMIT),
         fetchRows(["date"], now, DAILY_ROW_LIMIT, "web"),
       ]);
 
@@ -83,7 +91,9 @@ export const getDiscoverReport = createServerFn({ method: "POST" })
       const classify = pageTypeClassifier(
         [...pageRows, ...prevPageRows].flatMap((row) => row.keys?.[0] ?? []),
       );
-      const changes = compareDimension(pageRows, prevPageRows);
+      const changes = comparable
+        ? compareDimension(pageRows, prevPageRows)
+        : [];
       const prevByPage = new Map(
         prevPageRows.flatMap((row) =>
           row.keys?.[0] ? [[row.keys[0], row] as const] : [],
@@ -97,6 +107,7 @@ export const getDiscoverReport = createServerFn({ method: "POST" })
         period: {
           compare: periods.compare,
           fellBack: periods.fellBack,
+          comparable,
           days: periods.days,
           prevStartDate: prev.startDate,
           prevEndDate: prev.endDate,

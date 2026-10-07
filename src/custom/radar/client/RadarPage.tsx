@@ -8,7 +8,6 @@ import {
   ChevronUp,
   Layers,
   ListChecks,
-  Megaphone,
   Tag,
   TrendingDown,
   TrendingUp,
@@ -44,9 +43,6 @@ import { RadarControls } from "@/custom/radar/client/RadarControls";
 import { PageLink } from "@/custom/radar/client/RadarLinks";
 import { RadarTables } from "@/custom/radar/client/RadarTables";
 import { DailyChart } from "@/custom/radar/client/DailyChart";
-import { OngoingTag, UpdateBadge } from "@/custom/radar/client/UpdateBadge";
-import { useGoogleUpdates } from "@/custom/radar/client/useGoogleUpdates";
-import { updatesBetween } from "@/custom/radar/googleUpdates";
 import { Segments, type SegmentSet } from "@/custom/radar/client/Segments";
 import { useRadarReport } from "@/custom/radar/client/useRadarReport";
 import {
@@ -132,7 +128,10 @@ export function RadarPage({ projectId }: { projectId: string }) {
             <TrendCard report={report} />
             <BandsCard report={report} />
           </div>
-          <Segments sets={segmentSets(report)} />
+          <Segments
+            sets={segmentSets(report)}
+            comparable={report.period.comparable}
+          />
           <section className="space-y-3">
             <Button
               variant="outline"
@@ -295,33 +294,40 @@ function Delta({
 
 function Kpis({ report }: { report: RadarReport }) {
   const { totals, prevTotals } = report;
+  const comparable = report.period.comparable;
   const cards = [
     {
       label: "Clics",
       value: integer.format(totals.clicks),
-      delta: <Delta now={totals.clicks} before={prevTotals.clicks} />,
+      delta: comparable ? (
+        <Delta now={totals.clicks} before={prevTotals.clicks} />
+      ) : null,
     },
     {
       label: "Impresiones",
       value: integer.format(totals.impressions),
-      delta: <Delta now={totals.impressions} before={prevTotals.impressions} />,
+      delta: comparable ? (
+        <Delta now={totals.impressions} before={prevTotals.impressions} />
+      ) : null,
     },
     {
       label: "CTR",
       value: percent.format(totals.ctr),
-      delta: <Delta now={totals.ctr} before={prevTotals.ctr} />,
+      delta: comparable ? (
+        <Delta now={totals.ctr} before={prevTotals.ctr} />
+      ) : null,
     },
     {
       label: "Posición media",
       value: decimal.format(totals.position),
-      delta: (
+      delta: comparable ? (
         <Delta
           now={totals.position}
           before={prevTotals.position}
           lowerIsBetter
           asPoints
         />
-      ),
+      ) : null,
     },
   ];
   return (
@@ -338,9 +344,19 @@ function Kpis({ report }: { report: RadarReport }) {
         {shortDate.format(
           new Date(`${report.range.startDate}T00:00:00Z`),
         )} – {shortDate.format(new Date(`${report.range.endDate}T00:00:00Z`))}{" "}
-        frente a{" "}
-        {shortDate.format(new Date(`${report.period.prevStartDate}T00:00:00Z`))}{" "}
-        – {shortDate.format(new Date(`${report.period.prevEndDate}T00:00:00Z`))}
+        {comparable ? (
+          <>
+            {" "}
+            frente a{" "}
+            {shortDate.format(
+              new Date(`${report.period.prevStartDate}T00:00:00Z`),
+            )}{" "}
+            –{" "}
+            {shortDate.format(
+              new Date(`${report.period.prevEndDate}T00:00:00Z`),
+            )}
+          </>
+        ) : null}
       </p>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {cards.map((card) => (
@@ -378,24 +394,19 @@ function Insights({
   projectId: string;
   report: RadarReport;
 }) {
-  const clicksChange = relativeChange(
-    report.totals.clicks,
-    report.prevTotals.clicks,
-  );
+  const comparable = report.period.comparable;
+  const clicksChange = comparable
+    ? relativeChange(report.totals.clicks, report.prevTotals.clicks)
+    : null;
   const clicksDiff = report.totals.clicks - report.prevTotals.clicks;
   const { brand } = report;
-  const otherChange = relativeChange(brand.otherClicks, brand.prevOtherClicks);
-  const loser = report.pageChanges.losers[0];
-  const winner = report.pageChanges.winners[0];
+  const otherChange = comparable
+    ? relativeChange(brand.otherClicks, brand.prevOtherClicks)
+    : null;
+  const loser = comparable ? report.pageChanges.losers[0] : undefined;
+  const winner = comparable ? report.pageChanges.winners[0] : undefined;
   const page = topShare(report.segments.pageType);
   const intent = topShare(report.segments.intent);
-  const googleUpdates = useGoogleUpdates();
-  // Updates in this period or the one before: a drop may follow one of them.
-  const nearUpdates = updatesBetween(
-    googleUpdates.data ?? [],
-    report.period.prevStartDate,
-    report.range.endDate,
-  );
   const plan = useMemo(() => buildActions(report), [report]);
   const tasks =
     plan.losses.length +
@@ -410,12 +421,21 @@ function Insights({
     0,
   );
 
-  // The figures go in one row; the richer tiles (shares, Google updates, plan)
-  // in the next, so every row is full and equally tall.
-  const figures: ReactNode[] = [];
-  const details: ReactNode[] = [];
+  const tiles: ReactNode[] = [];
+  if (!comparable) {
+    tiles.push(
+      <Tile
+        key="clicks"
+        tone="info"
+        icon={TrendingUp}
+        label="Clics del periodo"
+        value={integer.format(report.totals.clicks)}
+        detail={`${integer.format(report.totals.impressions)} impresiones`}
+      />,
+    );
+  }
   if (clicksChange !== null) {
-    figures.push(
+    tiles.push(
       <Tile
         key="clicks"
         tone={clicksDiff >= 0 ? "good" : "bad"}
@@ -427,7 +447,7 @@ function Insights({
     );
   }
   if (brand.hasBrand) {
-    figures.push(
+    tiles.push(
       <Tile
         key="brand"
         tone={otherChange !== null && otherChange < 0 ? "bad" : "info"}
@@ -444,7 +464,7 @@ function Insights({
     );
   }
   if (loser && loser.clicksDelta < 0) {
-    figures.push(
+    tiles.push(
       <Tile
         key="loser"
         tone="bad"
@@ -457,7 +477,7 @@ function Insights({
     );
   }
   if (winner && winner.clicksDelta > 0) {
-    figures.push(
+    tiles.push(
       <Tile
         key="winner"
         tone="good"
@@ -469,7 +489,7 @@ function Insights({
     );
   }
   if (page || intent) {
-    details.push(
+    tiles.push(
       <Tile
         key="share"
         tone="info"
@@ -484,48 +504,8 @@ function Insights({
       />,
     );
   }
-  if (nearUpdates.length > 0) {
-    details.push(
-      <Tile
-        key="google"
-        tone="info"
-        icon={Megaphone}
-        label="Updates de Google"
-        value={String(nearUpdates.length)}
-        chip="en estas fechas"
-        detail={
-          <span className="block space-y-1.5">
-            {nearUpdates.slice(0, 4).map((update) => (
-              <a
-                key={update.id}
-                href={update.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="grid grid-cols-[4rem_1fr] items-center gap-x-2 text-xs hover:underline"
-              >
-                <UpdateBadge kind={update.kind} />
-                <span className="min-w-0 truncate font-medium text-foreground">
-                  {update.label}
-                  {update.end ? null : (
-                    <>
-                      {" · "}
-                      <OngoingTag />
-                    </>
-                  )}
-                </span>
-              </a>
-            ))}
-            <span className="block pt-1 text-xs">
-              Si una página cae en estas fechas, espera a que termine el
-              despliegue antes de tocarla.
-            </span>
-          </span>
-        }
-      />,
-    );
-  }
   if (tasks > 0) {
-    details.push(
+    tiles.push(
       <Tile
         key="plan"
         tone="info"
@@ -559,40 +539,19 @@ function Insights({
         </p>
       </CardHeader>
       <CardContent>
-        {figures.length + details.length === 0 ? (
+        {tiles.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             Aún no hay datos suficientes en este periodo.
           </p>
         ) : (
-          <div className="space-y-3">
-            {figures.length > 0 ? (
-              <div
-                className={`grid gap-3 sm:grid-cols-2 ${COLUMNS[Math.min(figures.length, 4)]}`}
-              >
-                {figures}
-              </div>
-            ) : null}
-            {details.length > 0 ? (
-              <div
-                className={`grid gap-3 sm:grid-cols-2 ${COLUMNS[Math.min(details.length, 3)]}`}
-              >
-                {details}
-              </div>
-            ) : null}
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {tiles}
           </div>
         )}
       </CardContent>
     </Card>
   );
 }
-
-// Full class names so Tailwind keeps them: columns for a row of n tiles.
-const COLUMNS: Record<number, string> = {
-  1: "xl:grid-cols-1",
-  2: "xl:grid-cols-2",
-  3: "xl:grid-cols-3",
-  4: "xl:grid-cols-4",
-};
 
 const TILE_TONES = {
   good: {
@@ -713,6 +672,7 @@ function TrendCard({ report }: { report: RadarReport }) {
   return (
     <DailyChart
       daily={report.daily}
+      comparable={report.period.comparable}
       note={
         report.brand.hasBrand && !report.brand.included
           ? "Incluye también la marca: Search Console no permite separarla día a día."
@@ -753,11 +713,13 @@ function BandsCard({ report }: { report: RadarReport }) {
               }
             />
             <ChartLegend content={<ChartLegendContent />} />
-            <Bar
-              dataKey="prevQueries"
-              fill="var(--color-prevQueries)"
-              radius={[2, 2, 0, 0]}
-            />
+            {report.period.comparable ? (
+              <Bar
+                dataKey="prevQueries"
+                fill="var(--color-prevQueries)"
+                radius={[2, 2, 0, 0]}
+              />
+            ) : null}
             <Bar
               dataKey="queries"
               fill="var(--color-queries)"

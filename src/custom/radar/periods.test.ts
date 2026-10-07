@@ -37,11 +37,25 @@ describe("resolvePeriods", () => {
 
   it("falls back to the previous period when the year-ago data no longer exists", () => {
     const result = resolvePeriods(
-      { range: "last_12_months", compare: "year" },
+      { range: "last_6_months", compare: "year" },
       today,
     );
     expect(result.fellBack).toBe(true);
     expect(result.compare).toBe("previous");
+    expect(result.comparable).toBe(true);
+  });
+
+  it("does not compare when the period before would be older than 16 months", () => {
+    for (const range of ["last_12_months", "last_16_months"] as const) {
+      for (const compare of ["previous", "year"] as const) {
+        const result = resolvePeriods({ range, compare }, today);
+        expect(result.comparable).toBe(false);
+      }
+    }
+    expect(
+      resolvePeriods({ range: "last_28_days", compare: "previous" }, today)
+        .comparable,
+    ).toBe(true);
   });
 
   it("accepts a custom range given backwards", () => {

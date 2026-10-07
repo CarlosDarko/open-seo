@@ -33,6 +33,18 @@ export const SOURCE_PATCHES = [
     to: "component: HubPage,",
   },
   {
+    // A red strip on every page while Google rolls out a ranking update
+    // (src/custom/radar/client/GoogleUpdateBanner.tsx).
+    file: "src/client/layout/AppShell.tsx",
+    from: 'import { Sidebar } from "@/client/components/Sidebar";',
+    to: 'import { Sidebar } from "@/client/components/Sidebar";\nimport { GoogleUpdateBanner } from "@/custom/radar/client/GoogleUpdateBanner";',
+  },
+  {
+    file: "src/client/layout/AppShell.tsx",
+    from: "        {banner}",
+    to: "        <GoogleUpdateBanner ready={ready} />\n        {banner}",
+  },
+  {
     // The projects hub (the "/" page) has no project menu: no sidebar.
     file: "src/client/layout/AppShell.tsx",
     from: /<Sidebar\s+projectId=\{sidebarProjectId\}\s+projectPending=\{sidebarProjectPending\}\s+ready=\{ready\}\s+\/>/,

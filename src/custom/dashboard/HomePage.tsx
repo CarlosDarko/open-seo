@@ -273,7 +273,11 @@ export function HomePage({ projectId }: { projectId: string }) {
             <KpiRow report={report} />
 
             <div className="grid gap-4 lg:grid-cols-3">
-              <Card className="lg:col-span-2">
+              <Card
+                className={
+                  report.period.comparable ? "lg:col-span-2" : "lg:col-span-3"
+                }
+              >
                 <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-2">
                   <div className="space-y-0.5">
                     <CardTitle>Qué hacer ahora</CardTitle>
@@ -387,11 +391,13 @@ export function HomePage({ projectId }: { projectId: string }) {
                 </CardContent>
               </Card>
 
-              <ChangesCard
-                winners={report.pageChanges.winners.slice(0, 3)}
-                losers={report.pageChanges.losers.slice(0, 3)}
-                signals={signals}
-              />
+              {report.period.comparable ? (
+                <ChangesCard
+                  winners={report.pageChanges.winners.slice(0, 3)}
+                  losers={report.pageChanges.losers.slice(0, 3)}
+                  signals={signals}
+                />
+              ) : null}
             </div>
 
             <div className="grid gap-4 lg:grid-cols-3">
@@ -501,6 +507,7 @@ function Spark({
 
 function KpiRow({ report }: { report: Report }) {
   const { totals, prevTotals } = report;
+  const comparable = report.period.comparable;
   const daily = report.daily.map((point) => ({
     ...point,
     ctr: point.impressions > 0 ? point.clicks / point.impressions : 0,
@@ -514,32 +521,38 @@ function KpiRow({ report }: { report: Report }) {
     {
       label: "Clics",
       value: integer.format(totals.clicks),
-      delta: <Delta now={totals.clicks} before={prevTotals.clicks} />,
+      delta: comparable ? (
+        <Delta now={totals.clicks} before={prevTotals.clicks} />
+      ) : null,
       spark: <Spark data={daily} dataKey="clicks" />,
     },
     {
       label: "Impresiones",
       value: integer.format(totals.impressions),
-      delta: <Delta now={totals.impressions} before={prevTotals.impressions} />,
+      delta: comparable ? (
+        <Delta now={totals.impressions} before={prevTotals.impressions} />
+      ) : null,
       spark: <Spark data={daily} dataKey="impressions" />,
     },
     {
       label: "CTR",
       value: percent.format(totals.ctr),
-      delta: <Delta now={totals.ctr} before={prevTotals.ctr} />,
+      delta: comparable ? (
+        <Delta now={totals.ctr} before={prevTotals.ctr} />
+      ) : null,
       spark: <Spark data={daily} dataKey="ctr" />,
     },
     {
       label: "Posición media",
       value: decimal.format(totals.position),
-      delta: (
+      delta: comparable ? (
         <Delta
           now={totals.position}
           before={prevTotals.position}
           lowerIsBetter
           asPoints
         />
-      ),
+      ) : null,
       spark: <Spark data={daily} dataKey="position" />,
     },
   ];
@@ -741,6 +754,7 @@ function BandsCard({
   report: Report;
 }) {
   const [open, setOpen] = useState<number | null>(null);
+  const comparable = report.period.comparable;
   const max = Math.max(1, ...report.bands.map((band) => band.queries));
   const reachGain = report.nearTop.reduce(
     (sum, item) => sum + item.potentialClicks,
@@ -751,15 +765,16 @@ function BandsCard({
       <CardHeader>
         <CardTitle>Dónde posicionan tus consultas</CardTitle>
         <p className="text-xs text-muted-foreground">
-          Cuántas consultas tienes en cada franja de posición y cuántas han
-          entrado o salido. Pulsa una franja para ver cuáles.
+          {comparable
+            ? "Cuántas consultas tienes en cada franja de posición y cuántas han entrado o salido. Pulsa una franja para ver cuáles."
+            : "Cuántas consultas tienes en cada franja de posición."}
         </p>
       </CardHeader>
       <CardContent className="space-y-3">
         <ul className="space-y-1.5">
           {report.bands.map((band, index) => {
             const isOpen = open === index;
-            const moved = band.enteredCount + band.leftCount > 0;
+            const moved = comparable && band.enteredCount + band.leftCount > 0;
             return (
               <li key={band.label} className="rounded-lg border border-border">
                 <button
@@ -773,12 +788,16 @@ function BandsCard({
                     <span className="font-medium">{band.label}</span>
                     <span className="flex items-baseline gap-2 tabular-nums">
                       <strong>{integer.format(band.queries)}</strong>
-                      <span className="text-xs font-semibold text-success">
-                        +{integer.format(band.enteredCount)}
-                      </span>
-                      <span className="text-xs font-semibold text-destructive">
-                        −{integer.format(band.leftCount)}
-                      </span>
+                      {comparable ? (
+                        <>
+                          <span className="text-xs font-semibold text-success">
+                            +{integer.format(band.enteredCount)}
+                          </span>
+                          <span className="text-xs font-semibold text-destructive">
+                            −{integer.format(band.leftCount)}
+                          </span>
+                        </>
+                      ) : null}
                       {moved ? (
                         <ChevronDown
                           className={`size-3.5 self-center text-muted-foreground transition-transform ${isOpen ? "rotate-180" : ""}`}
@@ -895,6 +914,7 @@ function TopicsCard({
       ? topics.topics.filter((topic) => topic.label !== OTHERS).slice(0, 9)
       : [];
   const max = Math.max(1, ...rows.map((topic) => topic.clicks));
+  const comparable = topics?.connected ? topics.period.comparable : true;
   return (
     <Card>
       <CardHeader className="flex flex-row items-start justify-between gap-2">
@@ -930,11 +950,13 @@ function TopicsCard({
                     <span className="min-w-0 truncate">{topic.label}</span>
                     <span className="shrink-0 tabular-nums">
                       {integer.format(topic.clicks)}
-                      <span
-                        className={`ml-1.5 text-xs ${delta === 0 ? "text-muted-foreground" : delta > 0 ? "text-success" : "text-destructive"}`}
-                      >
-                        {signed(delta)}
-                      </span>
+                      {comparable ? (
+                        <span
+                          className={`ml-1.5 text-xs ${delta === 0 ? "text-muted-foreground" : delta > 0 ? "text-success" : "text-destructive"}`}
+                        >
+                          {signed(delta)}
+                        </span>
+                      ) : null}
                     </span>
                   </div>
                   <div className="h-1.5 overflow-hidden rounded-full bg-muted">

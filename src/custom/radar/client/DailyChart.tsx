@@ -118,9 +118,12 @@ function trendWord(
 export function DailyChart({
   daily,
   note,
+  comparable = true,
 }: {
   daily: DailyPoint[];
   note?: ReactNode;
+  /** False when there is no period to compare with: only this period is drawn. */
+  comparable?: boolean;
 }) {
   const [metric, setMetric] = useState<Metric>("clicks");
   const lines = useTrendLines();
@@ -216,14 +219,16 @@ export function DailyChart({
                 />
               }
             />
-            <Line
-              dataKey="prev"
-              stroke="var(--color-prev)"
-              strokeDasharray="4 3"
-              strokeWidth={1.5}
-              dot={false}
-              connectNulls
-            />
+            {comparable ? (
+              <Line
+                dataKey="prev"
+                stroke="var(--color-prev)"
+                strokeDasharray="4 3"
+                strokeWidth={1.5}
+                dot={false}
+                connectNulls
+              />
+            ) : null}
             <Line
               dataKey="value"
               stroke="var(--color-value)"
@@ -297,15 +302,6 @@ export function DailyChart({
             value={mean !== null ? config.format(mean) : undefined}
           />
           <LineSwitch
-            on={lines.showUpdates}
-            onClick={lines.toggleUpdates}
-            color="var(--foreground)"
-            marker
-            label="Updates de Google"
-            value={marks.length > 0 ? String(marks.length) : undefined}
-            hint="Marca en el gráfico los días en que Google lanzó actualizaciones de su algoritmo (fuente: status.search.google.com, al día)."
-          />
-          <LineSwitch
             on={lines.showTrend}
             onClick={lines.toggleTrend}
             color={TREND_COLOR}
@@ -316,6 +312,15 @@ export function DailyChart({
                 ? `La recta ajustada a los días cambia un ${trendChange > 0 ? "+" : ""}${percent.format(trendChange)} entre el principio y el final del periodo. Es una referencia, no una cifra exacta.`
                 : undefined
             }
+          />
+          <LineSwitch
+            on={lines.showUpdates}
+            onClick={lines.toggleUpdates}
+            color="var(--foreground)"
+            marker
+            label="Google Updates"
+            value={marks.length > 0 ? String(marks.length) : undefined}
+            hint="Marca en el gráfico los días en que Google lanzó actualizaciones de su algoritmo (fuente: status.search.google.com, al día)."
           />
         </div>
         {lines.showUpdates && marks.length > 0 ? (

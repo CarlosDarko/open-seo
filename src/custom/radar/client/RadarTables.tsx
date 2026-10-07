@@ -36,15 +36,27 @@ const CAUSE_LABEL: Record<ChangeCause, string> = {
 };
 
 export function RadarTables({ report }: { report: RadarReport }) {
-  const [tab, setTab] = useState<DetailTab>("changes");
+  const comparable = report.period.comparable;
+  const [chosen, setTab] = useState<DetailTab>("changes");
+  // Without a period to compare with there are no changes to list.
+  const tab: DetailTab =
+    !comparable && (chosen === "changes" || chosen === "queries")
+      ? "opportunities"
+      : chosen;
   return (
     <div className="space-y-4">
       <Tabs value={tab} onValueChange={(value) => setTab(value as DetailTab)}>
         <TabsList>
-          <TabsTrigger value="changes">Ganadores y perdedores</TabsTrigger>
+          {comparable ? (
+            <TabsTrigger value="changes">Ganadores y perdedores</TabsTrigger>
+          ) : null}
           <TabsTrigger value="opportunities">Oportunidades</TabsTrigger>
           <TabsTrigger value="cannibal">Canibalización</TabsTrigger>
-          <TabsTrigger value="queries">Consultas nuevas y perdidas</TabsTrigger>
+          {comparable ? (
+            <TabsTrigger value="queries">
+              Consultas nuevas y perdidas
+            </TabsTrigger>
+          ) : null}
         </TabsList>
       </Tabs>
 

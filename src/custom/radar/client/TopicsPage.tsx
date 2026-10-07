@@ -153,8 +153,14 @@ export function TopicsPage({ projectId }: { projectId: string }) {
             <CustomTopicsDialog projectId={projectId} custom={report.custom} />
           </div>
           <Insights report={report} />
-          <TopicsChart topics={report.topics} />
-          <TopicsTable topics={report.topics} />
+          <TopicsChart
+            topics={report.topics}
+            comparable={report.period.comparable}
+          />
+          <TopicsTable
+            topics={report.topics}
+            comparable={report.period.comparable}
+          />
         </div>
       ) : null}
     </div>
@@ -187,7 +193,7 @@ function Insights({ report }: { report: Report }) {
         ),
       });
     }
-    const movers = real
+    const movers = (report.period.comparable ? real : [])
       .filter((topic) => Math.max(topic.clicks, topic.prev.clicks) >= 10)
       .map((topic) => ({ topic, delta: topic.clicks - topic.prev.clicks }));
     const grow = [...movers].sort((a, b) => b.delta - a.delta)[0];
@@ -308,7 +314,13 @@ function Insights({ report }: { report: Report }) {
   );
 }
 
-function TopicsChart({ topics }: { topics: Topic[] }) {
+function TopicsChart({
+  topics,
+  comparable,
+}: {
+  topics: Topic[];
+  comparable: boolean;
+}) {
   const rows = topics
     .filter((topic) => topic.label !== OTHERS)
     .slice(0, 12)
@@ -323,7 +335,9 @@ function TopicsChart({ topics }: { topics: Topic[] }) {
       <CardHeader>
         <CardTitle>Clics por tema</CardTitle>
         <p className="text-xs text-muted-foreground">
-          Los 12 temas con más clics, frente al periodo anterior.
+          {comparable
+            ? "Los 12 temas con más clics, frente al periodo anterior."
+            : "Los 12 temas con más clics."}
         </p>
       </CardHeader>
       <CardContent>
@@ -358,12 +372,14 @@ function TopicsChart({ topics }: { topics: Topic[] }) {
               }
             />
             <ChartLegend content={<ChartLegendContent />} />
-            <Bar
-              dataKey="prevClicks"
-              fill="var(--color-prevClicks)"
-              radius={[0, 2, 2, 0]}
-              maxBarSize={14}
-            />
+            {comparable ? (
+              <Bar
+                dataKey="prevClicks"
+                fill="var(--color-prevClicks)"
+                radius={[0, 2, 2, 0]}
+                maxBarSize={14}
+              />
+            ) : null}
             <Bar
               dataKey="clicks"
               fill="var(--color-clicks)"
@@ -377,7 +393,13 @@ function TopicsChart({ topics }: { topics: Topic[] }) {
   );
 }
 
-function TopicsTable({ topics }: { topics: Topic[] }) {
+function TopicsTable({
+  topics,
+  comparable,
+}: {
+  topics: Topic[];
+  comparable: boolean;
+}) {
   const [open, setOpen] = useState<string | null>(null);
   return (
     <TableCard>
@@ -395,7 +417,9 @@ function TopicsTable({ topics }: { topics: Topic[] }) {
             <TableHead>Tema</TableHead>
             <TableHead className="text-right">Consultas</TableHead>
             <TableHead className="text-right">Clics</TableHead>
-            <TableHead className="text-right">Cambio</TableHead>
+            {comparable ? (
+              <TableHead className="text-right">Cambio</TableHead>
+            ) : null}
             <TableHead className="text-right">Impresiones</TableHead>
             <TableHead className="text-right">Posición</TableHead>
             <TableHead className="text-right">Al alcance</TableHead>
@@ -431,17 +455,19 @@ function TopicsTable({ topics }: { topics: Topic[] }) {
                   <TableCell className="text-right tabular-nums">
                     {integer.format(topic.clicks)}
                   </TableCell>
-                  <TableCell
-                    className={`text-right whitespace-nowrap tabular-nums ${
-                      delta === 0
-                        ? "text-muted-foreground"
-                        : delta > 0
-                          ? "text-success"
-                          : "text-destructive"
-                    }`}
-                  >
-                    {signed(delta)}
-                  </TableCell>
+                  {comparable ? (
+                    <TableCell
+                      className={`text-right whitespace-nowrap tabular-nums ${
+                        delta === 0
+                          ? "text-muted-foreground"
+                          : delta > 0
+                            ? "text-success"
+                            : "text-destructive"
+                      }`}
+                    >
+                      {signed(delta)}
+                    </TableCell>
+                  ) : null}
                   <TableCell className="text-right tabular-nums">
                     {integer.format(topic.impressions)}
                   </TableCell>

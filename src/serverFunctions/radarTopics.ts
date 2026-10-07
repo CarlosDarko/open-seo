@@ -54,7 +54,12 @@ export const getTopicsReport = createServerFn({ method: "POST" })
       const [current, previous, queryPages, manualBrand, custom] =
         await Promise.all([
           fetchRows(["query"], periods.current),
-          fetchRows(["query"], periods.previous),
+          // Nothing to compare with when the period before is out of reach.
+          periods.comparable
+            ? fetchRows(["query"], periods.previous)
+            : Promise.resolve({ rows: [], siteUrl: "" } as unknown as Awaited<
+                ReturnType<typeof fetchRows>
+              >),
           fetchRows(["query", "page"], periods.current),
           getBrandTerms(projectId),
           getCustomTopics(projectId),
@@ -82,6 +87,7 @@ export const getTopicsReport = createServerFn({ method: "POST" })
         period: {
           compare: periods.compare,
           fellBack: periods.fellBack,
+          comparable: periods.comparable,
           prevStartDate: periods.previous.startDate,
           prevEndDate: periods.previous.endDate,
         },

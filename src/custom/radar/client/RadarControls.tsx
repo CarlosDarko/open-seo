@@ -10,10 +10,12 @@ import {
   SelectValue,
 } from "@/client/components/ui/select";
 import { Switch } from "@/client/components/ui/switch";
-import type {
-  RadarFilters,
-  RadarRange,
+import {
+  periodInput,
+  type RadarFilters,
+  type RadarRange,
 } from "@/custom/radar/client/useRadarFilters";
+import { resolvePeriods } from "@/custom/radar/periods";
 
 const WIDE_MENU = "w-auto min-w-(--anchor-width) max-w-[min(32rem,92vw)]";
 
@@ -52,6 +54,9 @@ export function RadarControls({
   fellBack?: boolean;
 }) {
   const today = new Date().toISOString().slice(0, 10);
+  // The period before must fit in the 16 months Search Console keeps: when it
+  // does not, nothing is compared and the dropdown is not offered.
+  const comparable = resolvePeriods(periodInput(filters)).comparable;
   return (
     <div className="flex flex-col items-end gap-2">
       <div className="flex flex-wrap items-center justify-end gap-2">
@@ -93,24 +98,26 @@ export function RadarControls({
             />
           </>
         ) : null}
-        <Select
-          items={COMPARE_ITEMS}
-          value={filters.compare}
-          onValueChange={(value) =>
-            onChange({ compare: value as RadarFilters["compare"] })
-          }
-        >
-          <SelectTrigger size="sm" aria-label="Comparación">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent className={WIDE_MENU}>
-            {COMPARE_ITEMS.map((item) => (
-              <SelectItem key={item.value} value={item.value}>
-                {item.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {comparable ? (
+          <Select
+            items={COMPARE_ITEMS}
+            value={filters.compare}
+            onValueChange={(value) =>
+              onChange({ compare: value as RadarFilters["compare"] })
+            }
+          >
+            <SelectTrigger size="sm" aria-label="Comparación">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className={WIDE_MENU}>
+              {COMPARE_ITEMS.map((item) => (
+                <SelectItem key={item.value} value={item.value}>
+                  {item.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : null}
       </div>
       {brand && projectId ? (
         <div className="flex flex-wrap items-center justify-end gap-3">

@@ -34,6 +34,10 @@ export type ResolvedPeriods = {
   /** The year-ago comparison was asked for but Search Console does not keep
    *  data that far back, so the previous period is used instead. */
   fellBack: boolean;
+  /** False when the period before would need data older than the 16 months
+   *  Search Console keeps: nothing is compared then (a shorter or partial
+   *  period would not be fair). `previous` is then not meaningful. */
+  comparable: boolean;
   days: number;
 };
 
@@ -78,32 +82,45 @@ export function resolvePeriods(
         DAY_MS,
     ) + 1;
 
+  // Search Console keeps 16 months: a comparison period that does not fit
+  // inside them cannot have the same number of days, so it is not offered.
+  const floor = resolveDateRange(
+    { dateRange: "last_16_months" },
+    today,
+  ).startDate;
+  const before = previousPeriod(current.startDate, current.endDate);
+  const previousFits = before.startDate >= floor;
+
   if (input.compare === "year") {
-    const previous = {
+    const yearAgo = {
       startDate: shiftYears(current.startDate, -1),
       endDate: shiftYears(current.endDate, -1),
     };
-    // GSC keeps 16 months: the year-ago window must fit inside them.
-    const floor = resolveDateRange(
-      { dateRange: "last_16_months" },
-      today,
-    ).startDate;
-    if (previous.startDate >= floor) {
-      return { current, previous, compare: "year", fellBack: false, days };
+    if (yearAgo.startDate >= floor) {
+      return {
+        current,
+        previous: yearAgo,
+        compare: "year",
+        fellBack: false,
+        comparable: true,
+        days,
+      };
     }
     return {
       current,
-      previous: previousPeriod(current.startDate, current.endDate),
+      previous: before,
       compare: "previous",
-      fellBack: true,
+      fellBack: previousFits,
+      comparable: previousFits,
       days,
     };
   }
   return {
     current,
-    previous: previousPeriod(current.startDate, current.endDate),
+    previous: before,
     compare: "previous",
     fellBack: false,
+    comparable: previousFits,
     days,
   };
 }

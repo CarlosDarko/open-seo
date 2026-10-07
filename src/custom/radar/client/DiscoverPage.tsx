@@ -172,6 +172,7 @@ export function DiscoverPage({ projectId }: { projectId: string }) {
             <TrendCard report={report} />
             <TopPages report={report} />
             <Segments
+              comparable={report.period.comparable}
               sets={[
                 {
                   key: "pageType",
@@ -225,22 +226,29 @@ function Delta({ now, before }: { now: number; before: number }) {
 
 function Kpis({ report, what }: { report: Report; what: string }) {
   const { totals, prevTotals, webClicks } = report;
+  const comparable = report.period.comparable;
   const all = totals.clicks + webClicks;
   const cards: { label: string; value: string; extra: ReactNode }[] = [
     {
       label: "Clics",
       value: integer.format(totals.clicks),
-      extra: <Delta now={totals.clicks} before={prevTotals.clicks} />,
+      extra: comparable ? (
+        <Delta now={totals.clicks} before={prevTotals.clicks} />
+      ) : null,
     },
     {
       label: "Impresiones",
       value: integer.format(totals.impressions),
-      extra: <Delta now={totals.impressions} before={prevTotals.impressions} />,
+      extra: comparable ? (
+        <Delta now={totals.impressions} before={prevTotals.impressions} />
+      ) : null,
     },
     {
       label: "CTR",
       value: percent.format(totals.ctr),
-      extra: <Delta now={totals.ctr} before={prevTotals.ctr} />,
+      extra: comparable ? (
+        <Delta now={totals.ctr} before={prevTotals.ctr} />
+      ) : null,
     },
     {
       label: "Peso sobre la búsqueda web",
@@ -365,17 +373,20 @@ function Highlights({ report, what }: { report: Report; what: string }) {
 }
 
 function TrendCard({ report }: { report: Report }) {
-  return <DailyChart daily={report.daily} />;
+  return (
+    <DailyChart daily={report.daily} comparable={report.period.comparable} />
+  );
 }
 
 function TopPages({ report }: { report: Report }) {
+  const comparable = report.period.comparable;
   return (
     <TableCard>
       <div className="border-b border-border p-4">
         <h3 className="font-medium">Páginas con más tráfico</h3>
         <p className="text-xs text-muted-foreground">
-          Las {report.topPages.length} que más clics reciben en este periodo,
-          con su variación.
+          Las {report.topPages.length} que más clics reciben en este periodo
+          {comparable ? ", con su variación" : ""}.
         </p>
       </div>
       <Table>
@@ -383,7 +394,9 @@ function TopPages({ report }: { report: Report }) {
           <TableRow>
             <TableHead>Página</TableHead>
             <TableHead className="text-right">Clics</TableHead>
-            <TableHead className="text-right">Cambio</TableHead>
+            {comparable ? (
+              <TableHead className="text-right">Cambio</TableHead>
+            ) : null}
             <TableHead className="text-right">Impresiones</TableHead>
             <TableHead className="text-right">CTR</TableHead>
           </TableRow>
@@ -399,17 +412,19 @@ function TopPages({ report }: { report: Report }) {
                 <TableCell className="text-right whitespace-nowrap tabular-nums">
                   {integer.format(page.clicks)}
                 </TableCell>
-                <TableCell
-                  className={`text-right whitespace-nowrap tabular-nums ${
-                    delta === 0
-                      ? "text-muted-foreground"
-                      : delta > 0
-                        ? "text-success"
-                        : "text-destructive"
-                  }`}
-                >
-                  {signed(delta)}
-                </TableCell>
+                {comparable ? (
+                  <TableCell
+                    className={`text-right whitespace-nowrap tabular-nums ${
+                      delta === 0
+                        ? "text-muted-foreground"
+                        : delta > 0
+                          ? "text-success"
+                          : "text-destructive"
+                    }`}
+                  >
+                    {signed(delta)}
+                  </TableCell>
+                ) : null}
                 <TableCell className="text-right whitespace-nowrap tabular-nums">
                   {integer.format(page.impressions)}
                 </TableCell>

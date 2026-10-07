@@ -93,6 +93,16 @@ export const getRadarReport = createServerFn({ method: "POST" })
     ) =>
       GscService.getPerformance({ projectId, ...period, dimensions, rowLimit });
 
+    // Nothing is compared when the period before does not fit in the 16
+    // months Search Console keeps: its data is simply not asked for.
+    const comparable = periods.comparable;
+    const NO_ROWS = {
+      rows: [],
+      siteUrl: "",
+    } as unknown as Awaited<ReturnType<typeof fetchRows>>;
+    const fetchPrev: typeof fetchRows = (...args) =>
+      comparable ? fetchRows(...args) : Promise.resolve(NO_ROWS);
+
     try {
       const [
         daily,
@@ -108,15 +118,15 @@ export const getRadarReport = createServerFn({ method: "POST" })
         manualBrand,
       ] = await Promise.all([
         fetchRows(["date"], now, DAILY_ROW_LIMIT),
-        fetchRows(["date"], prev, DAILY_ROW_LIMIT),
+        fetchPrev(["date"], prev, DAILY_ROW_LIMIT),
         fetchRows(["query"], now, DIMENSION_ROW_LIMIT),
-        fetchRows(["query"], prev, DIMENSION_ROW_LIMIT),
+        fetchPrev(["query"], prev, DIMENSION_ROW_LIMIT),
         fetchRows(["page"], now, DIMENSION_ROW_LIMIT),
-        fetchRows(["page"], prev, DIMENSION_ROW_LIMIT),
+        fetchPrev(["page"], prev, DIMENSION_ROW_LIMIT),
         fetchRows(["query", "page"], now, DIMENSION_ROW_LIMIT),
-        fetchRows(["query", "page"], prev, DIMENSION_ROW_LIMIT),
+        fetchPrev(["query", "page"], prev, DIMENSION_ROW_LIMIT),
         fetchRows(["device"], now, 10),
-        fetchRows(["device"], prev, 10),
+        fetchPrev(["device"], prev, 10),
         getBrandTerms(projectId),
       ]);
 
@@ -149,12 +159,14 @@ export const getRadarReport = createServerFn({ method: "POST" })
       const curve = ownCtrCurve(queryRows);
       const pageByQuery = bestPageByQuery(queryPageRows);
 
-      const pageGroups = winnersAndLosers(
-        compareDimension(pageRows, prevPageRows),
-      );
+      const pageGroups = comparable
+        ? winnersAndLosers(compareDimension(pageRows, prevPageRows))
+        : { winners: [], losers: [] };
       const withCauses = (rows: typeof pageGroups.winners) =>
         attachPageQueries(rows, queryPageRows, prevQueryPageRows);
-      const queryChanges = compareDimension(queryRows, prevQueryRows);
+      const queryChanges = comparable
+        ? compareDimension(queryRows, prevQueryRows)
+        : [];
 
       // A query whose snippet underperforms is a snippet task: keep it out of
       // the "near the top" list so one query is not reported twice.
@@ -203,6 +215,7 @@ export const getRadarReport = createServerFn({ method: "POST" })
         period: {
           compare: periods.compare,
           fellBack: periods.fellBack,
+          comparable,
           days: periods.days,
           prevStartDate: prev.startDate,
           prevEndDate: prev.endDate,
@@ -234,7 +247,11 @@ export const getRadarReport = createServerFn({ method: "POST" })
           prevDaily.rows,
           shiftInDays(now.startDate, prev.startDate),
         ),
-        bands: positionBands(queryRows, prevQueryRows),
+        bands: positionBands(queryRows, prevQueryRows).map((band) =>
+          comparable
+            ? band
+            : { ...band, enteredCount: 0, leftCount: 0, entered: [], left: [] },
+        ),
         ctrCurve: curve,
         topPages: [...pageRows]
           .sort((a, b) => b.clicks - a.clicks)
@@ -288,12 +305,14 @@ export const getRadarReport = createServerFn({ method: "POST" })
         cannibalized: cannibalizedQueries(queryPageRows),
         questions: questionOpportunities(queryPageRows, minImpressions),
         lowTraction: lowTractionPages(pageRows, queryPageRows, minImpressions),
-        emerging: emergingQueries(
-          queryRows,
-          new Set(prevQueryRows.flatMap((row) => row.keys?.[0] ?? [])),
-          pageByQuery,
-          minImpressions,
-        ),
+        emerging: comparable
+          ? emergingQueries(
+              queryRows,
+              new Set(prevQueryRows.flatMap((row) => row.keys?.[0] ?? [])),
+              pageByQuery,
+              minImpressions,
+            )
+          : [],
       };
     } catch (error) {
       // "none": no property linked. "reconnect": a property is linked but
