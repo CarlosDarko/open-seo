@@ -44,37 +44,66 @@ type Tone = "destructive" | "primary" | "success" | "info" | "warning";
 // Full class names on purpose: Tailwind only keeps classes it can read.
 const TONES: Record<
   Tone,
-  { border: string; soft: string; text: string; dot: string }
+  {
+    border: string;
+    soft: string;
+    text: string;
+    dot: string;
+    top: string;
+    wash: string;
+    solid: string;
+    softBorder: string;
+  }
 > = {
   destructive: {
     border: "border-l-destructive",
     soft: "bg-destructive/10",
     text: "text-destructive",
     dot: "bg-destructive",
+    top: "border-t-destructive",
+    wash: "bg-destructive/5",
+    solid: "bg-destructive text-white",
+    softBorder: "border-destructive/30",
   },
   primary: {
     border: "border-l-primary",
     soft: "bg-primary/10",
     text: "text-primary",
     dot: "bg-primary",
+    top: "border-t-primary",
+    wash: "bg-primary/5",
+    solid: "bg-primary text-white",
+    softBorder: "border-primary/30",
   },
   success: {
     border: "border-l-success",
     soft: "bg-success/10",
     text: "text-success",
     dot: "bg-success",
+    top: "border-t-success",
+    wash: "bg-success/5",
+    solid: "bg-success text-white",
+    softBorder: "border-success/30",
   },
   info: {
     border: "border-l-info",
     soft: "bg-info/10",
     text: "text-info",
     dot: "bg-info",
+    top: "border-t-info",
+    wash: "bg-info/5",
+    solid: "bg-info text-white",
+    softBorder: "border-info/30",
   },
   warning: {
     border: "border-l-warning",
     soft: "bg-warning/10",
     text: "text-warning",
     dot: "bg-warning",
+    top: "border-t-warning",
+    wash: "bg-warning/5",
+    solid: "bg-warning text-white",
+    softBorder: "border-warning/30",
   },
 };
 
@@ -382,19 +411,13 @@ function SectionLabel({ children }: { children: ReactNode }) {
 function EffortMeter({ effort }: { effort: Effort }) {
   const level = effort === "bajo" ? 1 : effort === "medio" ? 2 : 3;
   return (
-    <span
-      className="inline-flex items-center gap-1.5 text-xs text-muted-foreground"
-      title={`Esfuerzo ${effort}`}
-    >
-      <span className="flex gap-0.5" aria-hidden>
-        {[1, 2, 3].map((bar) => (
-          <span
-            key={bar}
-            className={`h-1.5 w-4 rounded-full ${bar <= level ? "bg-foreground/70" : "bg-border"}`}
-          />
-        ))}
-      </span>
-      Esfuerzo {effort}
+    <span className="flex gap-0.5" aria-hidden>
+      {[1, 2, 3].map((bar) => (
+        <span
+          key={bar}
+          className={`h-1.5 w-3 rounded-full ${bar <= level ? "bg-current" : "bg-current opacity-25"}`}
+        />
+      ))}
     </span>
   );
 }
@@ -439,148 +462,175 @@ export function ActionCard({
   return (
     <Card
       data-task-id={action.id}
-      className={`overflow-hidden border-l-4 ${tone.border}`}
+      className={`gap-0 overflow-hidden border-t-4 py-0 shadow-sm ${tone.top}`}
     >
       <CardContent className="p-0">
+        {/* Head: what it is, which page, and what it is worth. */}
         <div
-          className="flex cursor-pointer gap-4 p-4"
+          className={`flex cursor-pointer flex-col gap-4 p-4 sm:flex-row sm:items-start ${tone.wash}`}
           onClick={(event) => {
             if ((event.target as HTMLElement).closest("a, button")) return;
             onToggle();
           }}
         >
           <span
-            className={`flex size-10 shrink-0 items-center justify-center rounded-full ${tone.soft} ${tone.text}`}
+            className={`flex size-11 shrink-0 items-center justify-center rounded-xl ${tone.solid}`}
           >
             <Icon className="size-5" aria-hidden />
           </span>
 
-          <div className="min-w-0 flex-1 space-y-3">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div className="min-w-0 space-y-1">
-                <p
-                  className={`text-[11px] font-semibold tracking-wider uppercase ${tone.text}`}
-                >
-                  {meta.label}
-                </p>
-                {linkedPage ? (
-                  <a
-                    href={linkedPage}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="group inline-flex items-start gap-1.5 leading-snug font-semibold text-foreground hover:text-primary"
-                  >
-                    <span className="break-words">{mainTitle}</span>
-                    <ExternalLink
-                      className="mt-1 size-3.5 shrink-0 text-muted-foreground group-hover:text-primary"
-                      aria-hidden
-                    />
-                  </a>
-                ) : (
-                  <p className="leading-snug font-semibold">{mainTitle}</p>
-                )}
-                {path ? (
-                  <p className="truncate text-xs text-muted-foreground">
-                    {path === "/" ? "Página de inicio (/)" : path}
-                  </p>
-                ) : null}
-                <p className="text-sm text-muted-foreground">
-                  {action.subtitle}
-                </p>
-              </div>
-
-              <div className="shrink-0 sm:text-right">
-                {action.gain !== null ? (
-                  <>
-                    <p
-                      className={`text-2xl leading-none font-semibold tabular-nums ${isLoss ? "text-destructive" : "text-success"}`}
-                    >
-                      {isLoss ? "−" : "+"}
-                      {integer.format(action.gain)}
-                    </p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {isLoss ? "clics perdidos" : "clics posibles"}
-                    </p>
-                  </>
-                ) : (
-                  <p className="text-xs text-muted-foreground">
-                    Impacto por medir
-                  </p>
-                )}
-                <div className="mt-2 sm:flex sm:justify-end">
-                  <EffortMeter effort={action.effort} />
-                </div>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap gap-1.5">
-              {action.stats.map((stat) => (
-                <span
-                  key={stat.label}
-                  className="inline-flex items-baseline gap-1.5 rounded-md bg-muted px-2 py-1 text-xs"
-                >
-                  <span className="text-muted-foreground">{stat.label}</span>
-                  <span className="font-medium tabular-nums">{stat.value}</span>
-                </span>
-              ))}
-            </div>
-
-            <div className={`flex gap-2.5 rounded-lg px-3 py-2.5 text-sm ${tone.soft}`}>
-              <Lightbulb
-                className={`mt-0.5 size-4 shrink-0 ${tone.text}`}
-                aria-hidden
-              />
-              <p>
-                <strong className={tone.text}>Qué hacer: </strong>
-                {verdict}
-              </p>
-            </div>
-
-            <div className="flex items-center justify-between gap-2">
-              {onMarkDone ? (
-                <Button
-                  size="xs"
-                  variant="outline"
-                  disabled={marking}
-                  onClick={() => onMarkDone(pageTitle)}
-                  title="Guarda cómo está ahora y mide el efecto en las semanas siguientes"
-                >
-                  <CircleCheck className="size-3" aria-hidden />
-                  {marking ? "Guardando…" : "Marcar como hecha"}
-                </Button>
-              ) : (
-                <span />
-              )}
-              <button
-                type="button"
-                aria-expanded={open}
-                onClick={onToggle}
-                className="inline-flex items-center gap-1 rounded-md text-xs font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
+          <div className="min-w-0 flex-1 space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <span
+                className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold tracking-wide uppercase ${tone.soft} ${tone.text}`}
               >
-                {open ? "Ocultar detalle" : "Ver detalle"}
-                <ChevronDown
-                  className={`size-4 transition-transform ${open ? "rotate-180" : ""}`}
+                {meta.label}
+              </span>
+              <EffortPill effort={action.effort} />
+            </div>
+            {linkedPage ? (
+              <a
+                href={linkedPage}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group inline-flex items-start gap-1.5 text-lg leading-snug font-semibold text-foreground hover:text-primary"
+              >
+                <span className="break-words">{mainTitle}</span>
+                <ExternalLink
+                  className="mt-1.5 size-4 shrink-0 text-muted-foreground group-hover:text-primary"
                   aria-hidden
                 />
-              </button>
+              </a>
+            ) : (
+              <p className="text-lg leading-snug font-semibold">{mainTitle}</p>
+            )}
+            {path ? (
+              <p className="truncate font-mono text-xs text-muted-foreground">
+                {path}
+              </p>
+            ) : null}
+            <p className="text-sm text-muted-foreground">{action.subtitle}</p>
+          </div>
+
+          <div
+            className={`shrink-0 rounded-xl border px-4 py-2.5 text-center sm:min-w-28 ${tone.softBorder} bg-card`}
+          >
+            {action.gain !== null ? (
+              <>
+                <p
+                  className={`text-3xl leading-none font-bold tabular-nums ${isLoss ? "text-destructive" : "text-success"}`}
+                >
+                  {isLoss ? "−" : "+"}
+                  {integer.format(action.gain)}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {isLoss ? "clics perdidos" : "clics posibles"}
+                </p>
+              </>
+            ) : (
+              <p className="text-xs text-muted-foreground">Impacto por medir</p>
+            )}
+          </div>
+        </div>
+
+        <div className="space-y-3 p-4">
+          {/* Key figures as small tiles. */}
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+            {action.stats.map((stat) => {
+              const [before, after] = stat.value.split("→").map((x) => x.trim());
+              return (
+                <div
+                  key={stat.label}
+                  className="rounded-lg border border-border bg-muted/40 px-3 py-2"
+                >
+                  <p className="text-[11px] tracking-wide text-muted-foreground uppercase">
+                    {stat.label}
+                  </p>
+                  <p className="mt-0.5 flex items-baseline gap-1.5 tabular-nums">
+                    {after !== undefined ? (
+                      <>
+                        <span className="text-sm text-muted-foreground">
+                          {before}
+                        </span>
+                        <span className="text-xs text-muted-foreground">→</span>
+                        <span className="text-base font-semibold">{after}</span>
+                      </>
+                    ) : (
+                      <span className="text-base font-semibold">{before}</span>
+                    )}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* The recommendation, the most visible thing after the title. */}
+          <div
+            className={`flex gap-3 rounded-xl border-2 px-4 py-3 ${tone.softBorder} ${tone.soft}`}
+          >
+            <span
+              className={`flex size-8 shrink-0 items-center justify-center rounded-full ${tone.solid}`}
+            >
+              <Lightbulb className="size-4" aria-hidden />
+            </span>
+            <div className="min-w-0">
+              <p
+                className={`text-[11px] font-bold tracking-wider uppercase ${tone.text}`}
+              >
+                Qué hacer
+              </p>
+              <p className="text-sm leading-relaxed font-medium">{verdict}</p>
             </div>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            {onMarkDone ? (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={marking}
+                onClick={() => onMarkDone(pageTitle)}
+                title="Guarda cómo está ahora y mide el efecto en las semanas siguientes"
+              >
+                <CircleCheck className="size-4" aria-hidden />
+                {marking ? "Guardando…" : "Marcar como hecha"}
+              </Button>
+            ) : (
+              <span />
+            )}
+            <Button
+              size="sm"
+              variant={open ? "secondary" : "ghost"}
+              aria-expanded={open}
+              onClick={onToggle}
+            >
+              {open ? "Ocultar detalle" : "Ver el porqué y los pasos"}
+              <ChevronDown
+                className={`size-4 transition-transform ${open ? "rotate-180" : ""}`}
+                aria-hidden
+              />
+            </Button>
           </div>
         </div>
 
         {open ? (
-          <div className="space-y-4 border-t border-border bg-muted/20 p-4 pl-18">
-            <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
-              {action.query ? <GoogleLink query={action.query} /> : null}
-            </div>
+          <div className="grid gap-3 border-t border-border bg-muted/30 p-4 lg:grid-cols-2">
+            {action.query ? (
+              <div className="lg:col-span-2">
+                <GoogleLink query={action.query} />
+              </div>
+            ) : null}
 
             {action.kind === "cannibal" ? (
-              <div className="space-y-1.5">
-                <SectionLabel>Páginas que compiten</SectionLabel>
-                <ul className="space-y-1.5 text-sm">
+              <Panel title="Páginas que compiten" className="lg:col-span-2">
+                <ul className="space-y-2">
                   {action.pages.map((item, index) => {
                     const pageInfo = signals.get(item.page);
                     return (
-                      <li key={item.page} className="space-y-0.5">
+                      <li
+                        key={item.page}
+                        className="rounded-lg border border-border bg-muted/40 p-2.5 text-sm"
+                      >
                         <PageLink
                           url={item.page}
                           label={
@@ -589,23 +639,27 @@ export function ActionCard({
                               : undefined
                           }
                         />
-                        <p className="text-xs text-muted-foreground">
-                          {pathOf(item.page)} ·{" "}
-                          {index === 0 ? "propuesta como principal · " : ""}
-                          posición {decimal.format(item.position)} ·{" "}
-                          {clicksText(item.clicks)} ·{" "}
-                          {integer.format(item.impressions)} impresiones
-                        </p>
+                        <div className="mt-1.5 flex flex-wrap gap-1.5 text-xs">
+                          {index === 0 ? (
+                            <Pill className="bg-success/10 text-success">
+                              propuesta como principal
+                            </Pill>
+                          ) : null}
+                          <Pill>posición {decimal.format(item.position)}</Pill>
+                          <Pill>{clicksText(item.clicks)}</Pill>
+                          <Pill>
+                            {integer.format(item.impressions)} impresiones
+                          </Pill>
+                        </div>
                       </li>
                     );
                   })}
                 </ul>
-              </div>
+              </Panel>
             ) : null}
 
-            <div className="space-y-1.5">
-              <SectionLabel>Qué dicen los datos</SectionLabel>
-              <ul className="space-y-1.5">
+            <Panel title="Qué dicen los datos">
+              <ul className="space-y-2">
                 {action.lines.map((line) => (
                   <li key={line} className="flex gap-2 text-sm">
                     <span
@@ -616,13 +670,12 @@ export function ActionCard({
                   </li>
                 ))}
               </ul>
-            </div>
+            </Panel>
 
             {needsPage ? (
-              <div className="space-y-2 rounded-lg border border-border bg-card p-3">
-                <SectionLabel>Qué hay en la página ahora</SectionLabel>
+              <Panel title="Qué hay en la página ahora">
                 {diagnosis ? (
-                  <ul className="space-y-1.5">
+                  <ul className="space-y-2">
                     {diagnosis.findings.map((finding) => (
                       <FindingRow key={finding.text} finding={finding} />
                     ))}
@@ -638,18 +691,24 @@ export function ActionCard({
                     su título, su meta descripción y su H1.
                   </p>
                 )}
-                {diagnosis?.extra}
-              </div>
+                {diagnosis?.extra ? (
+                  <div className="mt-3 border-t border-border pt-3">
+                    {diagnosis.extra}
+                  </div>
+                ) : null}
+              </Panel>
             ) : null}
 
             {action.steps.length > 0 ? (
-              <div className="space-y-2">
-                <SectionLabel>Pasos</SectionLabel>
-                <ol className="space-y-2">
+              <Panel title="Pasos a seguir" className="lg:col-span-2">
+                <ol className="grid gap-2 md:grid-cols-2">
                   {action.steps.map((step, index) => (
-                    <li key={step} className="flex gap-3 text-sm">
+                    <li
+                      key={step}
+                      className="flex gap-3 rounded-lg border border-border bg-muted/40 p-2.5 text-sm"
+                    >
                       <span
-                        className={`flex size-5 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${tone.soft} ${tone.text}`}
+                        className={`flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${tone.solid}`}
                       >
                         {index + 1}
                       </span>
@@ -657,11 +716,61 @@ export function ActionCard({
                     </li>
                   ))}
                 </ol>
-              </div>
+              </Panel>
             ) : null}
           </div>
         ) : null}
       </CardContent>
     </Card>
+  );
+}
+
+function Panel({
+  title,
+  className = "",
+  children,
+}: {
+  title: string;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <section
+      className={`space-y-2.5 rounded-xl border border-border bg-card p-3.5 shadow-xs ${className}`}
+    >
+      <SectionLabel>{title}</SectionLabel>
+      {children}
+    </section>
+  );
+}
+
+function Pill({
+  className = "bg-muted text-muted-foreground",
+  children,
+}: {
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <span className={`rounded-full px-2 py-0.5 font-medium ${className}`}>
+      {children}
+    </span>
+  );
+}
+
+const EFFORT_STYLE: Record<Effort, string> = {
+  bajo: "bg-success/10 text-success",
+  medio: "bg-warning/10 text-warning",
+  alto: "bg-destructive/10 text-destructive",
+};
+
+function EffortPill({ effort }: { effort: Effort }) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${EFFORT_STYLE[effort]}`}
+    >
+      <EffortMeter effort={effort} />
+      Esfuerzo {effort}
+    </span>
   );
 }
