@@ -104,7 +104,7 @@ export function HomePage({ projectId }: { projectId: string }) {
     if (!plan) return [];
     const quick = [...plan.snippets, ...plan.pushes, ...plan.questions]
       .sort((a, b) => (b.gain ?? 0) - (a.gain ?? 0))
-      .slice(0, 3);
+      .slice(0, 2);
     return [...plan.losses.slice(0, 2), ...quick];
   }, [plan]);
   const totalTasks = plan
@@ -173,11 +173,6 @@ export function HomePage({ projectId }: { projectId: string }) {
 
         <WorkspaceMergeBanner />
         <AlertsBanner projectId={projectId} />
-        <DashboardOnboarding
-          key={projectId}
-          projectId={projectId}
-          activation={activation.data}
-        />
 
         {!gscConnected ? (
           <GscCard projectId={projectId} connected={false} />
@@ -365,6 +360,12 @@ export function HomePage({ projectId }: { projectId: string }) {
             </div>
           </div>
         ) : null}
+
+        <DashboardOnboarding
+          key={projectId}
+          projectId={projectId}
+          activation={activation.data}
+        />
       </div>
     </div>
   );
@@ -420,7 +421,7 @@ function Spark({
   dataKey: "clicks" | "impressions";
 }) {
   return (
-    <ChartContainer config={sparkConfig} className="h-9 w-full">
+    <ChartContainer config={sparkConfig} className="h-7 w-full">
       <LineChart data={data} margin={{ top: 3, right: 0, bottom: 3, left: 0 }}>
         <Line
           dataKey={dataKey}

@@ -1,5 +1,5 @@
 import { useMemo, type ReactNode } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQueries } from "@tanstack/react-query";
 import {
   ArrowUpRight,
   ChevronDown,
@@ -170,20 +170,34 @@ export const KIND_ORDER: ActionKind[] = [
 /** Reads the on-page signals of every page the plan mentions, once. */
 export function usePlanSignals(projectId: string, plan: Plan) {
   const urls = useMemo(() => signalUrls(plan), [plan]);
-  const query = useQuery({
-    queryKey: ["radar-signals", projectId, urls],
-    queryFn: () => getRadarPageSignals({ data: { projectId, urls } }),
-    enabled: urls.length > 0,
-    staleTime: 10 * 60_000,
+  // Read in small groups so the cards fill in as each group arrives, instead
+  // of waiting for the slowest page of all.
+  const chunks = useMemo(() => {
+    const groups: string[][] = [];
+    for (let i = 0; i < urls.length; i += 6) groups.push(urls.slice(i, i + 6));
+    return groups;
+  }, [urls]);
+  const results = useQueries({
+    queries: chunks.map((group) => ({
+      queryKey: ["radar-signals", projectId, group],
+      queryFn: () => getRadarPageSignals({ data: { projectId, urls: group } }),
+      staleTime: 10 * 60_000,
+    })),
   });
   const signals = useMemo(
     () =>
       new Map<string, PageSignals>(
-        (query.data?.signals ?? []).map((item) => [item.url, item]),
+        results.flatMap((result) =>
+          (result.data?.signals ?? []).map((item): [string, PageSignals] => [
+            item.url,
+            item,
+          ]),
+        ),
       ),
-    [query.data],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [results.map((result) => result.dataUpdatedAt).join(",")],
   );
-  return { signals, loading: query.isPending && urls.length > 0 };
+  return { signals, loading: results.some((result) => result.isPending) };
 }
 
 function FindingRow({ finding }: { finding: Finding }) {
