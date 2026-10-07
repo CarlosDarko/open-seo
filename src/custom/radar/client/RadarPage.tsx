@@ -2,7 +2,18 @@ import { useMemo, useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { Bar, BarChart, Line, LineChart, ReferenceLine } from "recharts";
 import { useTrendLines, withTrend } from "@/custom/radar/client/TrendLines";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import {
+  ArrowDownRight,
+  ArrowUpRight,
+  ChevronDown,
+  ChevronUp,
+  Layers,
+  ListChecks,
+  Tag,
+  TrendingDown,
+  TrendingUp,
+  type LucideIcon,
+} from "lucide-react";
 import {
   ChartGrid,
   ChartXAxis,
@@ -37,6 +48,7 @@ import { useRadarReport } from "@/custom/radar/client/useRadarReport";
 import {
   decimal,
   integer,
+  pathOf,
   percent,
   relativeChange,
   signed,
@@ -346,7 +358,6 @@ function Kpis({ report }: { report: RadarReport }) {
   );
 }
 
-type Tone = "good" | "bad" | "info";
 
 function topShare(
   segments: Segment[],
@@ -365,157 +376,256 @@ function Insights({
   projectId: string;
   report: RadarReport;
 }) {
-  const lines = useMemo(() => {
-    const out: { tone: Tone; node: ReactNode }[] = [];
-    const clicksChange = relativeChange(
-      report.totals.clicks,
-      report.prevTotals.clicks,
+  const clicksChange = relativeChange(
+    report.totals.clicks,
+    report.prevTotals.clicks,
+  );
+  const clicksDiff = report.totals.clicks - report.prevTotals.clicks;
+  const { brand } = report;
+  const otherChange = relativeChange(brand.otherClicks, brand.prevOtherClicks);
+  const loser = report.pageChanges.losers[0];
+  const winner = report.pageChanges.winners[0];
+  const page = topShare(report.segments.pageType);
+  const intent = topShare(report.segments.intent);
+  const plan = useMemo(() => buildActions(report), [report]);
+  const tasks =
+    plan.losses.length +
+    plan.snippets.length +
+    plan.pushes.length +
+    plan.questions.length +
+    plan.cannibals.length +
+    plan.traction.length +
+    plan.emerging.length;
+  const gain = [...plan.snippets, ...plan.pushes, ...plan.questions].reduce(
+    (sum, action) => sum + (action.gain ?? 0),
+    0,
+  );
+
+  const tiles: ReactNode[] = [];
+  if (clicksChange !== null) {
+    tiles.push(
+      <Tile
+        key="clicks"
+        tone={clicksDiff >= 0 ? "good" : "bad"}
+        icon={clicksDiff >= 0 ? TrendingUp : TrendingDown}
+        label={clicksDiff >= 0 ? "Clics al alza" : "Clics a la baja"}
+        value={`${clicksDiff >= 0 ? "+" : "−"}${percent.format(Math.abs(clicksChange))}`}
+        detail={`${signed(clicksDiff)} clics frente al periodo anterior`}
+      />,
     );
-    if (clicksChange !== null) {
-      const diff = report.totals.clicks - report.prevTotals.clicks;
-      out.push({
-        tone: diff >= 0 ? "good" : "bad",
-        node: (
-          <>
-            Clics <strong>{diff >= 0 ? "al alza" : "a la baja"}</strong>:{" "}
-            {percent.format(Math.abs(clicksChange))} ({signed(diff)}).
-          </>
-        ),
-      });
-    }
-    const { brand } = report;
-    if (brand.hasBrand) {
-      const other = relativeChange(brand.otherClicks, brand.prevOtherClicks);
-      out.push({
-        tone: other !== null && other < 0 ? "bad" : "info",
-        node: (
-          <>
-            Sin marca: <strong>{integer.format(brand.otherClicks)}</strong>{" "}
-            clics
-            {other !== null
-              ? ` (${other > 0 ? "+" : ""}${percent.format(other)})`
-              : ""}
-            . Marca: {integer.format(brand.clicks)}.
-          </>
-        ),
-      });
-    }
-    const loser = report.pageChanges.losers[0];
-    if (loser && loser.clicksDelta < 0) {
-      out.push({
-        tone: "bad",
-        node: (
-          <>
-            Mayor caída: <PageLink url={loser.key} />{" "}
-            <strong>{signed(loser.clicksDelta)}</strong>{" "}
-            {CAUSE_SHORT[loser.cause]}.
-          </>
-        ),
-      });
-    }
-    const winner = report.pageChanges.winners[0];
-    if (winner && winner.clicksDelta > 0) {
-      out.push({
-        tone: "good",
-        node: (
-          <>
-            Mayor subida: <PageLink url={winner.key} />{" "}
-            <strong>{signed(winner.clicksDelta)}</strong>.
-          </>
-        ),
-      });
-    }
-    const page = topShare(report.segments.pageType);
-    const intent = topShare(report.segments.intent);
-    if (page || intent) {
-      out.push({
-        tone: "info",
-        node: (
-          <>
-            Lo que más tráfico trae:{" "}
-            {page ? (
-              <>
-                páginas «{page.label}» ({percent.format(page.share)})
-              </>
-            ) : null}
-            {page && intent ? " y " : ""}
-            {intent ? (
-              <>
-                búsquedas de «{intent.label}» ({percent.format(intent.share)})
-              </>
-            ) : null}
-            .
-          </>
-        ),
-      });
-    }
-    const plan = buildActions(report);
-    const tasks =
-      plan.losses.length +
-      plan.snippets.length +
-      plan.pushes.length +
-      plan.questions.length +
-      plan.cannibals.length +
-      plan.traction.length +
-      plan.emerging.length;
-    const gain = [...plan.snippets, ...plan.pushes, ...plan.questions].reduce(
-      (sum, action) => sum + (action.gain ?? 0),
-      0,
+  }
+  if (brand.hasBrand) {
+    tiles.push(
+      <Tile
+        key="brand"
+        tone={otherChange !== null && otherChange < 0 ? "bad" : "info"}
+        icon={Tag}
+        label="Clics sin marca"
+        value={integer.format(brand.otherClicks)}
+        chip={
+          otherChange !== null
+            ? `${otherChange > 0 ? "+" : ""}${percent.format(otherChange)}`
+            : undefined
+        }
+        detail={`Con marca: ${integer.format(brand.clicks)} clics`}
+      />,
     );
-    if (tasks > 0) {
-      out.push({
-        tone: "info",
-        node: (
+  }
+  if (loser && loser.clicksDelta < 0) {
+    tiles.push(
+      <Tile
+        key="loser"
+        tone="bad"
+        icon={ArrowDownRight}
+        label="Mayor caída"
+        value={signed(loser.clicksDelta)}
+        chip={CAUSE_SHORT[loser.cause]}
+        detail={<PageRef url={loser.key} />}
+      />,
+    );
+  }
+  if (winner && winner.clicksDelta > 0) {
+    tiles.push(
+      <Tile
+        key="winner"
+        tone="good"
+        icon={ArrowUpRight}
+        label="Mayor subida"
+        value={signed(winner.clicksDelta)}
+        detail={<PageRef url={winner.key} />}
+      />,
+    );
+  }
+  if (page || intent) {
+    tiles.push(
+      <Tile
+        key="share"
+        tone="info"
+        icon={Layers}
+        label="Lo que más tráfico trae"
+        detail={
+          <span className="mt-1 block space-y-2">
+            {page ? <ShareBar kind="Páginas" item={page} /> : null}
+            {intent ? <ShareBar kind="Búsquedas" item={intent} /> : null}
+          </span>
+        }
+      />,
+    );
+  }
+  if (tasks > 0) {
+    tiles.push(
+      <Tile
+        key="plan"
+        tone="info"
+        icon={ListChecks}
+        label="Plan de acción"
+        value={`${tasks} tareas`}
+        detail={
           <>
-            <strong>{tasks} tareas</strong> en el plan de acción
             {gain > 0
-              ? `, unos +${integer.format(gain)} clics estimados`
-              : ""}.{" "}
+              ? `Unos +${integer.format(gain)} clics estimados en ${report.period.days} días. `
+              : ""}
             <Link
               to="/p/$projectId/action-plan"
               params={{ projectId }}
-              className="font-medium text-primary underline-offset-2 hover:underline"
+              className="font-semibold text-primary underline-offset-2 hover:underline"
             >
               Ver el plan →
             </Link>
           </>
-        ),
-      });
-    }
-    return out;
-  }, [projectId, report]);
-
-  const dot: Record<Tone, string> = {
-    good: "bg-success",
-    bad: "bg-destructive",
-    info: "bg-muted-foreground/60",
-  };
+        }
+      />,
+    );
+  }
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>Lo importante</CardTitle>
+        <p className="text-xs text-muted-foreground">
+          Lo que más se ha movido en este periodo, de un vistazo.
+        </p>
       </CardHeader>
       <CardContent>
-        {lines.length === 0 ? (
+        {tiles.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             Aún no hay datos suficientes en este periodo.
           </p>
         ) : (
-          <ul className="space-y-2.5">
-            {lines.map((line, index) => (
-              <li key={index} className="flex gap-3 text-sm">
-                <span
-                  className={`mt-1.5 size-2 shrink-0 rounded-full ${dot[line.tone]}`}
-                  aria-hidden
-                />
-                <span>{line.node}</span>
-              </li>
-            ))}
-          </ul>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {tiles}
+          </div>
         )}
       </CardContent>
     </Card>
+  );
+}
+
+const TILE_TONES = {
+  good: {
+    icon: "bg-success/15 text-success",
+    value: "text-success",
+    wash: "border-success/25 bg-success/5",
+  },
+  bad: {
+    icon: "bg-destructive/15 text-destructive",
+    value: "text-destructive",
+    wash: "border-destructive/25 bg-destructive/5",
+  },
+  info: {
+    icon: "bg-primary/10 text-primary",
+    value: "text-foreground",
+    wash: "border-border bg-card",
+  },
+} as const;
+
+/** One finding: icon, what it is, the figure and a line of detail. */
+function Tile({
+  tone,
+  icon: Icon,
+  label,
+  value,
+  chip,
+  detail,
+}: {
+  tone: keyof typeof TILE_TONES;
+  icon: LucideIcon;
+  label: string;
+  value?: string;
+  chip?: string;
+  detail: ReactNode;
+}) {
+  const style = TILE_TONES[tone];
+  return (
+    <div className={`rounded-xl border p-3.5 ${style.wash}`}>
+      <div className="flex items-center gap-2.5">
+        <span
+          className={`flex size-8 shrink-0 items-center justify-center rounded-lg ${style.icon}`}
+        >
+          <Icon className="size-4" aria-hidden />
+        </span>
+        <p className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+          {label}
+        </p>
+      </div>
+      {value ? (
+        <p className="mt-2 flex flex-wrap items-baseline gap-2">
+          <span
+            className={`text-3xl leading-none font-bold tabular-nums ${style.value}`}
+          >
+            {value}
+          </span>
+          {chip ? (
+            <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground">
+              {chip}
+            </span>
+          ) : null}
+        </p>
+      ) : null}
+      <div className="mt-1.5 text-sm text-muted-foreground">{detail}</div>
+    </div>
+  );
+}
+
+/** A page of the site, as a link that opens in a new tab. */
+function PageRef({ url }: { url: string }) {
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="line-clamp-2 font-mono text-xs break-all text-foreground hover:underline"
+      title={url}
+    >
+      {pathOf(url) || url}
+    </a>
+  );
+}
+
+function ShareBar({
+  kind,
+  item,
+}: {
+  kind: string;
+  item: { label: string; share: number };
+}) {
+  return (
+    <span className="block">
+      <span className="flex items-baseline justify-between gap-2 text-xs">
+        <span className="min-w-0 truncate text-foreground">
+          {kind} «{item.label}»
+        </span>
+        <strong className="shrink-0 tabular-nums text-foreground">
+          {percent.format(item.share)}
+        </strong>
+      </span>
+      <span className="mt-0.5 block h-1.5 overflow-hidden rounded-full bg-muted">
+        <span
+          className="block h-full rounded-full bg-primary"
+          style={{ width: `${Math.max(3, item.share * 100)}%` }}
+        />
+      </span>
+    </span>
   );
 }
 
