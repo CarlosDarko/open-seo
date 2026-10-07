@@ -142,7 +142,7 @@ export function RadarPage({ projectId }: { projectId: string }) {
       ) : query.isPending ? (
         <LoadingSkeleton />
       ) : query.data && !query.data.connected ? (
-        <NotConnected projectId={projectId} />
+        <NotConnected projectId={projectId} reason={query.data.reason} />
       ) : report ? (
         <>
           <Highlights report={report} />
@@ -169,19 +169,41 @@ function LoadingSkeleton() {
   );
 }
 
-function NotConnected({ projectId }: { projectId: string }) {
+function NotConnected({
+  projectId,
+  reason,
+}: {
+  projectId: string;
+  reason: "none" | "reconnect";
+}) {
+  const reconnect = reason === "reconnect";
   return (
     <Card>
       <CardContent className="space-y-3 py-8 text-center">
-        <p className="font-medium">Este proyecto no tiene Search Console conectado</p>
-        <p className="text-sm text-muted-foreground">
-          Conéctalo desde el Panel para ver aquí los cambios y las oportunidades.
+        <p className="font-medium">
+          {reconnect
+            ? "La conexión con Google ha caducado"
+            : "Este proyecto no tiene Search Console conectado"}
+        </p>
+        <p className="mx-auto max-w-xl text-sm text-muted-foreground">
+          {reconnect
+            ? "Google ya no acepta el permiso guardado (suele pasar a los 7 días si la aplicación de Google está en modo pruebas). Vuelve a conectar tu cuenta con «Cambiar propiedad o cuenta»."
+            : "Conéctalo desde el Panel para ver aquí los cambios y las oportunidades."}
         </p>
         <Button
-          render={<Link to="/p/$projectId" params={{ projectId }} />}
+          render={
+            reconnect ? (
+              <Link
+                to="/p/$projectId/search-performance"
+                params={{ projectId }}
+              />
+            ) : (
+              <Link to="/p/$projectId" params={{ projectId }} />
+            )
+          }
           variant="outline"
         >
-          Ir al Panel
+          {reconnect ? "Reconectar Search Console" : "Ir al Panel"}
         </Button>
       </CardContent>
     </Card>

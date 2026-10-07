@@ -106,11 +106,13 @@ export const getRadarReport = createServerFn({ method: "POST" })
         cannibalized: cannibalizedQueries(queryPages.rows),
       };
     } catch (error) {
-      if (
-        error instanceof GscNotConnectedError ||
-        isExpectedGrantFailure(error)
-      ) {
-        return { connected: false as const };
+      // "none": no property linked. "reconnect": a property is linked but
+      // Google no longer accepts the stored permission (revoked or expired).
+      if (error instanceof GscNotConnectedError) {
+        return { connected: false as const, reason: "none" as const };
+      }
+      if (isExpectedGrantFailure(error)) {
+        return { connected: false as const, reason: "reconnect" as const };
       }
       throw error;
     }
