@@ -1,4 +1,6 @@
 import { Input } from "@/client/components/ui/input";
+import type { RadarReport } from "@/custom/radar/actions";
+import { BrandDialog } from "@/custom/radar/client/BrandDialog";
 import { Label } from "@/client/components/ui/label";
 import {
   Select,
@@ -28,16 +30,19 @@ const COMPARE_ITEMS = [
   { value: "year", label: "Comparar con el año anterior" },
 ];
 
-/** Period, comparison and (optionally) brand controls for the Radar pages. */
+/** Period, comparison and (when a project is given) brand controls for the
+ *  Radar pages. */
 export function RadarControls({
+  projectId,
   filters,
   onChange,
-  showBrand,
+  brand,
   fellBack,
 }: {
+  projectId?: string;
   filters: RadarFilters;
   onChange: (patch: Partial<RadarFilters>) => void;
-  showBrand?: boolean;
+  brand?: RadarReport["brand"];
   /** The year-ago comparison was not possible (data goes back 16 months). */
   fellBack?: boolean;
 }) {
@@ -102,16 +107,23 @@ export function RadarControls({
           </SelectContent>
         </Select>
       </div>
-      {showBrand ? (
-        <div className="flex items-center gap-2">
-          <Switch
-            id="radar-brand"
-            checked={filters.includeBrand}
-            onCheckedChange={(checked) => onChange({ includeBrand: checked })}
-          />
-          <Label htmlFor="radar-brand" className="text-sm">
-            Incluir consultas de marca en el análisis
-          </Label>
+      {brand && projectId ? (
+        <div className="flex flex-wrap items-center justify-end gap-3">
+          <BrandDialog projectId={projectId} brand={brand} />
+          {brand.hasBrand ? (
+            <div className="flex items-center gap-2">
+              <Switch
+                id="radar-brand"
+                checked={filters.includeBrand}
+                onCheckedChange={(checked) =>
+                  onChange({ includeBrand: checked })
+                }
+              />
+              <Label htmlFor="radar-brand" className="text-sm">
+                Incluir marca en el análisis
+              </Label>
+            </div>
+          ) : null}
         </div>
       ) : null}
       {fellBack ? (

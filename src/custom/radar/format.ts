@@ -36,3 +36,8 @@ export function googleSearchUrl(query: string): string {
 export function position(value: number | null): string {
   return value === null ? "—" : decimal.format(value);
 }
+
+/** "1 clic" / "5 clics". */
+export function clicksText(count: number): string {
+  return `${integer.format(count)} ${count === 1 ? "clic" : "clics"}`;
+}

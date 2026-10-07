@@ -14,7 +14,7 @@ export function PageLink({ url }: { url: string }) {
       title={url}
       className={linkClass}
     >
-      <span>{pathOf(url)}</span>
+      <span>{pathOf(url) === "/" ? "Página de inicio (/)" : pathOf(url)}</span>
       <ExternalLink className="size-3 shrink-0" aria-hidden />
     </a>
   );

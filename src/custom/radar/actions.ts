@@ -4,6 +4,7 @@
 // lost click, a snippet fix and a cannibalization have impacts that cannot be
 // compared honestly.
 import {
+  clicksText,
   decimal,
   integer,
   pathOf,
@@ -11,7 +12,7 @@ import {
   position,
   signed,
 } from "@/custom/radar/format";
-import type { PageChange } from "@/custom/radar/radarAnalysis";
+import type { ChangeCause, PageChange } from "@/custom/radar/radarAnalysis";
 import type { getRadarReport } from "@/serverFunctions/radar";
 
 export type RadarReport = Extract<
@@ -41,6 +42,11 @@ export type Action = {
   effort: "bajo" | "medio";
   page: string | null;
   query: string | null;
+  /** Why a page lost clicks (losses only). */
+  cause?: ChangeCause;
+  /** The CTR is so far below the usual that the snippet is unlikely to be the
+   *  only cause (snippets only). */
+  anomaly?: boolean;
   /** Your strongest other pages: where to add an internal link from. */
   linkSources: string[];
   /** Competing pages, owner first (cannibalization only). */
@@ -72,7 +78,7 @@ function lossLines(row: PageChange): string[] {
   const pos = `${position(row.prevPosition)} → ${position(row.position)}`;
   const impressions = `${integer.format(row.prevImpressions)} → ${integer.format(row.impressions)}`;
   const lines: string[] = [
-    `${integer.format(row.prevClicks)} clics antes, ${integer.format(row.clicks)} ahora.`,
+    `${clicksText(row.prevClicks)} antes, ${integer.format(row.clicks)} ahora.`,
   ];
   switch (row.cause) {
     case "posicion":
@@ -153,12 +159,13 @@ export function buildActions(report: RadarReport): ActionPlan {
     .map((row) => ({
       id: `loss:${row.key}`,
       kind: "loss",
-      headline: `${pathOf(row.key)} pierde ${integer.format(-row.clicksDelta)} clics`,
+      headline: `${pathOf(row.key)} pierde ${clicksText(-row.clicksDelta)}`,
       lines: lossLines(row),
       steps: lossSteps(row),
       gain: -row.clicksDelta,
       effort: "medio",
       page: row.key,
+      cause: row.cause,
       query: row.topQueries[0]?.query ?? null,
       linkSources: [],
       pages: [],
@@ -171,9 +178,15 @@ export function buildActions(report: RadarReport): ActionPlan {
       id: `snippet:${item.query}`,
       kind: "snippet",
       headline: `Reescribe el título y la meta de ${pathOf(item.page!)} para «${item.query}»`,
+      anomaly: item.ctr < item.expectedCtr * 0.15,
       lines: [
-        `Posición ${decimal.format(item.position)} con ${integer.format(item.impressions)} impresiones, pero solo ${integer.format(item.clicks)} clics (CTR ${percent.format(item.ctr)}).`,
-        `Tu sitio consigue de media ${percent.format(item.expectedCtr)} en esa posición: la diferencia son unos ${integer.format(item.potentialClicks)} clics.`,
+        `Posición ${decimal.format(item.position)} con ${integer.format(item.impressions)} impresiones, pero solo ${clicksText(item.clicks)} (CTR ${percent.format(item.ctr)}).`,
+        `Tu sitio consigue de media ${percent.format(item.expectedCtr)} en esa posición: la diferencia son unos ${clicksText(item.potentialClicks)}.`,
+        ...(item.ctr < item.expectedCtr * 0.15
+          ? [
+              "La diferencia es enorme: con este CTR el título y la meta rara vez son la única causa. Puede haber respuestas de IA, anuncios o vídeos delante, o que la consulta no sea realmente para esta página.",
+            ]
+          : []),
       ],
       steps: [],
       gain: item.potentialClicks,
@@ -189,8 +202,8 @@ export function buildActions(report: RadarReport): ActionPlan {
     kind: "push",
     headline: `Sube «${item.query}» al top 3 con ${pathOf(item.page)}`,
     lines: [
-      `Posición ${decimal.format(item.position)} con ${integer.format(item.impressions)} impresiones y ${integer.format(item.clicks)} clics.`,
-      `En el top 3 tu sitio consigue de media ${percent.format(report.ctrCurve[2])} de CTR: unos ${integer.format(item.potentialClicks)} clics más (potencial máximo).`,
+      `Posición ${decimal.format(item.position)} con ${integer.format(item.impressions)} impresiones y ${clicksText(item.clicks)}.`,
+      `En el top 3 tu sitio consigue de media ${percent.format(report.ctrCurve[2])} de CTR: unos ${clicksText(item.potentialClicks)} más (potencial máximo).`,
     ],
     steps: [
       `Busca «${item.query}» en Google (enlace de abajo) y mira qué cubren las tres primeras páginas que tú no cubres.`,
@@ -211,8 +224,8 @@ export function buildActions(report: RadarReport): ActionPlan {
       kind: "cannibal",
       headline: `«${item.query}»: ${item.pages.length} de tus páginas compiten entre sí`,
       lines: [
-        `Se reparten ${integer.format(item.totalImpressions)} impresiones y ${integer.format(item.totalClicks)} clics.`,
-        `Página propuesta como principal: ${pathOf(owner.page)} (${integer.format(owner.clicks)} clics, posición ${decimal.format(owner.position)}).`,
+        `Se reparten ${integer.format(item.totalImpressions)} impresiones y ${clicksText(item.totalClicks)}.`,
+        `Página propuesta como principal: ${pathOf(owner.page)} (${clicksText(owner.clicks)}, posición ${decimal.format(owner.position)}).`,
       ],
       steps: [
         `Decide que ${pathOf(owner.page)} es la página para «${item.query}».`,
@@ -237,7 +250,7 @@ export function buildActions(report: RadarReport): ActionPlan {
     kind: "question",
     headline: `Responde «${item.query}» en ${pathOf(item.page)}`,
     lines: [
-      `Posición ${decimal.format(item.position)} con ${integer.format(item.impressions)} impresiones y ${integer.format(item.clicks)} clics.`,
+      `Posición ${decimal.format(item.position)} con ${integer.format(item.impressions)} impresiones y ${clicksText(item.clicks)}.`,
       "Es una pregunta: Google suele destacar una respuesta breve sacada de una página, justo encima de los resultados.",
     ],
     steps: [
@@ -259,7 +272,7 @@ export function buildActions(report: RadarReport): ActionPlan {
     kind: "traction",
     headline: `${pathOf(item.url)} se muestra mucho pero muy abajo`,
     lines: [
-      `${integer.format(item.impressions)} impresiones con posición media ${decimal.format(item.position)} y solo ${integer.format(item.clicks)} clics.`,
+      `${integer.format(item.impressions)} impresiones con posición media ${decimal.format(item.position)} y solo ${clicksText(item.clicks)}.`,
       ...(item.topQuery
         ? [`Su consulta con más impresiones: «${item.topQuery}».`]
         : []),

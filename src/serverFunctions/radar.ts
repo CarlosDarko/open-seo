@@ -11,6 +11,7 @@ import {
   alignDaily,
   attachPageQueries,
   bestPageByQuery,
+  brandSuspects,
   brandTokens,
   cannibalizedQueries,
   compareDimension,
@@ -18,6 +19,7 @@ import {
   isBrandQuery,
   mergePageVariants,
   newAndLostQueries,
+  normalizeBrandTerms,
   nearTopOpportunities,
   ownCtrCurve,
   positionBands,
@@ -33,6 +35,11 @@ import {
   questionOpportunities,
   segmentRows,
 } from "@/custom/radar/radarSegments";
+import {
+  brandTermsSchema,
+  getBrandTerms,
+  saveBrandTerms,
+} from "@/custom/radar/server/brandSettings";
 import { fetchPageSignals } from "@/custom/radar/server/fetchPageSignals";
 import { requireProjectContext } from "@/serverFunctions/middleware";
 
@@ -91,6 +98,7 @@ export const getRadarReport = createServerFn({ method: "POST" })
         prevQueryPages,
         devices,
         prevDevices,
+        manualBrand,
       ] = await Promise.all([
         fetchRows(["date"], now, DAILY_ROW_LIMIT),
         fetchRows(["date"], prev, DAILY_ROW_LIMIT),
@@ -102,6 +110,7 @@ export const getRadarReport = createServerFn({ method: "POST" })
         fetchRows(["query", "page"], prev, DIMENSION_ROW_LIMIT),
         fetchRows(["device"], now, 10),
         fetchRows(["device"], prev, 10),
+        getBrandTerms(projectId),
       ]);
 
       // The same page comes back under several URL variants: merge them.
@@ -111,7 +120,9 @@ export const getRadarReport = createServerFn({ method: "POST" })
       const mergedPrevQueryPages = mergePageVariants(prevQueryPages.rows, 1);
 
       const siteUrl = daily.siteUrl;
-      const tokens = brandTokens(siteUrl);
+      const autoTokens = brandTokens(siteUrl);
+      const tokens =
+        manualBrand.length > 0 ? normalizeBrandTerms(manualBrand) : autoTokens;
       const splitNow = splitBrandRows(queries.rows, tokens);
       const splitPrev = splitBrandRows(prevQueries.rows, tokens);
       const keep = <T extends { keys?: string[] }>(rows: T[]) =>
@@ -138,6 +149,17 @@ export const getRadarReport = createServerFn({ method: "POST" })
         attachPageQueries(rows, queryPageRows, prevQueryPageRows);
       const queryChanges = compareDimension(queryRows, prevQueryRows);
 
+      // A query whose snippet underperforms is a snippet task: keep it out of
+      // the "near the top" list so one query is not reported twice.
+      const allCtr = ctrOpportunities(
+        queryRows,
+        pageByQuery,
+        curve,
+        minImpressions,
+        500,
+      );
+      const ctrQueries = new Set(allCtr.map((item) => item.query));
+
       const classifyPage = pageTypeClassifier(
         [...pageRows, ...prevPageRows].flatMap((row) => row.keys?.[0] ?? []),
       );
@@ -158,6 +180,16 @@ export const getRadarReport = createServerFn({ method: "POST" })
         brand: {
           hasBrand: tokens.length > 0,
           included: data.includeBrand,
+          source: manualBrand.length > 0 ? ("manual" as const) : ("auto" as const),
+          terms: manualBrand.length > 0 ? manualBrand : autoTokens,
+          autoSuggestion: autoTokens,
+          examples: [...splitNow.brand]
+            .sort((a, b) => b.clicks - a.clicks)
+            .slice(0, 5)
+            .flatMap((row) =>
+              row.keys?.[0] ? [{ query: row.keys[0], clicks: row.clicks }] : [],
+            ),
+          suspects: brandSuspects(splitNow.other, tokens),
           clicks: sumClicks(splitNow.brand),
           prevClicks: sumClicks(splitPrev.brand),
           otherClicks: sumClicks(splitNow.other),
@@ -200,13 +232,10 @@ export const getRadarReport = createServerFn({ method: "POST" })
         },
         queryChanges: winnersAndLosers(queryChanges),
         ...newAndLostQueries(queryChanges),
-        ctrOpportunities: ctrOpportunities(
-          queryRows,
-          pageByQuery,
-          curve,
-          minImpressions,
-        ),
-        nearTop: nearTopOpportunities(queryPageRows, curve, minImpressions),
+        ctrOpportunities: allCtr.slice(0, 20),
+        nearTop: nearTopOpportunities(queryPageRows, curve, minImpressions, 60)
+          .filter((item) => !ctrQueries.has(item.query))
+          .slice(0, 20),
         cannibalized: cannibalizedQueries(queryPageRows),
         questions: questionOpportunities(queryPageRows, minImpressions),
         lowTraction: lowTractionPages(pageRows, queryPageRows, minImpressions),
@@ -253,3 +282,11 @@ export const getRadarPageSignals = createServerFn({ method: "POST" })
       ),
     };
   });
+
+/** Saves the brand words of a project (empty list = deduce from the domain). */
+export const saveRadarBrand = createServerFn({ method: "POST" })
+  .middleware(requireProjectContext)
+  .validator(z.object({ projectId: z.string().min(1), terms: brandTermsSchema }))
+  .handler(async ({ data, context }) => ({
+    terms: await saveBrandTerms(context.projectId, data.terms),
+  }));

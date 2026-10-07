@@ -86,9 +86,10 @@ export function RadarPage({ projectId }: { projectId: string }) {
         description="El pulso de tu web en Search Console: qué ha cambiado y dónde se mueve el tráfico. Para saber qué hacer, mira el Plan de acción."
         actions={
           <RadarControls
+            projectId={projectId}
             filters={filters}
             onChange={update}
-            showBrand={report?.brand.hasBrand}
+            brand={report?.brand}
             fellBack={report?.period.fellBack}
           />
         }

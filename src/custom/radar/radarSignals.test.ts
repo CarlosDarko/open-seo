@@ -11,7 +11,9 @@ import {
   type PageSignals,
 } from "@/custom/radar/pageSignals";
 import {
+  brandSuspects,
   brandTokens,
+  normalizeBrandTerms,
   explainChange,
   isBrandQuery,
   ownCtrCurve,
@@ -166,5 +168,36 @@ describe("ownCtrCurve", () => {
     ]);
     expect(curve[0]).toBeCloseTo(0.02, 5);
     expect(curve[1]).toBeLessThan(0.15);
+  });
+});
+
+describe("brand terms", () => {
+  const row = (query: string, clicks: number) => ({
+    keys: [query],
+    clicks,
+    impressions: clicks * 10,
+    ctr: 0.1,
+    position: 3,
+  });
+
+  it("matches manual variants without caring about accents, case or spaces", () => {
+    const tokens = normalizeBrandTerms(["Fruits Ràfols", "frutas rafols", "ab"]);
+    expect(tokens).toEqual(["fruitsrafols", "frutasrafols"]);
+    expect(isBrandQuery("fruits rafols precios", tokens)).toBe(true);
+    expect(isBrandQuery("frutas ràfols", tokens)).toBe(true);
+    expect(isBrandQuery("fruta al por mayor", tokens)).toBe(false);
+  });
+
+  it("suggests probable misspellings that are not counted as brand", () => {
+    const tokens = normalizeBrandTerms(["carlos ortega"]);
+    const suspects = brandSuspects(
+      [row("carlso ortega seo", 4), row("auditoria seo", 9), row("carlos ortgea", 2)],
+      tokens,
+    );
+    expect(suspects.map((item) => item.query)).toEqual([
+      "carlso ortega seo",
+      "carlos ortgea",
+    ]);
+    expect(suspects[0].variant).toBe("carlso ortega");
   });
 });
