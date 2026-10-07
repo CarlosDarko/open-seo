@@ -130,8 +130,8 @@ export function HomePage({ projectId }: { projectId: string }) {
     if (!plan) return [];
     const quick = [...plan.snippets, ...plan.pushes, ...plan.questions]
       .sort((a, b) => (b.gain ?? 0) - (a.gain ?? 0))
-      .slice(0, 2);
-    return [...plan.losses.slice(0, 2), ...quick];
+      .slice(0, 4);
+    return [...plan.losses.slice(0, 3), ...quick];
   }, [plan]);
   // The titles of the pages the Panel mentions, so rows say what the page is
   // about and not only its address (a handful of live reads, cached).
