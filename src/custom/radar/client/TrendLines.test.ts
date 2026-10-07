@@ -3,11 +3,12 @@ import { withTrend } from "@/custom/radar/client/TrendLines";
 
 describe("withTrend", () => {
   it("returns the average and a straight line through a rising series", () => {
-    const { mean, data } = withTrend(
+    const { mean, data, trendChange } = withTrend(
       [{ clicks: 10 }, { clicks: 20 }, { clicks: 30 }],
       "clicks",
     );
     expect(mean).toBe(20);
+    expect(trendChange).toBe(2);
     expect(data.map((point) => point.trend)).toEqual([10, 20, 30]);
   });
 
@@ -15,6 +16,10 @@ describe("withTrend", () => {
     expect(
       withTrend([{ clicks: 5 }, { clicks: 5 }], "clicks").data[1].trend,
     ).toBe(5);
-    expect(withTrend([], "clicks")).toEqual({ data: [], mean: null });
+    expect(withTrend([], "clicks")).toEqual({
+      data: [],
+      mean: null,
+      trendChange: null,
+    });
   });
 });

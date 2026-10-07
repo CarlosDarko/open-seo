@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { Button } from "@/client/components/ui/button";
 
 // Optional reference lines for the daily charts: the average of the period and
 // the trend (a straight line fitted to the days). Whether they are shown is
@@ -34,40 +33,25 @@ export function useTrendLines() {
   return {
     showMean: choice.mean,
     showTrend: choice.trend,
-    toggles: (
-      <div className="flex gap-1.5">
-        <Button
-          size="xs"
-          variant={choice.mean ? "default" : "outline"}
-          aria-pressed={choice.mean}
-          onClick={() => update({ ...choice, mean: !choice.mean })}
-          title="Línea con el valor medio diario del periodo"
-        >
-          Media
-        </Button>
-        <Button
-          size="xs"
-          variant={choice.trend ? "default" : "outline"}
-          aria-pressed={choice.trend}
-          onClick={() => update({ ...choice, trend: !choice.trend })}
-          title="Recta que resume si la cifra sube o baja a lo largo del periodo"
-        >
-          Tendencia
-        </Button>
-      </div>
-    ),
+    toggleMean: () => update({ ...choice, mean: !choice.mean }),
+    toggleTrend: () => update({ ...choice, trend: !choice.trend }),
   };
 }
 
 /** Adds `trend` (least-squares line over the days) to each point and returns
- *  the average of the series. */
+ *  the average of the series and how much the trend line moves in the period
+ *  (last point against first). */
 export function withTrend<T extends Record<string, unknown>>(
   data: T[],
   key: keyof T & string,
-): { data: (T & { trend: number | null })[]; mean: number | null } {
+): {
+  data: (T & { trend: number | null })[];
+  mean: number | null;
+  trendChange: number | null;
+} {
   const values = data.map((point) => Number(point[key]) || 0);
   const n = values.length;
-  if (n === 0) return { data: [], mean: null };
+  if (n === 0) return { data: [], mean: null, trendChange: null };
   const mean = values.reduce((sum, value) => sum + value, 0) / n;
   const xMean = (n - 1) / 2;
   let covariance = 0;
@@ -77,11 +61,15 @@ export function withTrend<T extends Record<string, unknown>>(
     variance += (x - xMean) ** 2;
   });
   const slope = variance > 0 ? covariance / variance : 0;
+  const at = (x: number) => mean + slope * (x - xMean);
+  const first = at(0);
   return {
     mean,
+    trendChange:
+      n > 1 && first !== 0 ? (at(n - 1) - first) / Math.abs(first) : null,
     data: data.map((point, x) => ({
       ...point,
-      trend: n > 1 ? mean + slope * (x - xMean) : null,
+      trend: n > 1 ? at(x) : null,
     })),
   };
 }

@@ -1,7 +1,6 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
-import { Bar, BarChart, Line, LineChart, ReferenceLine } from "recharts";
-import { useTrendLines, withTrend } from "@/custom/radar/client/TrendLines";
+import { Bar, BarChart } from "recharts";
 import {
   ArrowDownRight,
   ArrowUpRight,
@@ -43,6 +42,7 @@ import { AlertsBanner } from "@/custom/radar/client/AlertsBanner";
 import { RadarControls } from "@/custom/radar/client/RadarControls";
 import { PageLink } from "@/custom/radar/client/RadarLinks";
 import { RadarTables } from "@/custom/radar/client/RadarTables";
+import { DailyChart } from "@/custom/radar/client/DailyChart";
 import { Segments, type SegmentSet } from "@/custom/radar/client/Segments";
 import { useRadarReport } from "@/custom/radar/client/useRadarReport";
 import {
@@ -629,109 +629,15 @@ function ShareBar({
 }
 
 function TrendCard({ report }: { report: RadarReport }) {
-  const [metric, setMetric] = useState<"clicks" | "impressions">("clicks");
-  const prevKey = metric === "clicks" ? "prevClicks" : "prevImpressions";
-  const lines = useTrendLines();
-  const { data: points, mean } = withTrend(report.daily, metric);
   return (
-    <Card>
-      <CardHeader className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <CardTitle>Evolución diaria</CardTitle>
-          {report.brand.hasBrand && !report.brand.included ? (
-            <p className="mt-1 text-xs text-muted-foreground">
-              Incluye también la marca: Search Console no permite separarla día
-              a día.
-            </p>
-          ) : null}
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {lines.toggles}
-          <Tabs
-            value={metric}
-            onValueChange={(value) => setMetric(value as typeof metric)}
-          >
-            <TabsList>
-              <TabsTrigger value="clicks">Clics</TabsTrigger>
-              <TabsTrigger value="impressions">Impresiones</TabsTrigger>
-            </TabsList>
-          </Tabs>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <ChartContainer config={trendConfig} className="h-60 w-full">
-          <LineChart
-            data={points}
-            margin={{ top: 4, right: 8, bottom: 0, left: 0 }}
-          >
-            <ChartGrid />
-            <ChartXAxis
-              dataKey="date"
-              tickFormatter={(date: string) =>
-                shortDate.format(new Date(`${date}T00:00:00Z`))
-              }
-            />
-            <ChartYAxis
-              tickFormatter={(value: number) => integer.format(value)}
-            />
-            <ChartTooltip
-              content={
-                <ChartTooltipContent
-                  labelFormatter={(label: unknown) =>
-                    typeof label === "string"
-                      ? shortDate.format(new Date(`${label}T00:00:00Z`))
-                      : ""
-                  }
-                  valueFormatter={(value) => integer.format(Number(value))}
-                />
-              }
-            />
-            <Line
-              dataKey={prevKey}
-              stroke={`var(--color-${prevKey})`}
-              strokeDasharray="4 3"
-              strokeWidth={1.5}
-              dot={false}
-              connectNulls
-            />
-            <Line
-              dataKey={metric}
-              stroke={`var(--color-${metric})`}
-              strokeWidth={2}
-              dot={false}
-            />
-            {lines.showMean && mean !== null ? (
-              <ReferenceLine
-                y={mean}
-                stroke="var(--foreground)"
-                strokeDasharray="2 4"
-                strokeWidth={1.5}
-                ifOverflow="extendDomain"
-                label={{
-                  value: `Media ${integer.format(mean)}`,
-                  position: "insideTopRight",
-                  fontSize: 11,
-                  fill: "var(--foreground)",
-                }}
-              />
-            ) : null}
-            {lines.showTrend ? (
-              <Line
-                dataKey="trend"
-                stroke="var(--foreground)"
-                strokeWidth={1.75}
-                strokeOpacity={0.8}
-                dot={false}
-                activeDot={false}
-                isAnimationActive={false}
-                legendType="none"
-                tooltipType="none"
-              />
-            ) : null}
-          </LineChart>
-        </ChartContainer>
-      </CardContent>
-    </Card>
+    <DailyChart
+      daily={report.daily}
+      note={
+        report.brand.hasBrand && !report.brand.included
+          ? "Incluye también la marca: Search Console no permite separarla día a día."
+          : undefined
+      }
+    />
   );
 }
 

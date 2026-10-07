@@ -794,6 +794,7 @@ export type DailyPoint = {
   position: number;
   prevClicks: number | null;
   prevImpressions: number | null;
+  prevPosition: number | null;
 };
 
 /** Lines up each day with the same day of the previous period. */
@@ -824,6 +825,7 @@ export function alignDaily(
       position: row.position,
       prevClicks: old ? old.clicks : null,
       prevImpressions: old ? old.impressions : null,
+      prevPosition: old ? old.position : null,
     });
   }
   return points.sort((a, b) => a.date.localeCompare(b.date));
