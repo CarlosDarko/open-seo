@@ -683,8 +683,10 @@ function TrendCard({ report }: { report: RadarReport }) {
 }
 
 function BandsCard({ report }: { report: RadarReport }) {
+  // The chart takes the height of the card, which follows its neighbour (the
+  // daily chart and its list of Google updates).
   return (
-    <Card>
+    <Card className="h-full">
       <CardHeader>
         <CardTitle>Consultas por posición</CardTitle>
         <p className="text-xs text-muted-foreground">
@@ -692,8 +694,11 @@ function BandsCard({ report }: { report: RadarReport }) {
           buscas.
         </p>
       </CardHeader>
-      <CardContent>
-        <ChartContainer config={bandsConfig} className="h-60 w-full">
+      <CardContent className="flex flex-1 flex-col">
+        <ChartContainer
+          config={bandsConfig}
+          className="aspect-auto min-h-60 w-full flex-1"
+        >
           <BarChart
             data={report.bands}
             margin={{ top: 4, right: 8, bottom: 0, left: 0 }}

@@ -290,9 +290,6 @@ export function DailyChart({
         </ChartContainer>
 
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-border pt-3">
-          <span className="text-xs text-muted-foreground">
-            Líneas de ayuda:
-          </span>
           <LineSwitch
             on={lines.showMean}
             onClick={lines.toggleMean}
