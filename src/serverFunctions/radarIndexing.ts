@@ -96,6 +96,16 @@ export const getIndexReport = createServerFn({ method: "POST" })
               })
               .sort((a, b) => b.impressions - a.impressions);
 
+      console.log(
+        "[radar-index] ok",
+        JSON.stringify({
+          sitemaps: sitemaps.length,
+          sitemapUrls: sitemapByKey.size,
+          pages: shownByKey.size,
+          files: collected.files,
+          failed: collected.failed.length,
+        }),
+      );
       return {
         connected: true as const,
         siteUrl: connection.siteUrl,
@@ -128,6 +138,7 @@ export const getIndexReport = createServerFn({ method: "POST" })
       if (isExpectedGrantFailure(error)) {
         return { connected: false as const, reason: "reconnect" as const };
       }
+      console.error("[radar-index] failed", error);
       throw error;
     }
   });

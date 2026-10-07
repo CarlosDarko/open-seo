@@ -563,7 +563,7 @@ function CustomTopicsDialog({
         <ListPlus className="size-4" aria-hidden />
         Mis temas{custom.length > 0 ? ` (${custom.length})` : ""}
       </DialogTrigger>
-      <DialogContent className="max-w-xl">
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Mis temas</DialogTitle>
           <DialogDescription>

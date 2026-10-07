@@ -7,6 +7,15 @@
 // file: path ending of the file; from: RegExp or string; to: replacement.
 export const SOURCE_PATCHES = [
   {
+    // The project dropdown filters its list with the combobox's internal
+    // text, which can keep the name of the previously selected project: the
+    // list then shows only some projects, or none. With few projects there is
+    // no search box, so nothing should filter.
+    file: "src/client/features/projects/ProjectSwitcher.tsx",
+    from: "filter={matchesProject}",
+    to: "filter={projects.length > SEARCH_THRESHOLD ? matchesProject : null}",
+  },
+  {
     // "+ N more issue" + "s" would become "problema máss": give each plural
     // form its own whole string.
     file: "src/client/features/dashboard/DashboardCards.tsx",

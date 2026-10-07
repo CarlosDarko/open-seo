@@ -70,7 +70,7 @@ export function BrandDialog({
         Marca: {brand.terms.slice(0, 2).join(", ") || "sin definir"}
         {brand.terms.length > 2 ? ` +${brand.terms.length - 2}` : ""}
       </DialogTrigger>
-      <DialogContent className="max-w-xl">
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Marca de este proyecto</DialogTitle>
           <DialogDescription>

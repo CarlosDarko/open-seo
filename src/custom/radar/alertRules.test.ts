@@ -67,6 +67,31 @@ describe("checkItem", () => {
   });
 });
 
+describe("filters", () => {
+  it("only fires when every extra condition holds too", () => {
+    const narrowed = rule({
+      filters: [
+        { metric: "impressions", op: "gte", value: 1000, period: "current" },
+        { metric: "ctr", op: "lte", value: 2, period: "current" },
+      ],
+    });
+    // Clicks drop 40 %, 2000 impressions, CTR 1.5 %: fires.
+    expect(checkItem(narrowed, item(values(50, 2000), values(30, 2000)))).not.toBeNull();
+    // Same drop but only 400 impressions: filtered out.
+    expect(checkItem(narrowed, item(values(20, 400), values(12, 400)))).toBeNull();
+    // Enough impressions but a healthy 5 % CTR: filtered out.
+    expect(checkItem(narrowed, item(values(160, 2000), values(100, 2000)))).toBeNull();
+  });
+
+  it("can look at the previous period", () => {
+    const narrowed = rule({
+      filters: [{ metric: "position", op: "lte", value: 5, period: "previous" }],
+    });
+    expect(checkItem(narrowed, item(values(100, 1000, 3), values(60, 1000, 8)))).not.toBeNull();
+    expect(checkItem(narrowed, item(values(100, 1000, 9), values(60, 1000, 9)))).toBeNull();
+  });
+});
+
 describe("checkRule and describeTrigger", () => {
   it("lists the worst items first and writes a readable sentence", () => {
     const top = rule({ scope: "top_pages", condition: "drop_pct", threshold: 30 });

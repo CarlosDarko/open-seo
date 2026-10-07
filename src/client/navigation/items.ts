@@ -72,7 +72,7 @@ const projectNavItems = [
   },
   {
     to: "/p/$projectId/discover" as const,
-    label: "Discover",
+    label: "Discover & More",
     icon: Newspaper,
   },
   {

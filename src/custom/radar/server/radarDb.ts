@@ -84,6 +84,10 @@ export type RuleRow = {
   enabled: number;
   created_at: string;
   created_by: string | null;
+  /** JSON list of extra conditions, or null. */
+  filters_json: string | null;
+  /** JSON {emails, webhooks}, or null. */
+  notify_json: string | null;
 };
 
 export async function listRules(projectId: string): Promise<RuleRow[]> {
@@ -99,8 +103,8 @@ export async function insertRule(row: RuleRow): Promise<void> {
   await env.DB.prepare(
     `INSERT INTO radar_alert_rules
       (id, project_id, name, scope, target, metric, condition, threshold,
-       window_days, min_value, enabled, created_at, created_by)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       window_days, min_value, enabled, created_at, created_by, filters_json, notify_json)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   )
     .bind(
       row.id,
@@ -116,6 +120,8 @@ export async function insertRule(row: RuleRow): Promise<void> {
       row.enabled,
       row.created_at,
       row.created_by,
+      row.filters_json,
+      row.notify_json,
     )
     .run();
 }

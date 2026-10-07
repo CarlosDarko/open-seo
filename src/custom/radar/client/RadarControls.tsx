@@ -15,6 +15,8 @@ import type {
   RadarRange,
 } from "@/custom/radar/client/useRadarFilters";
 
+const WIDE_MENU = "w-auto min-w-(--anchor-width) max-w-[min(32rem,92vw)]";
+
 const RANGE_ITEMS = [
   { value: "last_7_days", label: "Últimos 7 días" },
   { value: "last_28_days", label: "Últimos 28 días" },
@@ -61,7 +63,7 @@ export function RadarControls({
           <SelectTrigger size="sm" aria-label="Periodo">
             <SelectValue />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className={WIDE_MENU}>
             {RANGE_ITEMS.map((item) => (
               <SelectItem key={item.value} value={item.value}>
                 {item.label}
@@ -101,7 +103,7 @@ export function RadarControls({
           <SelectTrigger size="sm" aria-label="Comparación">
             <SelectValue />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className={WIDE_MENU}>
             {COMPARE_ITEMS.map((item) => (
               <SelectItem key={item.value} value={item.value}>
                 {item.label}
