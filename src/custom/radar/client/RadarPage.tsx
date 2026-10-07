@@ -358,7 +358,6 @@ function Kpis({ report }: { report: RadarReport }) {
   );
 }
 
-
 function topShare(
   segments: Segment[],
 ): { label: string; share: number } | null {
