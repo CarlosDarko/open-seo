@@ -136,6 +136,29 @@ export function splitBrandRows(
   return { brand, other };
 }
 
+export type Totals = {
+  clicks: number;
+  impressions: number;
+  ctr: number;
+  position: number;
+};
+
+/** Site totals without the brand queries: the total Search Console reports
+ *  minus what the detected brand queries add up to. Search Console hides
+ *  rare queries, so subtracting from the total (instead of adding up the
+ *  other queries) keeps those in the figure. */
+export function subtractTotals(all: Totals, brand: Totals): Totals {
+  const clicks = Math.max(0, all.clicks - brand.clicks);
+  const impressions = Math.max(0, all.impressions - brand.impressions);
+  const weighted = all.position * all.impressions - brand.position * brand.impressions;
+  return {
+    clicks,
+    impressions,
+    ctr: impressions > 0 ? clicks / impressions : 0,
+    position: impressions > 0 ? Math.max(1, weighted / impressions) : 0,
+  };
+}
+
 export function sumClicks(rows: GscSearchAnalyticsRow[]): number {
   return rows.reduce((sum, row) => sum + row.clicks, 0);
 }

@@ -24,6 +24,7 @@ import {
   ownCtrCurve,
   positionBands,
   splitBrandRows,
+  subtractTotals,
   sumClicks,
   winnersAndLosers,
 } from "@/custom/radar/radarAnalysis";
@@ -160,6 +161,22 @@ export const getRadarReport = createServerFn({ method: "POST" })
       );
       const ctrQueries = new Set(allCtr.map((item) => item.query));
 
+      // The headline figures follow the brand switch too: without brand they
+      // are the site totals minus the detected brand queries.
+      const withoutBrand = !data.includeBrand && tokens.length > 0;
+      const totals = withoutBrand
+        ? subtractTotals(
+            sumSearchTotals(daily.rows),
+            sumSearchTotals(splitNow.brand),
+          )
+        : sumSearchTotals(daily.rows);
+      const prevTotals = withoutBrand
+        ? subtractTotals(
+            sumSearchTotals(prevDaily.rows),
+            sumSearchTotals(splitPrev.brand),
+          )
+        : sumSearchTotals(prevDaily.rows);
+
       const classifyPage = pageTypeClassifier(
         [...pageRows, ...prevPageRows].flatMap((row) => row.keys?.[0] ?? []),
       );
@@ -175,8 +192,9 @@ export const getRadarReport = createServerFn({ method: "POST" })
           prevStartDate: prev.startDate,
           prevEndDate: prev.endDate,
         },
-        totals: sumSearchTotals(daily.rows),
-        prevTotals: sumSearchTotals(prevDaily.rows),
+        totals,
+        prevTotals,
+        totalsScope: withoutBrand ? ("sin marca" as const) : ("todo" as const),
         brand: {
           hasBrand: tokens.length > 0,
           included: data.includeBrand,

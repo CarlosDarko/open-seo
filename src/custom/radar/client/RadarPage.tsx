@@ -302,6 +302,14 @@ function Kpis({ report }: { report: RadarReport }) {
   return (
     <section className="space-y-2">
       <p className="text-xs text-muted-foreground">
+        <strong className="text-foreground">
+          {report.totalsScope === "sin marca"
+            ? "Cifras sin marca (estimadas: total menos las consultas de marca detectadas)"
+            : report.brand.hasBrand
+              ? "Cifras de todo el tráfico, marca incluida"
+              : "Cifras de todo el tráfico"}
+        </strong>
+        {" · "}
         {shortDate.format(new Date(`${report.range.startDate}T00:00:00Z`))} –{" "}
         {shortDate.format(new Date(`${report.range.endDate}T00:00:00Z`))}{" "}
         frente a{" "}
@@ -501,7 +509,15 @@ function TrendCard({ report }: { report: RadarReport }) {
   return (
     <Card>
       <CardHeader className="flex flex-wrap items-center justify-between gap-2">
-        <CardTitle>Evolución diaria</CardTitle>
+        <div>
+          <CardTitle>Evolución diaria</CardTitle>
+          {report.brand.hasBrand && !report.brand.included ? (
+            <p className="mt-1 text-xs text-muted-foreground">
+              Incluye también la marca: Search Console no permite separarla día
+              a día.
+            </p>
+          ) : null}
+        </div>
         <Tabs
           value={metric}
           onValueChange={(value) => setMetric(value as typeof metric)}

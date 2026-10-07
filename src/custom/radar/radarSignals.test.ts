@@ -11,6 +11,7 @@ import {
   type PageSignals,
 } from "@/custom/radar/pageSignals";
 import {
+  subtractTotals,
   brandSuspects,
   brandTokens,
   normalizeBrandTerms,
@@ -199,5 +200,26 @@ describe("brand terms", () => {
       "carlos ortgea",
     ]);
     expect(suspects[0].variant).toBe("carlso ortega");
+  });
+});
+
+describe("subtractTotals", () => {
+  it("removes the brand queries from the site totals", () => {
+    const result = subtractTotals(
+      { clicks: 1000, impressions: 100000, ctr: 0.01, position: 6 },
+      { clicks: 400, impressions: 2000, ctr: 0.2, position: 1.5 },
+    );
+    expect(result.clicks).toBe(600);
+    expect(result.impressions).toBe(98000);
+    expect(result.ctr).toBeCloseTo(600 / 98000, 6);
+    expect(result.position).toBeCloseTo((6 * 100000 - 1.5 * 2000) / 98000, 6);
+  });
+
+  it("never goes below zero", () => {
+    const result = subtractTotals(
+      { clicks: 10, impressions: 100, ctr: 0.1, position: 3 },
+      { clicks: 50, impressions: 500, ctr: 0.1, position: 2 },
+    );
+    expect(result).toMatchObject({ clicks: 0, impressions: 0, ctr: 0, position: 0 });
   });
 });
