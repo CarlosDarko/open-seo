@@ -21,6 +21,24 @@ export const SOURCE_PATCHES = [
     to: 'import { ProjectLaunchView as LaunchView } from "@/custom/audit/ProjectLaunchView";',
   },
   {
+    // The landing page is the projects hub (src/custom/hub/HubPage.tsx)
+    // instead of a redirect to the last project.
+    file: "src/routes/_app/index.tsx",
+    from: 'import { SUBSCRIBE_ROUTE } from "@/shared/billing";',
+    to: 'import { SUBSCRIBE_ROUTE } from "@/shared/billing";\nimport { HubPage } from "@/custom/hub/HubPage";',
+  },
+  {
+    file: "src/routes/_app/index.tsx",
+    from: "component: IndexRedirect,",
+    to: "component: HubPage,",
+  },
+  {
+    // Projects in the dropdown are listed alphabetically.
+    file: "src/client/features/projects/ProjectSwitcher.tsx",
+    from: "const projects = projectsQuery.data ?? [];",
+    to: 'const projects = [...(projectsQuery.data ?? [])].sort((a, b) => a.name.localeCompare(b.name, "es", { sensitivity: "base" }));',
+  },
+  {
     // The project dropdown filters its list with the combobox's internal
     // text, which can keep the name of the previously selected project: the
     // list then shows only some projects, or none. With few projects there is
