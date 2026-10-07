@@ -127,21 +127,66 @@ export function languageClassifier(urls: string[]): {
   };
 }
 
+/** Folders that mean the same thing in different languages
+ *  (/services/, /servicios/, /tjenester/...): they are one page type. */
+const FOLDER_GROUPS: string[][] = [
+  ["servicios", "servicio", "services", "service", "tjenester", "dienstleistungen", "dienstleistung", "leistungen", "diensten", "dienste", "servicos", "servizi", "tjanster"],
+  ["productos", "producto", "products", "product", "produkte", "producten", "produits", "prodotti", "produtos"],
+  ["contacto", "contact", "kontakt", "contatto", "contato"],
+  ["sobre-nosotros", "nosotros", "about", "about-us", "over-ons", "uber-uns", "ueber-uns", "om-oss", "a-propos", "chi-siamo", "sobre-nos"],
+  ["categorias", "categoria", "category", "categories", "categorie", "kategorie", "kategorien", "categorias-de-producto"],
+  ["tienda", "shop", "store", "winkel", "laden", "boutique", "negozio", "loja"],
+  ["precios", "tarifas", "pricing", "prices", "preise", "prijzen", "tarifs", "prezzi"],
+  ["casos", "casos-de-exito", "casos-de-estudio", "cases", "case-studies", "fallstudien", "referenties"],
+  ["recursos", "resources", "ressourcen", "ressources", "risorse"],
+  ["noticias", "news", "nieuws", "nachrichten", "actualites", "notizie"],
+  ["empleo", "ofertas-empleo", "jobs", "careers", "vacatures", "stellenangebote", "karriere"],
+];
+
+const GROUP_OF = new Map<string, number>(
+  FOLDER_GROUPS.flatMap((names, index) =>
+    names.map((name): [string, number] => [name, index]),
+  ),
+);
+
+/** The key a folder is counted under: its group, or the folder itself. */
+function folderKey(folder: string): string {
+  const name = plain(folder);
+  const group = GROUP_OF.get(name);
+  return group === undefined ? name : `#${group}`;
+}
+
 /** Page type from the URL structure, ignoring the language folder: the first
  *  folder when several pages share it ("/blog/"), the home page (of any
  *  language), pages directly in the root, or other. The folders come from the
- *  site itself, so any site gets its own types. */
+ *  site itself, so any site gets its own types; folders that are the same word
+ *  in other languages are merged and shown under the spelling the site uses
+ *  most. */
 export function pageTypeClassifier(urls: string[]): (url: string) => string {
-  const folders = new Map<string, number>();
+  const counts = new Map<string, number>();
+  const spellings = new Map<string, Map<string, number>>();
   for (const url of urls) {
     const parts = withoutLanguage(pathParts(url));
-    if (parts.length >= 2) folders.set(parts[0], (folders.get(parts[0]) ?? 0) + 1);
+    if (parts.length < 2) continue;
+    const key = folderKey(parts[0]);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+    const variants = spellings.get(key) ?? new Map<string, number>();
+    variants.set(parts[0], (variants.get(parts[0]) ?? 0) + 1);
+    spellings.set(key, variants);
+  }
+  const label = new Map<string, string>();
+  for (const [key, variants] of spellings) {
+    const best = [...variants.entries()].sort((x, y) => y[1] - x[1])[0][0];
+    label.set(key, `/${best}/`);
   }
   return (url) => {
     const parts = withoutLanguage(pathParts(url));
     if (parts.length === 0) return "Inicio";
     if (parts.length === 1) return "Páginas en la raíz";
-    return (folders.get(parts[0]) ?? 0) >= 2 ? `/${parts[0]}/` : OTHER_PAGES;
+    const key = folderKey(parts[0]);
+    return (counts.get(key) ?? 0) >= 2
+      ? (label.get(key) ?? `/${parts[0]}/`)
+      : OTHER_PAGES;
   };
 }
 

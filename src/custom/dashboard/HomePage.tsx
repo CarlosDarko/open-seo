@@ -19,7 +19,11 @@ import { GscCard } from "@/client/features/dashboard/DashboardCards";
 import { DashboardOnboarding } from "@/client/features/dashboard/DashboardOnboarding";
 import { WorkspaceMergeBanner } from "@/client/features/dashboard/WorkspaceMergeBanner";
 import { buildActions } from "@/custom/radar/actions";
-import { KIND_META } from "@/custom/radar/client/ActionPlan";
+import {
+  KIND_META,
+  taskTitle,
+  tileHeadline,
+} from "@/custom/radar/client/ActionPlan";
 import { AlertsBanner } from "@/custom/radar/client/AlertsBanner";
 import { RadarControls } from "@/custom/radar/client/RadarControls";
 import { PageLink } from "@/custom/radar/client/RadarLinks";
@@ -39,6 +43,7 @@ import {
   getDashboardOverview,
   refreshDashboardBacklinkSnapshot,
 } from "@/serverFunctions/dashboard";
+import { getRadarPageSignals } from "@/serverFunctions/radar";
 import { listTrackedActions } from "@/serverFunctions/radarTracking";
 import { getTopicsReport } from "@/serverFunctions/radarTopics";
 
@@ -106,6 +111,31 @@ export function HomePage({ projectId }: { projectId: string }) {
       .slice(0, 2);
     return [...plan.losses.slice(0, 2), ...quick];
   }, [plan]);
+  // The titles of the pages the Panel mentions, so rows say what the page is
+  // about and not only its address (a handful of live reads, cached).
+  const titleUrls = useMemo(() => {
+    const urls = new Set<string>();
+    for (const action of nextActions) {
+      if (action.kind !== "cannibal" && action.page) urls.add(action.page);
+    }
+    for (const row of [
+      ...(report?.pageChanges.winners.slice(0, 3) ?? []),
+      ...(report?.pageChanges.losers.slice(0, 3) ?? []),
+    ]) {
+      urls.add(row.key);
+    }
+    return [...urls];
+  }, [nextActions, report]);
+  const titles = useQuery({
+    queryKey: ["radar-signals", projectId, titleUrls],
+    queryFn: () => getRadarPageSignals({ data: { projectId, urls: titleUrls } }),
+    enabled: titleUrls.length > 0,
+    staleTime: 10 * 60_000,
+  });
+  const signals = useMemo(
+    () => new Map((titles.data?.signals ?? []).map((item) => [item.url, item])),
+    [titles.data],
+  );
   const totalTasks = plan
     ? plan.losses.length +
       plan.snippets.length +
@@ -267,8 +297,11 @@ export function HomePage({ projectId }: { projectId: string }) {
                                   <Icon className="size-4" aria-hidden />
                                 </span>
                                 <span className="min-w-0 flex-1">
-                                  <span className="line-clamp-2 block text-sm leading-snug font-medium">
-                                    {action.headline}
+                                  <span className="line-clamp-2 block text-sm leading-snug font-semibold">
+                                    {tileHeadline(action)}
+                                  </span>
+                                  <span className="block truncate text-xs text-muted-foreground">
+                                    {taskTitle(action, signals)}
                                   </span>
                                   <span className="block truncate text-xs text-muted-foreground">
                                     {meta.label} ·{" "}
@@ -333,11 +366,13 @@ export function HomePage({ projectId }: { projectId: string }) {
                     title="Suben"
                     tone="text-success"
                     rows={report.pageChanges.winners.slice(0, 3)}
+                    signals={signals}
                   />
                   <ChangeList
                     title="Bajan"
                     tone="text-destructive"
                     rows={report.pageChanges.losers.slice(0, 3)}
+                    signals={signals}
                   />
                 </CardContent>
               </Card>
@@ -487,10 +522,12 @@ function ChangeList({
   title,
   tone,
   rows,
+  signals,
 }: {
   title: string;
   tone: string;
   rows: Report["pageChanges"]["winners"];
+  signals: Map<string, { title: string | null; ok: boolean }>;
 }) {
   return (
     <div className="space-y-1">
@@ -502,7 +539,12 @@ function ChangeList({
           {rows.map((row) => (
             <li key={row.key} className="flex items-baseline justify-between gap-2">
               <span className="min-w-0">
-                <PageLink url={row.key} />
+                <PageLink
+                  url={row.key}
+                  label={
+                    signals.get(row.key)?.ok ? (signals.get(row.key)?.title ?? undefined) : undefined
+                  }
+                />
               </span>
               <span className={`shrink-0 font-medium tabular-nums ${tone}`}>
                 {signed(row.clicksDelta)}

@@ -1,15 +1,23 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { Area, AreaChart } from "recharts";
-import { ArrowDownRight, ArrowUpRight, Bell, TriangleAlert } from "lucide-react";
-import { PageHeader } from "@/client/components/PageHeader";
+import {
+  ArrowDownRight,
+  ArrowUpRight,
+  Bell,
+  Plus,
+  Settings,
+  TriangleAlert,
+  Wallet,
+} from "lucide-react";
 import { QueryError } from "@/client/components/QueryState";
 import { Button } from "@/client/components/ui/button";
 import { Card, CardContent } from "@/client/components/ui/card";
 import { ChartContainer, type ChartConfig } from "@/client/components/ui/chart";
 import { Skeleton } from "@/client/components/ui/skeleton";
 import { projectsQueryOptions } from "@/client/features/projects/projectQueries";
+import { CreateProjectModal } from "@/client/features/projects/CreateProjectModal";
 import type { ProjectSummary } from "@/client/features/projects/types";
 import { setLastProjectId } from "@/client/lib/active-project";
 import {
@@ -42,6 +50,7 @@ const chartConfig = {
  * (custom/i18n/patches.mjs) and is where the logo leads.
  */
 export function HubPage() {
+  const [creating, setCreating] = useState(false);
   const projectsQuery = useQuery(projectsQueryOptions());
   const projects = useMemo(
     () =>
@@ -60,12 +69,50 @@ export function HubPage() {
   });
 
   return (
-    <div className="px-4 py-4 pb-24 md:px-6 md:py-6 md:pb-8">
-      <div className="mx-auto flex max-w-7xl flex-col gap-5">
-        <PageHeader
-          title="Tus proyectos"
-          description="Cómo va cada web en los últimos 28 días (sin consultas de marca) frente a los 28 anteriores. Haz clic en una para abrirla."
-        />
+    <div className="px-4 py-3 pb-12 md:px-6">
+      <div className="mx-auto flex max-w-[1800px] flex-col gap-4">
+        <header className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-4">
+            <Link to="/" aria-label="Carlos Ortega">
+              <img
+                src="/carlos-ortega-logo.svg"
+                alt="Carlos Ortega"
+                className="brand-mark-light h-6 w-auto"
+              />
+              <img
+                src="/carlos-ortega-logo-dark.svg"
+                alt="Carlos Ortega"
+                className="brand-mark-dark h-6 w-auto"
+              />
+            </Link>
+            <div>
+              <h1 className="text-xl leading-tight font-semibold tracking-tight">
+                Tus proyectos
+              </h1>
+              <p className="text-xs text-muted-foreground">
+                Últimos 28 días (sin consultas de marca) frente a los 28
+                anteriores. Haz clic en una web para abrirla.
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button size="sm" onClick={() => setCreating(true)}>
+              <Plus className="size-4" aria-hidden />
+              Nuevo proyecto
+            </Button>
+            <Button size="sm" variant="outline" render={<Link to="/costs" />}>
+              <Wallet className="size-4" aria-hidden />
+              Costes
+            </Button>
+            <Button size="sm" variant="outline" render={<Link to="/settings" />}>
+              <Settings className="size-4" aria-hidden />
+              Ajustes
+            </Button>
+          </div>
+        </header>
+        {creating ? (
+          <CreateProjectModal onClose={() => setCreating(false)} />
+        ) : null}
 
         {projectsQuery.isError ? (
           <QueryError
@@ -76,13 +123,13 @@ export function HubPage() {
             isRetrying={projectsQuery.isFetching}
           />
         ) : projectsQuery.isPending ? (
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             {Array.from({ length: 3 }, (_, index) => (
               <Skeleton key={index} className="h-80" />
             ))}
           </div>
         ) : (
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             {projects.map((project, index) => (
               <ProjectCard
                 key={project.id}
@@ -132,7 +179,7 @@ function ProjectCard({
   const ok = summary?.status === "ok" ? summary : null;
   return (
     <Card className="group relative overflow-hidden transition hover:-translate-y-0.5 hover:shadow-md">
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-3">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <h2 className="truncate text-base font-semibold">
@@ -161,7 +208,7 @@ function ProjectCard({
         {loading ? (
           <div className="space-y-3">
             <Skeleton className="h-9 w-40" />
-            <Skeleton className="h-20 w-full" />
+            <Skeleton className="h-14 w-full" />
             <Skeleton className="h-10 w-full" />
           </div>
         ) : ok ? (

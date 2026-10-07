@@ -30,6 +30,20 @@ describe("pageTypeClassifier", () => {
     expect(classify("https://x.com/es/contacto")).toBe("Páginas en la raíz");
   });
 
+  it("merges folders that are the same word in other languages", () => {
+    const classify = pageTypeClassifier([
+      "https://x.com/services/a",
+      "https://x.com/services/b",
+      "https://x.com/servicios/c",
+      "https://x.com/dienstleistungen/d",
+      "https://x.com/dienstleistungen/e",
+      "https://x.com/diensten/f",
+    ]);
+    expect(classify("https://x.com/servicios/c")).toBe("/services/");
+    expect(classify("https://x.com/dienstleistungen/d")).toBe("/services/");
+    expect(classify("https://x.com/diensten/f")).toBe("/services/");
+  });
+
   it("keeps working on sites without language folders", () => {
     const plain = ["https://x.com/blog/a", "https://x.com/blog/b", "https://x.com/precios"];
     const classify = pageTypeClassifier(plain);

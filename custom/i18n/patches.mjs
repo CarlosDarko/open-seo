@@ -33,6 +33,17 @@ export const SOURCE_PATCHES = [
     to: "component: HubPage,",
   },
   {
+    // The projects hub (the "/" page) has no project menu: no sidebar.
+    file: "src/client/layout/AppShell.tsx",
+    from: /<Sidebar\s+projectId=\{sidebarProjectId\}\s+projectPending=\{sidebarProjectPending\}\s+ready=\{ready\}\s+\/>/,
+    to: '{location.pathname === "/" ? null : <Sidebar projectId={sidebarProjectId} projectPending={sidebarProjectPending} ready={ready} />}',
+  },
+  {
+    file: "src/client/layout/AppShell.tsx",
+    from: "<MobileTopBar />",
+    to: '{location.pathname === "/" ? null : <MobileTopBar />}',
+  },
+  {
     // Projects in the dropdown are listed alphabetically.
     file: "src/client/features/projects/ProjectSwitcher.tsx",
     from: "const projects = projectsQuery.data ?? [];",
