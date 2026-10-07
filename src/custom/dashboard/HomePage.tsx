@@ -76,7 +76,6 @@ export function HomePage({ projectId }: { projectId: string }) {
   const overview = useQuery({
     queryKey: ["dashboardOverview", projectId],
     queryFn: () => getDashboardOverview({ data: { projectId } }),
-    refetchInterval: (q) => (q.state.data?.audit?.status === "running" ? 3000 : false),
   });
   const topicInput = { ...periodInput(filters), includeBrand: filters.includeBrand };
   const topics = useQuery({
@@ -349,7 +348,6 @@ export function HomePage({ projectId }: { projectId: string }) {
               <TopicsCard projectId={projectId} topics={topics.data} loading={topics.isPending} />
               <HealthCard
                 projectId={projectId}
-                audit={overview.data?.audit ?? null}
                 backlinks={overview.data?.backlinks ?? null}
                 showBacklinks={activation.data.domain !== null}
                 ga4Connected={activation.data.ga4.connected}
@@ -695,7 +693,6 @@ type Overview = Awaited<ReturnType<typeof getDashboardOverview>>;
 
 function HealthCard({
   projectId,
-  audit,
   backlinks,
   showBacklinks,
   ga4Connected,
@@ -704,7 +701,6 @@ function HealthCard({
   onRefresh,
 }: {
   projectId: string;
-  audit: Overview["audit"];
   backlinks: Overview["backlinks"];
   showBacklinks: boolean;
   ga4Connected: boolean;
@@ -712,13 +708,12 @@ function HealthCard({
   refreshing: boolean;
   onRefresh: () => void;
 }) {
-  const critical = audit?.topIssues.filter((issue) => issue.severity === "critical").length ?? 0;
   return (
     <Card>
       <CardHeader>
         <CardTitle>Salud técnica</CardTitle>
         <p className="text-xs text-muted-foreground">
-          Auditoría del sitio, backlinks y conexiones.
+          Backlinks, conexiones e indexación.
         </p>
       </CardHeader>
       <CardContent className="space-y-3 text-sm">
@@ -726,25 +721,6 @@ function HealthCard({
           <Skeleton className="h-32 w-full" />
         ) : (
           <>
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <p className="font-medium">Auditoría del sitio</p>
-                <p className="text-xs text-muted-foreground">
-                  {!audit
-                    ? "Aún no has lanzado ninguna."
-                    : audit.status === "running"
-                      ? "En curso…"
-                      : `${integer.format(audit.pagesCrawled)} páginas · ${audit.totalIssueTypes} tipos de problema${critical > 0 ? ` (${critical} críticos)` : ""}`}
-                </p>
-              </div>
-              <Button
-                size="xs"
-                variant="outline"
-                render={<Link to="/p/$projectId/audit" params={{ projectId }} />}
-              >
-                {audit ? "Ver" : "Lanzar"}
-              </Button>
-            </div>
             {showBacklinks ? (
               <div className="flex items-start justify-between gap-2">
                 <div>
