@@ -7,6 +7,13 @@
 // file: path ending of the file; from: RegExp or string; to: replacement.
 export const SOURCE_PATCHES = [
   {
+    // The project home is our own page (src/custom/dashboard/HomePage.tsx),
+    // which reuses OpenSEO's onboarding and cards.
+    file: "src/routes/_app/p/$projectId/index.tsx",
+    from: 'import { DashboardPage } from "@/client/features/dashboard/DashboardPage";',
+    to: 'import { HomePage as DashboardPage } from "@/custom/dashboard/HomePage";',
+  },
+  {
     // The project dropdown filters its list with the combobox's internal
     // text, which can keep the name of the previously selected project: the
     // list then shows only some projects, or none. With few projects there is

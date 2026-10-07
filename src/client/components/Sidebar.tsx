@@ -16,7 +16,6 @@ import { organizationContextQueryOptions } from "@/client/features/team/organiza
 import { switchOrganization } from "@/serverFunctions/organization";
 import {
   connectNavGroup,
-  getProjectNavGroups,
 } from "@/client/navigation/items";
 import { ProjectSwitcher } from "@/client/features/projects/ProjectSwitcher";
 import {
@@ -29,13 +28,12 @@ import { signOutAndRedirect, useSession } from "@/lib/auth-client";
 import { BILLING_ROUTE } from "@/shared/billing";
 import { isHostedClientAuthMode } from "@/lib/auth-mode";
 import { SidebarCostMeter } from "@/custom/costs/client/SidebarCostMeter";
+import { CollapsibleNavGroup } from "@/custom/nav/CollapsibleNavGroup";
+import { getCustomProjectNavGroups } from "@/custom/nav/customNav";
 import {
   Sidebar as UiSidebar,
   SidebarContent,
   SidebarFooter as UiSidebarFooter,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
@@ -130,7 +128,7 @@ export function Sidebar({
   const navPlaceholder = projectId === null && projectPending;
   const navGroups =
     projectId !== null || navPlaceholder
-      ? getProjectNavGroups(projectId ?? "")
+      ? getCustomProjectNavGroups(projectId ?? "")
       : [connectNavGroup];
   const { pathname } = useLocation();
   const { setOpenMobile } = useSidebar();
@@ -182,27 +180,25 @@ export function Sidebar({
             aria-busy={navPlaceholder || undefined}
           >
             {navGroups.map((group) => (
-              <SidebarGroup key={group.label} className="py-1">
-                <SidebarGroupLabel className="h-7 uppercase tracking-wider text-sidebar-foreground/40">
-                  {group.label}
-                </SidebarGroupLabel>
-                <SidebarGroupContent>
-                  <SidebarMenu>
-                    {group.items.map((item) => {
-                      const { icon, label, ...linkProps } = item;
-                      return (
-                        <SidebarNavLink
-                          key={linkProps.to}
-                          icon={icon}
-                          label={label}
-                          linkProps={linkProps}
-                          placeholder={navPlaceholder}
-                        />
-                      );
-                    })}
-                  </SidebarMenu>
-                </SidebarGroupContent>
-              </SidebarGroup>
+              <CollapsibleNavGroup
+                key={group.label}
+                label={group.label}
+                collapsible={"collapsible" in group ? group.collapsible : undefined}
+                paths={group.items.map((item) => item.to as string)}
+              >
+                {group.items.map((item) => {
+                  const { icon, label, ...linkProps } = item;
+                  return (
+                    <SidebarNavLink
+                      key={linkProps.to}
+                      icon={icon}
+                      label={label}
+                      linkProps={linkProps}
+                      placeholder={navPlaceholder}
+                    />
+                  );
+                })}
+              </CollapsibleNavGroup>
             ))}
           </nav>
         )}

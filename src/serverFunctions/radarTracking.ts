@@ -123,9 +123,15 @@ const MAX_MEASURED = 20;
 /** The actions marked as done, with their impact when enough time has passed. */
 export const listTrackedActions = createServerFn({ method: "POST" })
   .middleware(requireProjectContext)
-  .validator(z.object({ projectId: z.string().min(1) }))
-  .handler(async ({ context }): Promise<TrackedAction[]> => {
-    const rows = await listActions(context.projectId);
+  .validator(
+    z.object({
+      projectId: z.string().min(1),
+      /** Only the newest N (the home page shows three). */
+      limit: z.number().int().min(1).max(60).optional(),
+    }),
+  )
+  .handler(async ({ data, context }): Promise<TrackedAction[]> => {
+    const rows = await listActions(context.projectId, data.limit ?? 60);
     const now = new Date();
     return Promise.all(
       rows.map(async (row, index): Promise<TrackedAction> => {
