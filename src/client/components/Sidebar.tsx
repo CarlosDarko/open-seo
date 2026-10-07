@@ -14,9 +14,7 @@ import {
 } from "lucide-react";
 import { organizationContextQueryOptions } from "@/client/features/team/organizationQueries";
 import { switchOrganization } from "@/serverFunctions/organization";
-import {
-  connectNavGroup,
-} from "@/client/navigation/items";
+import { connectNavGroup } from "@/client/navigation/items";
 import { ProjectSwitcher } from "@/client/features/projects/ProjectSwitcher";
 import {
   SamChatListSkeleton,
@@ -183,7 +181,9 @@ export function Sidebar({
               <CollapsibleNavGroup
                 key={group.label}
                 label={group.label}
-                collapsible={"collapsible" in group ? group.collapsible : undefined}
+                collapsible={
+                  "collapsible" in group ? group.collapsible : undefined
+                }
                 paths={group.items.map((item) => item.to as string)}
               >
                 {group.items.map((item) => {

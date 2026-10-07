@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { buildTopics } from "@/custom/radar/topics";
 
-const row = (query: string, clicks: number, impressions: number, position = 8) => ({
+const row = (
+  query: string,
+  clicks: number,
+  impressions: number,
+  position = 8,
+) => ({
   keys: [query],
   clicks,
   impressions,
@@ -32,7 +37,9 @@ describe("buildTopics", () => {
   const labels = result.topics.map((topic) => topic.label.toLowerCase());
 
   it("names topics the way a person would", () => {
-    expect(labels.some((label) => label.includes("incapacidad temporal"))).toBe(true);
+    expect(labels.some((label) => label.includes("incapacidad temporal"))).toBe(
+      true,
+    );
     expect(labels.some((label) => label.includes("herencia"))).toBe(true);
     expect(labels.some((label) => label.includes("fruta"))).toBe(true);
   });
@@ -52,7 +59,9 @@ describe("buildTopics", () => {
 
   it("keeps queries that fit nothing as 'Otros temas' instead of forcing them", () => {
     const others = result.topics.find((topic) => topic.label === "Otros temas");
-    expect(others?.topQueries.map((q) => q.query)).toContain("zapatillas rojas");
+    expect(others?.topQueries.map((q) => q.query)).toContain(
+      "zapatillas rojas",
+    );
   });
 
   it("measures the previous period with the same topics", () => {
@@ -60,8 +69,14 @@ describe("buildTopics", () => {
       current: queries,
       previous: [row("incapacidad temporal requisitos", 5, 500)],
     });
-    const topic = withPrev.topics.find((t) => t.label.toLowerCase().includes("incapacidad"));
-    expect(topic?.prev).toMatchObject({ queries: 1, clicks: 5, impressions: 500 });
+    const topic = withPrev.topics.find((t) =>
+      t.label.toLowerCase().includes("incapacidad"),
+    );
+    expect(topic?.prev).toMatchObject({
+      queries: 1,
+      clicks: 5,
+      impressions: 500,
+    });
   });
 
   it("gives the user's own topics priority and their name", () => {
@@ -70,9 +85,13 @@ describe("buildTopics", () => {
       previous: [],
       custom: [{ name: "Mercados mayoristas", terms: ["mercabarna", "mayor"] }],
     });
-    const own = custom.topics.find((topic) => topic.label === "Mercados mayoristas");
+    const own = custom.topics.find(
+      (topic) => topic.label === "Mercados mayoristas",
+    );
     expect(own?.custom).toBe(true);
-    expect(own?.topQueries.map((q) => q.query)).toContain("fruta por mayor mercabarna");
+    expect(own?.topQueries.map((q) => q.query)).toContain(
+      "fruta por mayor mercabarna",
+    );
   });
 
   it("tells which topic a query belongs to", () => {

@@ -127,7 +127,8 @@ export function ActionPlanPage({ projectId }: { projectId: string }) {
   const allActions = plan
     ? KIND_ORDER.flatMap((kind) => plan[KIND_META[kind].planKey])
     : [];
-  const selected = allActions.find((action) => action.id === selectedId) ?? null;
+  const selected =
+    allActions.find((action) => action.id === selectedId) ?? null;
   const columns = COLUMNS.map((column) => ({
     ...column,
     items: visible
@@ -262,9 +263,9 @@ export function ActionPlanPage({ projectId }: { projectId: string }) {
               {total === 0 ? (
                 <Card>
                   <CardContent className="py-6 text-sm text-muted-foreground">
-                    No hay tareas pendientes con estos filtros: o no se
-                    detectan pérdidas ni consultas con potencial, o ya las has
-                    marcado como hechas. Prueba con un periodo más largo.
+                    No hay tareas pendientes con estos filtros: o no se detectan
+                    pérdidas ni consultas con potencial, o ya las has marcado
+                    como hechas. Prueba con un periodo más largo.
                   </CardContent>
                 </Card>
               ) : (

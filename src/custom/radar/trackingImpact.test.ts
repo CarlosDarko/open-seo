@@ -23,13 +23,27 @@ const baseline = (page: WindowStats, site: WindowStats): Baseline => ({
 
 describe("measurementWindows", () => {
   it("measures 28 days before the change and waits for 14 days of data after", () => {
-    const early = measurementWindows("2026-10-01T10:00:00Z", new Date("2026-10-10T00:00:00Z"));
-    expect(early.baseline).toEqual({ start: "2026-09-01", end: "2026-09-28", days: 28 });
+    const early = measurementWindows(
+      "2026-10-01T10:00:00Z",
+      new Date("2026-10-10T00:00:00Z"),
+    );
+    expect(early.baseline).toEqual({
+      start: "2026-09-01",
+      end: "2026-09-28",
+      days: 28,
+    });
     expect(early.after).toBeNull();
     expect(early.waitingDays).toBeGreaterThan(0);
 
-    const later = measurementWindows("2026-09-01T10:00:00Z", new Date("2026-10-10T00:00:00Z"));
-    expect(later.after).toEqual({ start: "2026-09-02", end: "2026-09-29", days: 28 });
+    const later = measurementWindows(
+      "2026-09-01T10:00:00Z",
+      new Date("2026-10-10T00:00:00Z"),
+    );
+    expect(later.after).toEqual({
+      start: "2026-09-02",
+      end: "2026-09-29",
+      days: 28,
+    });
     expect(later.waitingDays).toBe(0);
   });
 });

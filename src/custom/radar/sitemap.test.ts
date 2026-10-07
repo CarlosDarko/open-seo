@@ -28,7 +28,8 @@ describe("parseSitemap", () => {
 
 describe("parseRobotsSitemaps", () => {
   it("finds the Sitemap lines of robots.txt", () => {
-    const robots = "User-agent: *\nDisallow: /admin\nSitemap: https://x.com/sitemap.xml\nsitemap: https://x.com/news.xml\n";
+    const robots =
+      "User-agent: *\nDisallow: /admin\nSitemap: https://x.com/sitemap.xml\nsitemap: https://x.com/news.xml\n";
     expect(parseRobotsSitemaps(robots)).toEqual([
       "https://x.com/sitemap.xml",
       "https://x.com/news.xml",

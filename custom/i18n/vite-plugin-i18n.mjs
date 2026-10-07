@@ -94,9 +94,7 @@ export function translateEs() {
         (a) =>
           !templates.some(
             (b) =>
-              b !== a &&
-              b.node.pos >= a.node.pos &&
-              b.node.end <= a.node.end,
+              b !== a && b.node.pos >= a.node.pos && b.node.end <= a.node.end,
           ),
       );
       if (innermost.length === 0) break;

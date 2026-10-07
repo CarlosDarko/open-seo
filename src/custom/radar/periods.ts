@@ -84,8 +84,10 @@ export function resolvePeriods(
       endDate: shiftYears(current.endDate, -1),
     };
     // GSC keeps 16 months: the year-ago window must fit inside them.
-    const floor = resolveDateRange({ dateRange: "last_16_months" }, today)
-      .startDate;
+    const floor = resolveDateRange(
+      { dateRange: "last_16_months" },
+      today,
+    ).startDate;
     if (previous.startDate >= floor) {
       return { current, previous, compare: "year", fellBack: false, days };
     }

@@ -62,13 +62,27 @@ describe("parsePageSignals", () => {
 
 describe("assertUrlInSite", () => {
   it("only accepts URLs of the Search Console property", () => {
-    expect(() => assertUrlInSite("https://www.x.com/a", "sc-domain:x.com")).not.toThrow();
-    expect(() => assertUrlInSite("https://blog.x.com/a", "sc-domain:x.com")).not.toThrow();
-    expect(() => assertUrlInSite("https://x.com/a", "https://x.com/")).not.toThrow();
-    expect(() => assertUrlInSite("https://evil.com/a", "sc-domain:x.com")).toThrow();
-    expect(() => assertUrlInSite("https://x.com.evil.com/a", "sc-domain:x.com")).toThrow();
-    expect(() => assertUrlInSite("http://169.254.169.254/", "sc-domain:x.com")).toThrow();
-    expect(() => assertUrlInSite("file:///etc/passwd", "sc-domain:x.com")).toThrow();
+    expect(() =>
+      assertUrlInSite("https://www.x.com/a", "sc-domain:x.com"),
+    ).not.toThrow();
+    expect(() =>
+      assertUrlInSite("https://blog.x.com/a", "sc-domain:x.com"),
+    ).not.toThrow();
+    expect(() =>
+      assertUrlInSite("https://x.com/a", "https://x.com/"),
+    ).not.toThrow();
+    expect(() =>
+      assertUrlInSite("https://evil.com/a", "sc-domain:x.com"),
+    ).toThrow();
+    expect(() =>
+      assertUrlInSite("https://x.com.evil.com/a", "sc-domain:x.com"),
+    ).toThrow();
+    expect(() =>
+      assertUrlInSite("http://169.254.169.254/", "sc-domain:x.com"),
+    ).toThrow();
+    expect(() =>
+      assertUrlInSite("file:///etc/passwd", "sc-domain:x.com"),
+    ).toThrow();
   });
 });
 
@@ -76,7 +90,8 @@ describe("snippetFindings", () => {
   it("says exactly what is wrong with the title and the meta description", () => {
     const findings = snippetFindings(
       signals({
-        title: "Una guía larguísima sobre muchas cosas distintas que no menciona el tema",
+        title:
+          "Una guía larguísima sobre muchas cosas distintas que no menciona el tema",
         metaDescription: null,
       }),
       "adjudicación de herencia",
@@ -113,11 +128,14 @@ describe("pushFindings and links", () => {
   });
 
   it("lists strong pages that do not link to the target yet", () => {
-    const withLink = signals({ url: "https://x.com/s1", links: ["https://x.com/blog/a"] });
+    const withLink = signals({
+      url: "https://x.com/s1",
+      links: ["https://x.com/blog/a"],
+    });
     const without = signals({ url: "https://x.com/s2", links: [] });
-    expect(missingLinkSources("https://x.com/blog/a", [withLink, without])).toEqual([
-      "https://x.com/s2",
-    ]);
+    expect(
+      missingLinkSources("https://x.com/blog/a", [withLink, without]),
+    ).toEqual(["https://x.com/s2"]);
   });
 
   it("keeps meaningful query words only", () => {
@@ -137,7 +155,9 @@ describe("brand", () => {
     expect(tokens).toEqual(["carlosortega"]);
     expect(isBrandQuery("Carlos Ortega seo", tokens)).toBe(true);
     expect(isBrandQuery("auditoria seo", tokens)).toBe(false);
-    expect(brandTokens("https://www.fruitsrafols.com/")).toEqual(["fruitsrafols"]);
+    expect(brandTokens("https://www.fruitsrafols.com/")).toEqual([
+      "fruitsrafols",
+    ]);
   });
 });
 
@@ -155,7 +175,9 @@ describe("explainChange", () => {
   };
 
   it("tells apart position, demand and CTR", () => {
-    expect(explainChange({ ...base, position: 8, prevPosition: 4 })).toBe("posicion");
+    expect(explainChange({ ...base, position: 8, prevPosition: 4 })).toBe(
+      "posicion",
+    );
     expect(explainChange({ ...base, impressions: 500 })).toBe("demanda");
     expect(explainChange(base)).toBe("ctr");
     expect(explainChange({ ...base, status: "lost" })).toBe("perdida");
@@ -182,7 +204,11 @@ describe("brand terms", () => {
   });
 
   it("matches manual variants without caring about accents, case or spaces", () => {
-    const tokens = normalizeBrandTerms(["Fruits Ràfols", "frutas rafols", "ab"]);
+    const tokens = normalizeBrandTerms([
+      "Fruits Ràfols",
+      "frutas rafols",
+      "ab",
+    ]);
     expect(tokens).toEqual(["fruitsrafols", "frutasrafols"]);
     expect(isBrandQuery("fruits rafols precios", tokens)).toBe(true);
     expect(isBrandQuery("frutas ràfols", tokens)).toBe(true);
@@ -192,7 +218,11 @@ describe("brand terms", () => {
   it("suggests probable misspellings that are not counted as brand", () => {
     const tokens = normalizeBrandTerms(["carlos ortega"]);
     const suspects = brandSuspects(
-      [row("carlso ortega seo", 4), row("auditoria seo", 9), row("carlos ortgea", 2)],
+      [
+        row("carlso ortega seo", 4),
+        row("auditoria seo", 9),
+        row("carlos ortgea", 2),
+      ],
       tokens,
     );
     expect(suspects.map((item) => item.query)).toEqual([
@@ -220,6 +250,11 @@ describe("subtractTotals", () => {
       { clicks: 10, impressions: 100, ctr: 0.1, position: 3 },
       { clicks: 50, impressions: 500, ctr: 0.1, position: 2 },
     );
-    expect(result).toMatchObject({ clicks: 0, impressions: 0, ctr: 0, position: 0 });
+    expect(result).toMatchObject({
+      clicks: 0,
+      impressions: 0,
+      ctr: 0,
+      position: 0,
+    });
   });
 });

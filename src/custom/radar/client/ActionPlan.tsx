@@ -219,7 +219,8 @@ export function usePlanSignals(projectId: string, plan: Plan) {
         try {
           const data = await queryClient.fetchQuery({
             queryKey: ["radar-signals", projectId, group],
-            queryFn: () => getRadarPageSignals({ data: { projectId, urls: group } }),
+            queryFn: () =>
+              getRadarPageSignals({ data: { projectId, urls: group } }),
             staleTime: 10 * 60_000,
           });
           if (cancelled) return;
@@ -377,7 +378,10 @@ const LOSS_VERDICT = {
 } as const;
 
 /** The one-sentence recommendation: what to do first, given what was found. */
-export function verdictFor(action: Action, diagnosis: Diagnosis | null): string {
+export function verdictFor(
+  action: Action,
+  diagnosis: Diagnosis | null,
+): string {
   const problems = diagnosis?.findings.some((f) => f.level !== "ok") ?? false;
   switch (action.kind) {
     case "loss":
@@ -386,7 +390,8 @@ export function verdictFor(action: Action, diagnosis: Diagnosis | null): string 
       if (action.anomaly) {
         return "Antes de reescribir nada, abre la búsqueda en Google: con un CTR tan bajo suele haber algo (respuesta de IA, anuncios, vídeos) que se lleva los clics, o la consulta no es realmente para tu página.";
       }
-      if (!diagnosis) return "Reescribe el título y la meta descripción de la página.";
+      if (!diagnosis)
+        return "Reescribe el título y la meta descripción de la página.";
       return problems
         ? "Reescribe el título y la meta descripción: abajo ves qué falla exactamente."
         : "El título y la meta están bien: prueba otro gancho (dato, año, beneficio) y compáralos con los de las tres primeras páginas.";
@@ -558,7 +563,9 @@ export function ActionCard({
           {/* Key figures as small tiles. */}
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
             {action.stats.map((stat) => {
-              const [before, after] = stat.value.split("→").map((x) => x.trim());
+              const [before, after] = stat.value
+                .split("→")
+                .map((x) => x.trim());
               return (
                 <div
                   key={stat.label}
@@ -620,18 +627,18 @@ export function ActionCard({
               <span />
             )}
             {hideToggle ? null : (
-            <Button
-              size="sm"
-              variant={open ? "secondary" : "ghost"}
-              aria-expanded={open}
-              onClick={onToggle}
-            >
-              {open ? "Ocultar detalle" : "Ver el porqué y los pasos"}
-              <ChevronDown
-                className={`size-4 transition-transform ${open ? "rotate-180" : ""}`}
-                aria-hidden
-              />
-            </Button>
+              <Button
+                size="sm"
+                variant={open ? "secondary" : "ghost"}
+                aria-expanded={open}
+                onClick={onToggle}
+              >
+                {open ? "Ocultar detalle" : "Ver el porqué y los pasos"}
+                <ChevronDown
+                  className={`size-4 transition-transform ${open ? "rotate-180" : ""}`}
+                  aria-hidden
+                />
+              </Button>
             )}
           </div>
         </div>
@@ -866,11 +873,14 @@ export function taskTitle(
   action: Action,
   signals: Map<string, PageSignals>,
 ): string {
-  if (action.kind === "cannibal") return `${action.pages.length} páginas tuyas compiten`;
+  if (action.kind === "cannibal")
+    return `${action.pages.length} páginas tuyas compiten`;
   const info = action.page ? signals.get(action.page) : undefined;
   if (info?.ok && info.title) return info.title;
   const path = action.page ? pathOf(action.page) : null;
-  return path === "/" ? "Página de inicio" : (path ?? `«${action.query ?? ""}»`);
+  return path === "/"
+    ? "Página de inicio"
+    : (path ?? `«${action.query ?? ""}»`);
 }
 
 /** What the task is, in one sentence and without the page address. */

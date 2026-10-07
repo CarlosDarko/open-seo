@@ -31,7 +31,9 @@ export function parseSitemap(xml: string): ParsedSitemap {
   const urls: string[] = [];
   const sitemaps: string[] = [];
   for (const match of xml.matchAll(/<url\b[^>]*>([\s\S]*?)<\/url>/gi)) {
-    const loc = locOf(match[1].replace(/<image:image[\s\S]*?<\/image:image>/gi, ""));
+    const loc = locOf(
+      match[1].replace(/<image:image[\s\S]*?<\/image:image>/gi, ""),
+    );
     if (loc) urls.push(loc);
   }
   for (const match of xml.matchAll(/<sitemap\b[^>]*>([\s\S]*?)<\/sitemap>/gi)) {
@@ -43,5 +45,7 @@ export function parseSitemap(xml: string): ParsedSitemap {
 
 /** The sitemaps a robots.txt announces. */
 export function parseRobotsSitemaps(robots: string): string[] {
-  return [...robots.matchAll(/^\s*sitemap:\s*(\S+)/gim)].map((match) => match[1]);
+  return [...robots.matchAll(/^\s*sitemap:\s*(\S+)/gim)].map(
+    (match) => match[1],
+  );
 }

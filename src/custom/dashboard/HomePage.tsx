@@ -51,8 +51,14 @@ const OTHERS = "Otros temas";
 
 const VERDICT_LABEL: Record<Verdict, { text: string; className: string }> = {
   mejora: { text: "Ha mejorado", className: "bg-success/10 text-success" },
-  empeora: { text: "Ha empeorado", className: "bg-destructive/10 text-destructive" },
-  sin_cambio: { text: "Sin cambio notable", className: "bg-muted text-muted-foreground" },
+  empeora: {
+    text: "Ha empeorado",
+    className: "bg-destructive/10 text-destructive",
+  },
+  sin_cambio: {
+    text: "Sin cambio notable",
+    className: "bg-muted text-muted-foreground",
+  },
   pocos_datos: { text: "Pocos datos", className: "bg-warning/10 text-warning" },
 };
 
@@ -82,7 +88,10 @@ export function HomePage({ projectId }: { projectId: string }) {
     queryKey: ["dashboardOverview", projectId],
     queryFn: () => getDashboardOverview({ data: { projectId } }),
   });
-  const topicInput = { ...periodInput(filters), includeBrand: filters.includeBrand };
+  const topicInput = {
+    ...periodInput(filters),
+    includeBrand: filters.includeBrand,
+  };
   const topics = useQuery({
     queryKey: ["radar-topics", projectId, topicInput],
     queryFn: () => getTopicsReport({ data: { projectId, ...topicInput } }),
@@ -100,7 +109,9 @@ export function HomePage({ projectId }: { projectId: string }) {
   const refreshBacklinks = useMutation({
     mutationFn: () => refreshDashboardBacklinkSnapshot({ data: { projectId } }),
     onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ["dashboardOverview", projectId] }),
+      queryClient.invalidateQueries({
+        queryKey: ["dashboardOverview", projectId],
+      }),
   });
 
   const plan = useMemo(() => (report ? buildActions(report) : null), [report]);
@@ -128,7 +139,8 @@ export function HomePage({ projectId }: { projectId: string }) {
   }, [nextActions, report]);
   const titles = useQuery({
     queryKey: ["radar-signals", projectId, titleUrls],
-    queryFn: () => getRadarPageSignals({ data: { projectId, urls: titleUrls } }),
+    queryFn: () =>
+      getRadarPageSignals({ data: { projectId, urls: titleUrls } }),
     enabled: titleUrls.length > 0,
     staleTime: 10 * 60_000,
   });
@@ -233,7 +245,10 @@ export function HomePage({ projectId }: { projectId: string }) {
               <Button
                 variant="outline"
                 render={
-                  <Link to="/p/$projectId/search-performance" params={{ projectId }} />
+                  <Link
+                    to="/p/$projectId/search-performance"
+                    params={{ projectId }}
+                  />
                 }
               >
                 Ir a Search Console
@@ -262,7 +277,9 @@ export function HomePage({ projectId }: { projectId: string }) {
                   {doneItems.length > 0 ? (
                     <Tabs
                       value={tasksTab}
-                      onValueChange={(value) => setTasksTab(value as typeof tasksTab)}
+                      onValueChange={(value) =>
+                        setTasksTab(value as typeof tasksTab)
+                      }
                     >
                       <TabsList>
                         <TabsTrigger value="todo">Por hacer</TabsTrigger>
@@ -307,7 +324,9 @@ export function HomePage({ projectId }: { projectId: string }) {
                                     {meta.label} ·{" "}
                                     {action.stats
                                       .slice(0, 3)
-                                      .map((stat) => `${stat.label} ${stat.value}`)
+                                      .map(
+                                        (stat) => `${stat.label} ${stat.value}`,
+                                      )
                                       .join(" · ")}
                                   </span>
                                 </span>
@@ -320,7 +339,10 @@ export function HomePage({ projectId }: { projectId: string }) {
                                       {integer.format(action.gain)}
                                     </span>
                                     <span className="block text-[11px] text-muted-foreground">
-                                      {isLoss ? "clics perdidos" : "clics posibles"} en {report.period.days} días
+                                      {isLoss
+                                        ? "clics perdidos"
+                                        : "clics posibles"}{" "}
+                                      en {report.period.days} días
                                     </span>
                                   </span>
                                 ) : null}
@@ -380,7 +402,11 @@ export function HomePage({ projectId }: { projectId: string }) {
 
             <div className="grid gap-4 lg:grid-cols-3">
               <BandsCard projectId={projectId} report={report} />
-              <TopicsCard projectId={projectId} topics={topics.data} loading={topics.isPending} />
+              <TopicsCard
+                projectId={projectId}
+                topics={topics.data}
+                loading={topics.isPending}
+              />
               <HealthCard
                 projectId={projectId}
                 backlinks={overview.data?.backlinks ?? null}
@@ -470,7 +496,12 @@ function Spark({
 
 function KpiRow({ report }: { report: Report }) {
   const { totals, prevTotals, daily } = report;
-  const cards: { label: string; value: string; delta: ReactNode; spark?: ReactNode }[] = [
+  const cards: {
+    label: string;
+    value: string;
+    delta: ReactNode;
+    spark?: ReactNode;
+  }[] = [
     {
       label: "Clics",
       value: integer.format(totals.clicks),
@@ -492,7 +523,12 @@ function KpiRow({ report }: { report: Report }) {
       label: "Posición media",
       value: decimal.format(totals.position),
       delta: (
-        <Delta now={totals.position} before={prevTotals.position} lowerIsBetter asPoints />
+        <Delta
+          now={totals.position}
+          before={prevTotals.position}
+          lowerIsBetter
+          asPoints
+        />
       ),
     },
   ];
@@ -531,26 +567,31 @@ function ChangeList({
 }) {
   return (
     <div className="space-y-1">
-      <p className={`text-xs font-semibold tracking-wide uppercase ${tone}`}>{title}</p>
+      <p className={`text-xs font-semibold tracking-wide uppercase ${tone}`}>
+        {title}
+      </p>
       {rows.length === 0 ? (
         <p className="text-sm text-muted-foreground">Sin cambios relevantes.</p>
       ) : (
         <ul className="space-y-1 text-sm">
           {rows.map((row, index) => (
-            <li key={row.key} className="flex items-baseline justify-between gap-2">
+            <li
+              key={row.key}
+              className="flex items-baseline justify-between gap-2"
+            >
               <span className="flex min-w-0 gap-1.5">
-                <span
-                  className="w-4 shrink-0 text-right text-xs font-semibold text-foreground tabular-nums"
-                >
+                <span className="w-4 shrink-0 text-right text-xs font-semibold text-foreground tabular-nums">
                   {index + 1}.
                 </span>
                 <span className="min-w-0">
-                <PageLink
-                  url={row.key}
-                  label={
-                    signals.get(row.key)?.ok ? (signals.get(row.key)?.title ?? undefined) : undefined
-                  }
-                />
+                  <PageLink
+                    url={row.key}
+                    label={
+                      signals.get(row.key)?.ok
+                        ? (signals.get(row.key)?.title ?? undefined)
+                        : undefined
+                    }
+                  />
                 </span>
               </span>
               <span className={`shrink-0 font-medium tabular-nums ${tone}`}>
@@ -581,7 +622,10 @@ function DoneList({
           >
             <span className="min-w-0 text-sm">
               <span className="block truncate font-medium">
-                {item.title ?? item.query ?? item.page ?? KIND_META[item.kind].label}
+                {item.title ??
+                  item.query ??
+                  item.page ??
+                  KIND_META[item.kind].label}
               </span>
               <span className="block text-xs text-muted-foreground">
                 {KIND_META[item.kind].label} ·{" "}
@@ -610,9 +654,18 @@ function DoneList({
 
 /** How many queries sit in each position band, now and before: the shape of
  *  the search presence, and how much of it is within reach. */
-function BandsCard({ projectId, report }: { projectId: string; report: Report }) {
+function BandsCard({
+  projectId,
+  report,
+}: {
+  projectId: string;
+  report: Report;
+}) {
   const max = Math.max(1, ...report.bands.map((band) => band.queries));
-  const reachGain = report.nearTop.reduce((sum, item) => sum + item.potentialClicks, 0);
+  const reachGain = report.nearTop.reduce(
+    (sum, item) => sum + item.potentialClicks,
+    0,
+  );
   return (
     <Card>
       <CardHeader>
@@ -642,7 +695,9 @@ function BandsCard({ projectId, report }: { projectId: string; report: Report })
                 <div className="h-1.5 overflow-hidden rounded-full bg-muted">
                   <div
                     className="h-full rounded-full bg-primary"
-                    style={{ width: `${Math.max(2, (band.queries / max) * 100)}%` }}
+                    style={{
+                      width: `${Math.max(2, (band.queries / max) * 100)}%`,
+                    }}
                   />
                 </div>
               </li>
@@ -656,8 +711,8 @@ function BandsCard({ projectId, report }: { projectId: string; report: Report })
             rel="noopener noreferrer"
             className="block rounded-md bg-muted/50 px-3 py-2 text-xs hover:bg-muted"
           >
-            <strong>{report.nearTop.length} consultas</strong> están cerca del top
-            3: subirlas valdría hasta unos{" "}
+            <strong>{report.nearTop.length} consultas</strong> están cerca del
+            top 3: subirlas valdría hasta unos{" "}
             <strong>+{integer.format(reachGain)} clics</strong>.
           </a>
         ) : null}
@@ -725,7 +780,9 @@ function TopicsCard({
                   <div className="h-1.5 overflow-hidden rounded-full bg-muted">
                     <div
                       className="h-full rounded-full bg-primary"
-                      style={{ width: `${Math.max(2, (topic.clicks / max) * 100)}%` }}
+                      style={{
+                        width: `${Math.max(2, (topic.clicks / max) * 100)}%`,
+                      }}
                     />
                   </div>
                 </li>
@@ -778,10 +835,18 @@ function HealthCard({
                     {backlinks
                       ? `${backlinks.referringDomains === null ? "—" : integer.format(backlinks.referringDomains)} dominios · ${backlinks.backlinks === null ? "—" : integer.format(backlinks.backlinks)} enlaces`
                       : "Sin datos todavía."}
-                    {backlinks ? ` · ${backlinks.stale ? "desactualizado" : "al día"}` : ""}
+                    {backlinks
+                      ? ` · ${backlinks.stale ? "desactualizado" : "al día"}`
+                      : ""}
                   </p>
                 </div>
-                <Button size="xs" variant="outline" disabled={refreshing} onClick={onRefresh} title="Cuesta unos 0,02 €">
+                <Button
+                  size="xs"
+                  variant="outline"
+                  disabled={refreshing}
+                  onClick={onRefresh}
+                  title="Cuesta unos 0,02 €"
+                >
                   <RefreshCw
                     className={`size-3 ${refreshing ? "animate-spin" : ""}`}
                     aria-hidden
@@ -800,7 +865,9 @@ function HealthCard({
               <Button
                 size="xs"
                 variant="outline"
-                render={<Link to="/p/$projectId/settings" params={{ projectId }} />}
+                render={
+                  <Link to="/p/$projectId/settings" params={{ projectId }} />
+                }
               >
                 {ga4Connected ? "Ajustes" : "Conectar"}
               </Button>
@@ -815,7 +882,9 @@ function HealthCard({
               <Button
                 size="xs"
                 variant="outline"
-                render={<Link to="/p/$projectId/indexing" params={{ projectId }} />}
+                render={
+                  <Link to="/p/$projectId/indexing" params={{ projectId }} />
+                }
               >
                 Revisar
               </Button>

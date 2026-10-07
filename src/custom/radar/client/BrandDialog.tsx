@@ -99,7 +99,9 @@ export function BrandDialog({
 
           {brand.examples.length > 0 ? (
             <div className="space-y-1">
-              <p className="font-medium">Consultas que ahora cuentan como marca</p>
+              <p className="font-medium">
+                Consultas que ahora cuentan como marca
+              </p>
               <ul className="space-y-0.5 text-muted-foreground">
                 {brand.examples.map((example) => (
                   <li key={example.query}>
@@ -152,10 +154,7 @@ export function BrandDialog({
           <Button variant="ghost" onClick={() => setOpen(false)}>
             Cancelar
           </Button>
-          <Button
-            disabled={save.isPending}
-            onClick={() => save.mutate(terms)}
-          >
+          <Button disabled={save.isPending} onClick={() => save.mutate(terms)}>
             {save.isPending ? "Guardando…" : "Guardar marca"}
           </Button>
         </DialogFooter>

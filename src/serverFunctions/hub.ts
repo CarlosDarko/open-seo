@@ -100,17 +100,25 @@ async function buildSummary(projectId: string): Promise<HubSummary> {
     });
 
   try {
-    const [daily, prevDaily, queries, prevQueries, pages, prevPages, manual, unseen] =
-      await Promise.all([
-        fetchRows(["date"], now),
-        fetchRows(["date"], prev),
-        fetchRows(["query"], now),
-        fetchRows(["query"], prev),
-        fetchRows(["page"], now),
-        fetchRows(["page"], prev),
-        getBrandTerms(projectId),
-        countUnseenEvents(projectId).catch(() => 0),
-      ]);
+    const [
+      daily,
+      prevDaily,
+      queries,
+      prevQueries,
+      pages,
+      prevPages,
+      manual,
+      unseen,
+    ] = await Promise.all([
+      fetchRows(["date"], now),
+      fetchRows(["date"], prev),
+      fetchRows(["query"], now),
+      fetchRows(["query"], prev),
+      fetchRows(["page"], now),
+      fetchRows(["page"], prev),
+      getBrandTerms(projectId),
+      countUnseenEvents(projectId).catch(() => 0),
+    ]);
 
     const tokens =
       manual.length > 0
@@ -120,7 +128,10 @@ async function buildSummary(projectId: string): Promise<HubSummary> {
     const splitPrev = splitBrandRows(prevQueries.rows, tokens);
     const withoutBrand = tokens.length > 0;
     const totals = withoutBrand
-      ? subtractTotals(sumSearchTotals(daily.rows), sumSearchTotals(splitNow.brand))
+      ? subtractTotals(
+          sumSearchTotals(daily.rows),
+          sumSearchTotals(splitNow.brand),
+        )
       : sumSearchTotals(daily.rows);
     const prevTotals = withoutBrand
       ? subtractTotals(

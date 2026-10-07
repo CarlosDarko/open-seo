@@ -58,7 +58,12 @@ export type Action = {
   /** Your strongest other pages: where to add an internal link from. */
   linkSources: string[];
   /** Competing pages, owner first (cannibalization only). */
-  pages: { page: string; clicks: number; impressions: number; position: number }[];
+  pages: {
+    page: string;
+    clicks: number;
+    impressions: number;
+    position: number;
+  }[];
 };
 
 export type ActionPlan = {
@@ -310,7 +315,9 @@ export function buildActions(report: RadarReport): ActionPlan {
       { label: "Impresiones", value: integer.format(item.impressions) },
       { label: "Clics", value: integer.format(item.clicks) },
     ],
-    gain: Math.max(0, Math.round(item.impressions * topThree - item.clicks)) || null,
+    gain:
+      Math.max(0, Math.round(item.impressions * topThree - item.clicks)) ||
+      null,
     effort: "bajo",
     page: item.page,
     query: item.query,

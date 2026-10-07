@@ -157,7 +157,8 @@ export async function collectSitemapUrls(
         urls.add(page);
       }
       if (depth < MAX_DEPTH) {
-        for (const child of parsed.sitemaps) next.push({ url: child, depth: depth + 1 });
+        for (const child of parsed.sitemaps)
+          next.push({ url: child, depth: depth + 1 });
       }
     }
     level = next;

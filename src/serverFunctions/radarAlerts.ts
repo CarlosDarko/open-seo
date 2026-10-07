@@ -1,10 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
-import {
-  isSafeWebhookUrl,
-  isValidEmail,
-} from "@/custom/radar/alertMessages";
+import { isSafeWebhookUrl, isValidEmail } from "@/custom/radar/alertMessages";
 import {
   CONDITIONS,
   DEVICES,
@@ -100,11 +97,17 @@ export const saveAlertRule = createServerFn({ method: "POST" })
   .validator(ruleInputSchema)
   .handler(async ({ data, context }) => {
     if (!isValidCombination(data.metric, data.condition)) {
-      throw new AppError("VALIDATION_ERROR", "Esa condición no se puede usar con esa métrica.");
+      throw new AppError(
+        "VALIDATION_ERROR",
+        "Esa condición no se puede usar con esa métrica.",
+      );
     }
     const needsTarget = SCOPES_WITH_TARGET.includes(data.scope);
     if (needsTarget && !data.target) {
-      throw new AppError("VALIDATION_ERROR", "Indica a qué se aplica la regla.");
+      throw new AppError(
+        "VALIDATION_ERROR",
+        "Indica a qué se aplica la regla.",
+      );
     }
     if (
       data.scope === "device" &&
@@ -126,7 +129,8 @@ export const saveAlertRule = createServerFn({ method: "POST" })
       enabled: 1,
       created_at: new Date().toISOString(),
       created_by: context.userEmail,
-      filters_json: data.filters.length > 0 ? JSON.stringify(data.filters) : null,
+      filters_json:
+        data.filters.length > 0 ? JSON.stringify(data.filters) : null,
       notify_json:
         data.notify.emails.length + data.notify.webhooks.length > 0
           ? JSON.stringify(data.notify)
@@ -205,7 +209,10 @@ export const runAlertsNow = createServerFn({ method: "POST" })
     const rules = (await listRules(context.projectId))
       .filter((row) => row.enabled === 1)
       .map(ruleFromRow);
-    const { results, created } = await evaluateAndStore(context.projectId, rules);
+    const { results, created } = await evaluateAndStore(
+      context.projectId,
+      rules,
+    );
     return { checked: rules.length, triggered: results.length, created };
   });
 
@@ -257,7 +264,10 @@ export const sendAlertTest = createServerFn({ method: "POST" })
     await remember();
     const connection = await GscService.getConnection(context.projectId);
     const site = connection
-      ? connection.siteUrl.replace(/^sc-domain:/, "").replace(/^https?:\/\//, "").replace(/\/$/, "")
+      ? connection.siteUrl
+          .replace(/^sc-domain:/, "")
+          .replace(/^https?:\/\//, "")
+          .replace(/\/$/, "")
       : null;
     return {
       results: await sendTestNotification({

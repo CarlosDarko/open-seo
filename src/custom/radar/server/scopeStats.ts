@@ -1,10 +1,7 @@
 import { GscService } from "@/server/features/gsc/services/GscService";
 import type { GscPerformanceFilter } from "@/server/features/gsc/searchAnalytics";
 import { canonicalPageKey } from "@/custom/radar/radarAnalysis";
-import {
-  statsFromRows,
-  type WindowStats,
-} from "@/custom/radar/trackingImpact";
+import { statsFromRows, type WindowStats } from "@/custom/radar/trackingImpact";
 
 export type Scope = { page: string | null; query: string | null };
 export type Window = { start: string; end: string; days: number };
@@ -53,7 +50,9 @@ export async function fetchScopeStats(
   });
   const wanted = scope.page ? canonicalPageKey(scope.page) : null;
   const rows = wanted
-    ? result.rows.filter((row) => canonicalPageKey(row.keys?.[1] ?? "") === wanted)
+    ? result.rows.filter(
+        (row) => canonicalPageKey(row.keys?.[1] ?? "") === wanted,
+      )
     : result.rows;
   return statsFromRows(rows, window.days);
 }

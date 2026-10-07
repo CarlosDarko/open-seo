@@ -70,7 +70,14 @@ export function useSortedDomainKeywordsQuery(input: KeywordsInput) {
             fetchedAt: "",
           }
         : query.data,
-    [snapshot, query.data, input.domain, input.pageSize, input.sortMode, input.sortOrder],
+    [
+      snapshot,
+      query.data,
+      input.domain,
+      input.pageSize,
+      input.sortMode,
+      input.sortOrder,
+    ],
   );
 
   return {
@@ -121,7 +128,14 @@ export function useSortedDomainPagesQuery(input: PagesInput) {
             fetchedAt: "",
           }
         : query.data,
-    [snapshot, query.data, input.domain, input.pageSize, input.sortMode, input.sortOrder],
+    [
+      snapshot,
+      query.data,
+      input.domain,
+      input.pageSize,
+      input.sortMode,
+      input.sortOrder,
+    ],
   );
 
   return {

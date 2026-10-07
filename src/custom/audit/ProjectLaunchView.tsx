@@ -14,7 +14,8 @@ type Props = Parameters<typeof LaunchView>[0];
 export function ProjectLaunchView(props: Props) {
   const activation = useQuery({
     queryKey: ["dashboardActivation", props.projectId],
-    queryFn: () => getDashboardActivation({ data: { projectId: props.projectId } }),
+    queryFn: () =>
+      getDashboardActivation({ data: { projectId: props.projectId } }),
     staleTime: 5 * 60_000,
   });
 

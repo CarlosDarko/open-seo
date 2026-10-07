@@ -4,7 +4,12 @@ import { useQuery } from "@tanstack/react-query";
 import { PageHeader } from "@/client/components/PageHeader";
 import { QueryError } from "@/client/components/QueryState";
 import { Button } from "@/client/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/client/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/client/components/ui/card";
 import { Checkbox } from "@/client/components/ui/checkbox";
 import { Skeleton } from "@/client/components/ui/skeleton";
 import {
@@ -31,17 +36,22 @@ const COVERAGE_ES: Record<string, string> = {
   "Submitted and indexed": "Enviada e indexada",
   "Indexed, not submitted in sitemap": "Indexada, pero no está en el sitemap",
   "Crawled - currently not indexed": "Rastreada, pero Google no la indexa",
-  "Discovered - currently not indexed": "Descubierta, pero sin rastrear ni indexar",
-  "Duplicate without user-selected canonical": "Duplicada: no has elegido canónica",
-  "Duplicate, Google chose different canonical than user": "Duplicada: Google eligió otra canónica",
-  "Duplicate, submitted URL not selected as canonical": "Duplicada: Google prefiere otra URL",
+  "Discovered - currently not indexed":
+    "Descubierta, pero sin rastrear ni indexar",
+  "Duplicate without user-selected canonical":
+    "Duplicada: no has elegido canónica",
+  "Duplicate, Google chose different canonical than user":
+    "Duplicada: Google eligió otra canónica",
+  "Duplicate, submitted URL not selected as canonical":
+    "Duplicada: Google prefiere otra URL",
   "Page with redirect": "Redirección",
   "Not found (404)": "No encontrada (404)",
   "Soft 404": "Soft 404 (parece vacía)",
   "Blocked by robots.txt": "Bloqueada por robots.txt",
   "Excluded by 'noindex' tag": "Excluida por etiqueta noindex",
   "URL is unknown to Google": "Google no la conoce",
-  "Alternate page with proper canonical tag": "Alternativa con canónica correcta",
+  "Alternate page with proper canonical tag":
+    "Alternativa con canónica correcta",
   "Server error (5xx)": "Error de servidor (5xx)",
 };
 
@@ -52,7 +62,10 @@ function coverageText(state: string | null): string {
 
 const VERDICT: Record<string, { label: string; className: string }> = {
   PASS: { label: "Indexada", className: "bg-success/10 text-success" },
-  FAIL: { label: "No indexada", className: "bg-destructive/10 text-destructive" },
+  FAIL: {
+    label: "No indexada",
+    className: "bg-destructive/10 text-destructive",
+  },
   NEUTRAL: { label: "Excluida", className: "bg-warning/10 text-warning" },
   PARTIAL: { label: "Parcial", className: "bg-warning/10 text-warning" },
 };
@@ -77,11 +90,16 @@ export function IndexingPage({ projectId }: { projectId: string }) {
     staleTime: 10 * 60_000,
   });
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [inspected, setInspected] = useState<Map<string, InspectedUrl>>(new Map());
+  const [inspected, setInspected] = useState<Map<string, InspectedUrl>>(
+    new Map(),
+  );
 
   // Google answers one URL at a time; they are sent in small batches so the
   // results appear as they arrive and the progress is visible.
-  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const [progress, setProgress] = useState<{
+    done: number;
+    total: number;
+  } | null>(null);
   const [inspectFailed, setInspectFailed] = useState(false);
   const inspecting = progress !== null;
   const runInspect = async (urls: string[]) => {
@@ -98,7 +116,10 @@ export function IndexingPage({ projectId }: { projectId: string }) {
           for (const item of data.results) next.set(item.url, item);
           return next;
         });
-        setProgress({ done: Math.min(start + BATCH, list.length), total: list.length });
+        setProgress({
+          done: Math.min(start + BATCH, list.length),
+          total: list.length,
+        });
       }
     } catch {
       setInspectFailed(true);
@@ -113,7 +134,8 @@ export function IndexingPage({ projectId }: { projectId: string }) {
   const data = report.data?.connected ? report.data : null;
   const unseen = data?.unseen ?? [];
   const selectedUrls = useMemo(
-    () => unseen.filter((item) => selected.has(item.url)).map((item) => item.url),
+    () =>
+      unseen.filter((item) => selected.has(item.url)).map((item) => item.url),
     [unseen, selected],
   );
 
@@ -159,7 +181,10 @@ export function IndexingPage({ projectId }: { projectId: string }) {
             <Button
               variant="outline"
               render={
-                <Link to="/p/$projectId/search-performance" params={{ projectId }} />
+                <Link
+                  to="/p/$projectId/search-performance"
+                  params={{ projectId }}
+                />
               }
             >
               Ir a Search Console
@@ -171,7 +196,10 @@ export function IndexingPage({ projectId }: { projectId: string }) {
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {[
               { label: "URLs en el sitemap", value: data.counts.inSitemap },
-              { label: "Páginas con impresiones (3 meses)", value: data.counts.pagesWithImpressions },
+              {
+                label: "Páginas con impresiones (3 meses)",
+                value: data.counts.pagesWithImpressions,
+              },
               {
                 label: "En el sitemap sin ninguna impresión",
                 value: data.counts.unseen,
@@ -180,7 +208,10 @@ export function IndexingPage({ projectId }: { projectId: string }) {
                     ? `${percent.format(data.counts.unseen / data.counts.inSitemap)} del sitemap`
                     : undefined,
               },
-              { label: "Con impresiones pero fuera del sitemap", value: data.counts.notInSitemap },
+              {
+                label: "Con impresiones pero fuera del sitemap",
+                value: data.counts.notInSitemap,
+              },
             ].map((card) => (
               <Card key={card.label}>
                 <CardContent className="space-y-1">
@@ -201,7 +232,9 @@ export function IndexingPage({ projectId }: { projectId: string }) {
           {data.counts.inSitemap === 0 ? (
             <Card>
               <CardContent className="space-y-1 py-6 text-sm">
-                <p className="font-medium">No he encontrado URLs en tu sitemap.</p>
+                <p className="font-medium">
+                  No he encontrado URLs en tu sitemap.
+                </p>
                 <p className="text-muted-foreground">
                   Si no tienes sitemap, créalo y envíalo en Search Console
                   (Sitemaps): ayuda a Google a descubrir tus páginas. Si lo
@@ -218,8 +251,8 @@ export function IndexingPage({ projectId }: { projectId: string }) {
 
           {data.read.truncated ? (
             <p className="text-xs text-muted-foreground">
-              El sitemap es muy grande: se han leído {data.read.files} archivos y
-              como máximo 5.000 URLs.
+              El sitemap es muy grande: se han leído {data.read.files} archivos
+              y como máximo 5.000 URLs.
             </p>
           ) : null}
 
@@ -243,7 +276,10 @@ export function IndexingPage({ projectId }: { projectId: string }) {
               <TableBody>
                 {data.sitemaps.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="py-6 text-center text-muted-foreground">
+                    <TableCell
+                      colSpan={5}
+                      className="py-6 text-center text-muted-foreground"
+                    >
                       No hay ningún sitemap enviado en Search Console. Envíalo
                       en «Sitemaps» para que Google lo lea con regularidad.
                     </TableCell>
@@ -254,7 +290,9 @@ export function IndexingPage({ projectId }: { projectId: string }) {
                     <TableCell className="min-w-64">
                       <PageLink url={sitemap.path} />
                       {sitemap.isIndex ? (
-                        <span className="ml-1 text-xs text-muted-foreground">(índice)</span>
+                        <span className="ml-1 text-xs text-muted-foreground">
+                          (índice)
+                        </span>
                       ) : null}
                     </TableCell>
                     <TableCell className="text-right whitespace-nowrap tabular-nums">
@@ -284,9 +322,9 @@ export function IndexingPage({ projectId }: { projectId: string }) {
               <div className="border-b border-border p-4">
                 <h3 className="font-medium">Dónde está el problema</h3>
                 <p className="text-xs text-muted-foreground">
-                  Las secciones de tu sitemap con más URLs que Google no
-                  muestra nunca. Un porcentaje alto en una sección apunta a
-                  contenido ignorado o sin indexar.
+                  Las secciones de tu sitemap con más URLs que Google no muestra
+                  nunca. Un porcentaje alto en una sección apunta a contenido
+                  ignorado o sin indexar.
                 </p>
               </div>
               <Table>
@@ -294,7 +332,9 @@ export function IndexingPage({ projectId }: { projectId: string }) {
                   <TableRow>
                     <TableHead>Sección</TableHead>
                     <TableHead className="text-right">En el sitemap</TableHead>
-                    <TableHead className="text-right">Sin impresiones</TableHead>
+                    <TableHead className="text-right">
+                      Sin impresiones
+                    </TableHead>
                     <TableHead className="text-right">Porcentaje</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -335,7 +375,9 @@ export function IndexingPage({ projectId }: { projectId: string }) {
                 disabled={inspecting || data.topPages.length === 0}
                 onClick={() => void runInspect(data.topPages)}
               >
-                {inspecting ? progressText : "Comprobar mis páginas principales"}
+                {inspecting
+                  ? progressText
+                  : "Comprobar mis páginas principales"}
               </Button>
               {inspectFailed ? (
                 <p className="mt-2 text-sm text-destructive">
@@ -359,8 +401,8 @@ export function IndexingPage({ projectId }: { projectId: string }) {
                   </h3>
                   <p className="text-xs text-muted-foreground">
                     Candidatas a no estar indexadas o a ser ignoradas por
-                    Google. Marca hasta {MAX_INSPECT} y comprueba qué dice Google
-                    de cada una.
+                    Google. Marca hasta {MAX_INSPECT} y comprueba qué dice
+                    Google de cada una.
                   </p>
                 </div>
                 <Button
@@ -418,7 +460,9 @@ export function IndexingPage({ projectId }: { projectId: string }) {
           {data.notInSitemap.length > 0 ? (
             <TableCard>
               <div className="border-b border-border p-4">
-                <h3 className="font-medium">Con impresiones pero fuera del sitemap</h3>
+                <h3 className="font-medium">
+                  Con impresiones pero fuera del sitemap
+                </h3>
                 <p className="text-xs text-muted-foreground">
                   Páginas que Google ya muestra y que no declaras. Si son
                   páginas que quieres posicionar, añádelas al sitemap; si son
@@ -504,12 +548,14 @@ function InspectionTable({ results }: { results: InspectedUrl[] }) {
                   ) : null}
                   {item.canonicalMismatch ? (
                     <p className="text-xs text-warning">
-                      Canónica distinta. Tú declaras {item.userCanonical}; Google
-                      eligió {item.googleCanonical}.
+                      Canónica distinta. Tú declaras {item.userCanonical};
+                      Google eligió {item.googleCanonical}.
                     </p>
                   ) : null}
                   {item.robotsTxtState === "DISALLOWED" ? (
-                    <p className="text-xs text-destructive">Bloqueada por robots.txt.</p>
+                    <p className="text-xs text-destructive">
+                      Bloqueada por robots.txt.
+                    </p>
                   ) : null}
                 </TableCell>
                 <TableCell className="text-right align-top whitespace-nowrap tabular-nums">

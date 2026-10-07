@@ -26,10 +26,7 @@ import { pathOf } from "@/custom/radar/format";
 import { getBrandTerms } from "@/custom/radar/server/brandSettings";
 import { sendAlertNotifications } from "@/custom/radar/server/notify";
 import { insertEvent, type RuleRow } from "@/custom/radar/server/radarDb";
-import {
-  fetchScopeStats,
-  type Window,
-} from "@/custom/radar/server/scopeStats";
+import { fetchScopeStats, type Window } from "@/custom/radar/server/scopeStats";
 import type { WindowStats } from "@/custom/radar/trackingImpact";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -51,7 +48,11 @@ export function alertWindows(windowDays: number, today: Date = new Date()) {
   const prevStart = prevEnd - (windowDays - 1) * DAY_MS;
   return {
     current: { start: iso(start), end: iso(end), days: windowDays } as Window,
-    previous: { start: iso(prevStart), end: iso(prevEnd), days: windowDays } as Window,
+    previous: {
+      start: iso(prevStart),
+      end: iso(prevEnd),
+      days: windowDays,
+    } as Window,
   };
 }
 
@@ -104,7 +105,9 @@ function parseNotify(json: string | null): Notify {
         ? raw.emails.filter((item): item is string => typeof item === "string")
         : [],
       webhooks: Array.isArray(raw.webhooks)
-        ? raw.webhooks.filter((item): item is string => typeof item === "string")
+        ? raw.webhooks.filter(
+            (item): item is string => typeof item === "string",
+          )
         : [],
     };
   } catch {
@@ -175,7 +178,10 @@ async function listItems(
   const nowMap = new Map(now.map((row) => [keyOf(row), row]));
   const beforeMap = new Map(before.map((row) => [keyOf(row), row]));
   const top = (rows: GscSearchAnalyticsRow[]) =>
-    [...rows].sort((a, b) => b.clicks - a.clicks).slice(0, limit).map(keyOf);
+    [...rows]
+      .sort((a, b) => b.clicks - a.clicks)
+      .slice(0, limit)
+      .map(keyOf);
   const keys = new Set([...top(before), ...top(now)]);
   return [...keys].map((key) => {
     const row = nowMap.get(key) ?? beforeMap.get(key);
@@ -213,7 +219,8 @@ async function brandItems(
     const brand = sumSearchTotals(
       queries.filter((row) => isBrandQuery(row.keys?.[0] ?? "", tokens)),
     );
-    const part = rule.scope === "site_brand" ? brand : subtractTotals(total, brand);
+    const part =
+      rule.scope === "site_brand" ? brand : subtractTotals(total, brand);
     return valuesOfRow(part);
   };
   const [current, previous] = await Promise.all([
@@ -255,7 +262,11 @@ async function itemsFor(
       ]);
     case "country":
       return single(target.toUpperCase(), [
-        { dimension: "country", operator: "equals", expression: target.toLowerCase() },
+        {
+          dimension: "country",
+          operator: "equals",
+          expression: target.toLowerCase(),
+        },
       ]);
     case "site_brand":
     case "site_nonbrand":
@@ -339,9 +350,13 @@ export async function evaluateAndStore(
 ): Promise<{ results: RuleResult[]; created: number }> {
   const results = await evaluateRules(projectId, rules);
   const now = new Date();
-  const connection = results.length > 0 ? await GscService.getConnection(projectId) : null;
+  const connection =
+    results.length > 0 ? await GscService.getConnection(projectId) : null;
   const site = connection
-    ? connection.siteUrl.replace(/^sc-domain:/, "").replace(/^https?:\/\//, "").replace(/\/$/, "")
+    ? connection.siteUrl
+        .replace(/^sc-domain:/, "")
+        .replace(/^https?:\/\//, "")
+        .replace(/\/$/, "")
     : null;
   let created = 0;
   for (const result of results) {
@@ -353,7 +368,10 @@ export async function evaluateAndStore(
       day: iso(now.getTime()),
       created_at: now.toISOString(),
       summary: result.summary,
-      details_json: JSON.stringify({ window: result.window, hits: result.hits }),
+      details_json: JSON.stringify({
+        window: result.window,
+        hits: result.hits,
+      }),
       seen: 0,
     });
     if (!inserted) continue;
@@ -367,7 +385,12 @@ export async function evaluateAndStore(
         site,
       });
       for (const item of sent) {
-        if (!item.ok) console.error("[radar-alerts] notify failed", item.channel, item.error);
+        if (!item.ok)
+          console.error(
+            "[radar-alerts] notify failed",
+            item.channel,
+            item.error,
+          );
       }
     } catch (error) {
       console.error("[radar-alerts] notifications failed", error);

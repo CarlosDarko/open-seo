@@ -76,7 +76,11 @@ export function periodInput(filters: RadarFilters) {
   const custom =
     filters.range === "custom" && filters.startDate && filters.endDate;
   return {
-    range: custom ? ("custom" as const) : filters.range === "custom" ? "last_28_days" as const : filters.range,
+    range: custom
+      ? ("custom" as const)
+      : filters.range === "custom"
+        ? ("last_28_days" as const)
+        : filters.range,
     ...(custom
       ? { startDate: filters.startDate, endDate: filters.endDate }
       : {}),

@@ -104,7 +104,11 @@ export function HubPage() {
               <Wallet className="size-4" aria-hidden />
               Costes
             </Button>
-            <Button size="sm" variant="outline" render={<Link to="/settings" />}>
+            <Button
+              size="sm"
+              variant="outline"
+              render={<Link to="/settings" />}
+            >
               <Settings className="size-4" aria-hidden />
               Ajustes
             </Button>
@@ -233,7 +237,10 @@ function SummaryBody({
 }: {
   summary: Extract<HubSummary, { status: "ok" }>;
 }) {
-  const totalQueries = summary.bands.reduce((sum, band) => sum + band.queries, 0);
+  const totalQueries = summary.bands.reduce(
+    (sum, band) => sum + band.queries,
+    0,
+  );
   return (
     <>
       <div className="grid grid-cols-3 gap-2">
@@ -264,7 +271,11 @@ function SummaryBody({
                   : "text-muted-foreground"
             }`}
           >
-            {summary.position < summary.prevPosition ? "▲" : summary.position > summary.prevPosition ? "▼" : "="}{" "}
+            {summary.position < summary.prevPosition
+              ? "▲"
+              : summary.position > summary.prevPosition
+                ? "▼"
+                : "="}{" "}
             {decimal.format(Math.abs(summary.position - summary.prevPosition))}
           </p>
         </div>
@@ -341,11 +352,7 @@ function SummaryBody({
 
       <ul className="space-y-1.5 border-t border-border pt-3 text-sm">
         {summary.riser ? (
-          <Insight
-            up
-            url={summary.riser.url}
-            delta={summary.riser.delta}
-          />
+          <Insight up url={summary.riser.url} delta={summary.riser.delta} />
         ) : null}
         {summary.faller ? (
           <Insight url={summary.faller.url} delta={summary.faller.delta} />

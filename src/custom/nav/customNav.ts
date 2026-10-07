@@ -4,7 +4,9 @@
 // here lands in the collapsed "More tools" group instead of being lost.
 import { getProjectNavGroups } from "@/client/navigation/items";
 
-type UpstreamItem = ReturnType<typeof getProjectNavGroups>[number]["items"][number];
+type UpstreamItem = ReturnType<
+  typeof getProjectNavGroups
+>[number]["items"][number];
 
 export type CustomNavGroup = {
   label: string;

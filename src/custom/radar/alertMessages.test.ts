@@ -39,9 +39,15 @@ describe("buildAlertMessage", () => {
 
 describe("webhookBody", () => {
   it("uses the field each service expects", () => {
-    expect(webhookBody("https://hooks.slack.com/services/T/B/x", message)).toHaveProperty("text");
-    expect(webhookBody("https://discord.com/api/webhooks/1/x", message)).toHaveProperty("content");
-    expect(webhookBody("https://example.com/hook", message)).toHaveProperty("subject");
+    expect(
+      webhookBody("https://hooks.slack.com/services/T/B/x", message),
+    ).toHaveProperty("text");
+    expect(
+      webhookBody("https://discord.com/api/webhooks/1/x", message),
+    ).toHaveProperty("content");
+    expect(webhookBody("https://example.com/hook", message)).toHaveProperty(
+      "subject",
+    );
   });
 });
 

@@ -45,7 +45,9 @@ export const getIndexReport = createServerFn({ method: "POST" })
         userId: connection.connectedByUserId,
         accountId: connection.gscAccountId ?? undefined,
       }).catch(() => []);
-      const roots = sitemaps.filter((item) => !item.pending).map((item) => item.path);
+      const roots = sitemaps
+        .filter((item) => !item.pending)
+        .map((item) => item.path);
 
       const pageRows = [];
       for (let request = 0; request < MAX_PAGE_REQUESTS; request += 1) {
@@ -217,11 +219,15 @@ export const inspectIndexUrls = createServerFn({ method: "POST" })
     const results = new Map<string, InspectedUrl>();
     const missing: string[] = [];
     for (const url of data.urls) {
-      const kept = await env.KV.get(inspectCacheKey(context.projectId, url)).catch(
-        () => null,
-      );
+      const kept = await env.KV.get(
+        inspectCacheKey(context.projectId, url),
+      ).catch(() => null);
       if (kept) {
-        results.set(url, { ...(JSON.parse(kept) as InspectedUrl), url, cached: true });
+        results.set(url, {
+          ...(JSON.parse(kept) as InspectedUrl),
+          url,
+          cached: true,
+        });
       } else {
         missing.push(url);
       }

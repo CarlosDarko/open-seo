@@ -86,10 +86,48 @@ const OTHER_PAGES = "Otras páginas";
 // (/es/, /fr/…). Matching a known list avoids mistaking "/us/" or "/me/" for
 // a language.
 const LANGUAGES = new Set([
-  "es", "en", "fr", "de", "it", "pt", "ca", "eu", "gl", "nl", "pl", "ru", "tr",
-  "ar", "zh", "ja", "ko", "sv", "da", "no", "nb", "fi", "cs", "el", "he", "hi",
-  "id", "ro", "hu", "uk", "bg", "hr", "sk", "sl", "sr", "lt", "lv", "et", "vi",
-  "th", "ms", "fa",
+  "es",
+  "en",
+  "fr",
+  "de",
+  "it",
+  "pt",
+  "ca",
+  "eu",
+  "gl",
+  "nl",
+  "pl",
+  "ru",
+  "tr",
+  "ar",
+  "zh",
+  "ja",
+  "ko",
+  "sv",
+  "da",
+  "no",
+  "nb",
+  "fi",
+  "cs",
+  "el",
+  "he",
+  "hi",
+  "id",
+  "ro",
+  "hu",
+  "uk",
+  "bg",
+  "hr",
+  "sk",
+  "sl",
+  "sr",
+  "lt",
+  "lv",
+  "et",
+  "vi",
+  "th",
+  "ms",
+  "fa",
 ]);
 
 /** The language folder of a URL path ("es", "pt-br"), if it starts with one. */
@@ -130,17 +168,87 @@ export function languageClassifier(urls: string[]): {
 /** Folders that mean the same thing in different languages
  *  (/services/, /servicios/, /tjenester/...): they are one page type. */
 const FOLDER_GROUPS: string[][] = [
-  ["servicios", "servicio", "services", "service", "tjenester", "dienstleistungen", "dienstleistung", "leistungen", "diensten", "dienste", "servicos", "servizi", "tjanster"],
-  ["productos", "producto", "products", "product", "produkte", "producten", "produits", "prodotti", "produtos"],
+  [
+    "servicios",
+    "servicio",
+    "services",
+    "service",
+    "tjenester",
+    "dienstleistungen",
+    "dienstleistung",
+    "leistungen",
+    "diensten",
+    "dienste",
+    "servicos",
+    "servizi",
+    "tjanster",
+  ],
+  [
+    "productos",
+    "producto",
+    "products",
+    "product",
+    "produkte",
+    "producten",
+    "produits",
+    "prodotti",
+    "produtos",
+  ],
   ["contacto", "contact", "kontakt", "contatto", "contato"],
-  ["sobre-nosotros", "nosotros", "about", "about-us", "over-ons", "uber-uns", "ueber-uns", "om-oss", "a-propos", "chi-siamo", "sobre-nos"],
-  ["categorias", "categoria", "category", "categories", "categorie", "kategorie", "kategorien", "categorias-de-producto"],
+  [
+    "sobre-nosotros",
+    "nosotros",
+    "about",
+    "about-us",
+    "over-ons",
+    "uber-uns",
+    "ueber-uns",
+    "om-oss",
+    "a-propos",
+    "chi-siamo",
+    "sobre-nos",
+  ],
+  [
+    "categorias",
+    "categoria",
+    "category",
+    "categories",
+    "categorie",
+    "kategorie",
+    "kategorien",
+    "categorias-de-producto",
+  ],
   ["tienda", "shop", "store", "winkel", "laden", "boutique", "negozio", "loja"],
-  ["precios", "tarifas", "pricing", "prices", "preise", "prijzen", "tarifs", "prezzi"],
-  ["casos", "casos-de-exito", "casos-de-estudio", "cases", "case-studies", "fallstudien", "referenties"],
+  [
+    "precios",
+    "tarifas",
+    "pricing",
+    "prices",
+    "preise",
+    "prijzen",
+    "tarifs",
+    "prezzi",
+  ],
+  [
+    "casos",
+    "casos-de-exito",
+    "casos-de-estudio",
+    "cases",
+    "case-studies",
+    "fallstudien",
+    "referenties",
+  ],
   ["recursos", "resources", "ressourcen", "ressources", "risorse"],
   ["noticias", "news", "nieuws", "nachrichten", "actualites", "notizie"],
-  ["empleo", "ofertas-empleo", "jobs", "careers", "vacatures", "stellenangebote", "karriere"],
+  [
+    "empleo",
+    "ofertas-empleo",
+    "jobs",
+    "careers",
+    "vacatures",
+    "stellenangebote",
+    "karriere",
+  ],
 ];
 
 const GROUP_OF = new Map<string, number>(
@@ -220,11 +328,7 @@ export function pageTypeClassifier(urls: string[]): (url: string) => string {
 // --------------------------------------------------------------- intent
 
 function plain(text: string): string {
-  return text
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .toLowerCase()
-    .trim();
+  return text.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
 }
 
 const QUESTION_START =
@@ -243,28 +347,66 @@ export function isQuestionQuery(query: string): boolean {
 
 /** What the searcher is after, from the wording of the query. */
 const CONTENT_FOLDERS = new Set([
-  "blog", "noticias", "news", "articulos", "articles", "guia", "guias", "guides",
-  "recursos", "resources", "wiki", "faq", "preguntas", "ayuda", "help", "aprende",
-  "learn", "actualidad", "consejos", "tips",
+  "blog",
+  "noticias",
+  "news",
+  "articulos",
+  "articles",
+  "guia",
+  "guias",
+  "guides",
+  "recursos",
+  "resources",
+  "wiki",
+  "faq",
+  "preguntas",
+  "ayuda",
+  "help",
+  "aprende",
+  "learn",
+  "actualidad",
+  "consejos",
+  "tips",
 ]);
 const SERVICE_FOLDERS = new Set([
-  "servicios", "servicio", "services", "service", "productos", "producto",
-  "products", "product", "tienda", "shop", "store", "comprar", "precios",
-  "tarifas", "contacto", "contact", "presupuesto", "reservar", "booking",
-  "catalogo", "catalog",
+  "servicios",
+  "servicio",
+  "services",
+  "service",
+  "productos",
+  "producto",
+  "products",
+  "product",
+  "tienda",
+  "shop",
+  "store",
+  "comprar",
+  "precios",
+  "tarifas",
+  "contacto",
+  "contact",
+  "presupuesto",
+  "reservar",
+  "booking",
+  "catalogo",
+  "catalog",
 ]);
 
 /** What kind of page a query lands on, from the first folder of its URL
  *  ("content", "service") or null when the folder says nothing. Used to place
  *  queries that carry no intent words of their own. */
-export function pageKindOf(url: string | null | undefined): "content" | "service" | null {
+export function pageKindOf(
+  url: string | null | undefined,
+): "content" | "service" | null {
   if (!url) return null;
   const parts = withoutLanguage(pathParts(url));
   const folder = parts[0]?.toLowerCase().split("-")[0];
   if (!folder || parts.length < 2) return null;
   const whole = parts[0].toLowerCase();
-  if (CONTENT_FOLDERS.has(whole) || CONTENT_FOLDERS.has(folder)) return "content";
-  if (SERVICE_FOLDERS.has(whole) || SERVICE_FOLDERS.has(folder)) return "service";
+  if (CONTENT_FOLDERS.has(whole) || CONTENT_FOLDERS.has(folder))
+    return "content";
+  if (SERVICE_FOLDERS.has(whole) || SERVICE_FOLDERS.has(folder))
+    return "service";
   return null;
 }
 
@@ -278,7 +420,11 @@ export function queryIntent(
   if (TRANSACTIONAL.test(text)) return "Quieren comprar o contratar";
   if (COMPARISON.test(text)) return "Comparan opciones";
   if (LOCAL.test(text)) return "Búsqueda local";
-  if (QUESTION_START.test(text) || INFORMATIONAL.test(text) || text.includes("?")) {
+  if (
+    QUESTION_START.test(text) ||
+    INFORMATIONAL.test(text) ||
+    text.includes("?")
+  ) {
     return "Quieren informarse";
   }
   // No intent words in the query: the page it lands on is the best clue.

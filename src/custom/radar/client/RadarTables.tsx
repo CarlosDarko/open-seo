@@ -10,10 +10,7 @@ import {
 } from "@/client/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/client/components/ui/tabs";
 import type { RadarReport } from "@/custom/radar/actions";
-import {
-  GoogleLink,
-  PageLink,
-} from "@/custom/radar/client/RadarLinks";
+import { GoogleLink, PageLink } from "@/custom/radar/client/RadarLinks";
 import {
   decimal,
   integer,
@@ -76,11 +73,22 @@ export function RadarTables({ report }: { report: RadarReport }) {
             title="Casi en el top 3"
             help="Consultas entre las posiciones 4 y 20. «Clics extra» es lo que ganarías si la página llegara a la posición 3 con el CTR habitual de tu sitio."
             empty="No hay consultas con potencial claro en este periodo."
-            head={["Consulta", "Página", "Posición", "Impresiones", "Clics extra"]}
+            head={[
+              "Consulta",
+              "Página",
+              "Posición",
+              "Impresiones",
+              "Clics extra",
+            ]}
             rows={report.nearTop.map((row) => ({
               key: `${row.query}|${row.page}`,
               cells: [
-                <GoogleLink key="q" query={row.query} label={row.query} subtle />,
+                <GoogleLink
+                  key="q"
+                  query={row.query}
+                  label={row.query}
+                  subtle
+                />,
                 <PageLink key="p" url={row.page} />,
                 decimal.format(row.position),
                 integer.format(row.impressions),
@@ -92,11 +100,22 @@ export function RadarTables({ report }: { report: RadarReport }) {
             title="CTR bajo para su posición"
             help="Consultas de primera página con menos de la mitad de los clics que tu sitio suele conseguir en esa posición."
             empty="No hay consultas con CTR claramente bajo en este periodo."
-            head={["Consulta", "Página", "Posición", "CTR (habitual)", "Clics extra"]}
+            head={[
+              "Consulta",
+              "Página",
+              "Posición",
+              "CTR (habitual)",
+              "Clics extra",
+            ]}
             rows={report.ctrOpportunities.map((row) => ({
               key: row.query,
               cells: [
-                <GoogleLink key="q" query={row.query} label={row.query} subtle />,
+                <GoogleLink
+                  key="q"
+                  query={row.query}
+                  label={row.query}
+                  subtle
+                />,
                 row.page ? <PageLink key="p" url={row.page} /> : "—",
                 decimal.format(row.position),
                 `${percent.format(row.ctr)} (${percent.format(row.expectedCtr)})`,
@@ -196,7 +215,9 @@ function PageChangeTable({
           `${integer.format(row.clicks)} (${integer.format(row.prevClicks)})`,
           <span
             key="d"
-            className={row.clicksDelta > 0 ? "text-success" : "text-destructive"}
+            className={
+              row.clicksDelta > 0 ? "text-success" : "text-destructive"
+            }
           >
             {signed(row.clicksDelta)}
           </span>,
@@ -239,7 +260,9 @@ function QueryChangeTable({
           `${integer.format(row.clicks)} (${integer.format(row.prevClicks)})`,
           <span
             key="d"
-            className={row.clicksDelta > 0 ? "text-success" : "text-destructive"}
+            className={
+              row.clicksDelta > 0 ? "text-success" : "text-destructive"
+            }
           >
             {signed(row.clicksDelta)}
           </span>,

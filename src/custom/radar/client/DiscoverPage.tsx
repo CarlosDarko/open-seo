@@ -274,10 +274,7 @@ function Kpis({ report, what }: { report: Report; what: string }) {
 
 function Highlights({ report, what }: { report: Report; what: string }) {
   const lines: { good: boolean | null; node: ReactNode }[] = [];
-  const change = relativeChange(
-    report.totals.clicks,
-    report.prevTotals.clicks,
-  );
+  const change = relativeChange(report.totals.clicks, report.prevTotals.clicks);
   if (change !== null) {
     const diff = report.totals.clicks - report.prevTotals.clicks;
     lines.push({

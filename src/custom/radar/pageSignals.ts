@@ -55,7 +55,9 @@ export function normalizeUrl(href: string, base: string): string | null {
     if (url.protocol !== "http:" && url.protocol !== "https:") return null;
     url.hash = "";
     const text = url.toString();
-    return text.endsWith("/") && url.pathname !== "/" ? text.slice(0, -1) : text;
+    return text.endsWith("/") && url.pathname !== "/"
+      ? text.slice(0, -1)
+      : text;
   } catch {
     return null;
   }
@@ -132,7 +134,9 @@ export function parsePageSignals(
     url,
     title: title ? cleanText(title[1]) || null : null,
     metaDescription:
-      metaDescription !== null && metaDescription !== "" ? metaDescription : null,
+      metaDescription !== null && metaDescription !== ""
+        ? metaDescription
+        : null,
     h1,
     headings,
     canonical,

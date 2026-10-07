@@ -45,7 +45,10 @@ export function CollapsibleNavGroup({
   const toggle = () =>
     setOpen((previous) => {
       try {
-        window.localStorage.setItem(STORAGE_PREFIX + label, previous ? "0" : "1");
+        window.localStorage.setItem(
+          STORAGE_PREFIX + label,
+          previous ? "0" : "1",
+        );
       } catch {
         // The choice then lasts for this visit only.
       }

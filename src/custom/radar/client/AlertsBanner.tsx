@@ -21,7 +21,9 @@ export function AlertsBanner({ projectId }: { projectId: string }) {
     <Alert variant="warning">
       <Bell />
       <AlertTitle>
-        {unseen === 1 ? "Tienes 1 aviso nuevo" : `Tienes ${unseen} avisos nuevos`}
+        {unseen === 1
+          ? "Tienes 1 aviso nuevo"
+          : `Tienes ${unseen} avisos nuevos`}
       </AlertTitle>
       <AlertDescription className="text-foreground/80">
         Alguna de tus reglas de alerta ha saltado.{" "}

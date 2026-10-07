@@ -74,10 +74,16 @@ async function readPage(url: string, siteUrl: string): Promise<PageSignals> {
   }
 }
 
-const RETRYABLE = ["La web tardó demasiado en responder", "No se pudo leer la página"];
+const RETRYABLE = [
+  "La web tardó demasiado en responder",
+  "No se pudo leer la página",
+];
 
 async function cacheKey(url: string): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(url));
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(url),
+  );
   const hex = [...new Uint8Array(digest)]
     .map((byte) => byte.toString(16).padStart(2, "0"))
     .join("");

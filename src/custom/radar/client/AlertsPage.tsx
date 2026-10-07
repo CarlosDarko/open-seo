@@ -145,7 +145,10 @@ const BLANK: Draft = {
 };
 
 const PRESETS: { label: string; draft: Partial<Draft> }[] = [
-  { label: "Caída fuerte de clics del sitio", draft: { name: "Caída fuerte de clics del sitio" } },
+  {
+    label: "Caída fuerte de clics del sitio",
+    draft: { name: "Caída fuerte de clics del sitio" },
+  },
   {
     label: "Mis páginas principales pierden tráfico",
     draft: {
@@ -164,7 +167,9 @@ const PRESETS: { label: string; draft: Partial<Draft> }[] = [
       threshold: "30",
       windowDays: "14",
       minValue: "20",
-      filters: [{ metric: "impressions", op: "gte", value: "1000", period: "current" }],
+      filters: [
+        { metric: "impressions", op: "gte", value: "1000", period: "current" },
+      ],
     },
   },
   {
@@ -253,12 +258,23 @@ function draftToRule(draft: Draft): Rule {
     target: draft.target.trim() || null,
     metric: draft.metric,
     condition: draft.condition,
-    threshold: Number.isFinite(number(draft.threshold)) ? number(draft.threshold) : 0,
+    threshold: Number.isFinite(number(draft.threshold))
+      ? number(draft.threshold)
+      : 0,
     windowDays: Number(draft.windowDays),
-    minValue: Number.isFinite(number(draft.minValue || "0")) ? number(draft.minValue || "0") : 0,
+    minValue: Number.isFinite(number(draft.minValue || "0"))
+      ? number(draft.minValue || "0")
+      : 0,
     filters: draft.filters.flatMap((filter) =>
       filter.value.trim() !== "" && Number.isFinite(number(filter.value))
-        ? [{ metric: filter.metric, op: filter.op, value: number(filter.value), period: filter.period }]
+        ? [
+            {
+              metric: filter.metric,
+              op: filter.op,
+              value: number(filter.value),
+              period: filter.period,
+            },
+          ]
         : [],
     ),
     notify: {
@@ -301,19 +317,25 @@ export function AlertsPage({ projectId }: { projectId: string }) {
     mutationFn: () => runAlertsNow({ data: { projectId } }),
     onSuccess: () => {
       freshIds.current = null;
-      void queryClient.invalidateQueries({ queryKey: ["radar-alerts", projectId] });
+      void queryClient.invalidateQueries({
+        queryKey: ["radar-alerts", projectId],
+      });
     },
   });
   const toggle = useMutation({
     mutationFn: (input: { id: string; enabled: boolean }) =>
       setAlertRuleEnabled({ data: { projectId, ...input } }),
     onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ["radar-alert-rules", projectId] }),
+      queryClient.invalidateQueries({
+        queryKey: ["radar-alert-rules", projectId],
+      }),
   });
   const remove = useMutation({
     mutationFn: (id: string) => deleteAlertRule({ data: { projectId, id } }),
     onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ["radar-alert-rules", projectId] }),
+      queryClient.invalidateQueries({
+        queryKey: ["radar-alert-rules", projectId],
+      }),
   });
 
   const grouped = useMemo(() => {
@@ -359,8 +381,12 @@ export function AlertsPage({ projectId }: { projectId: string }) {
 
       <Tabs value={tab} onValueChange={(value) => setTab(value as typeof tab)}>
         <TabsList>
-          <TabsTrigger value="events">Avisos ({events.data?.length ?? 0})</TabsTrigger>
-          <TabsTrigger value="rules">Reglas ({rules.data?.length ?? 0})</TabsTrigger>
+          <TabsTrigger value="events">
+            Avisos ({events.data?.length ?? 0})
+          </TabsTrigger>
+          <TabsTrigger value="rules">
+            Reglas ({rules.data?.length ?? 0})
+          </TabsTrigger>
         </TabsList>
       </Tabs>
 
@@ -413,7 +439,11 @@ export function AlertsPage({ projectId }: { projectId: string }) {
                               className="flex flex-wrap items-baseline justify-between gap-2"
                             >
                               <span className="min-w-0">
-                                {hit.url ? <PageLink url={hit.url} /> : hit.label}
+                                {hit.url ? (
+                                  <PageLink url={hit.url} />
+                                ) : (
+                                  hit.label
+                                )}
                               </span>
                               <span className="text-xs text-muted-foreground tabular-nums">
                                 {Math.round(hit.before * 10) / 10} →{" "}
@@ -429,7 +459,8 @@ export function AlertsPage({ projectId }: { projectId: string }) {
                       {event.window ? (
                         <p className="text-xs text-muted-foreground">
                           Comparado: {event.window.start} – {event.window.end}{" "}
-                          frente a {event.window.prevStart} – {event.window.prevEnd}
+                          frente a {event.window.prevStart} –{" "}
+                          {event.window.prevEnd}
                         </p>
                       ) : null}
                     </CardContent>
@@ -545,7 +576,8 @@ function RuleDialog({ projectId }: { projectId: string }) {
   const [tests, setTests] = useState<TestResult[]>([]);
 
   const rule = draftToRule(draft);
-  const set = (patch: Partial<Draft>) => setDraft((prev) => ({ ...prev, ...patch }));
+  const set = (patch: Partial<Draft>) =>
+    setDraft((prev) => ({ ...prev, ...patch }));
   const updateFilter = (index: number, patch: Partial<FilterDraft>) =>
     setDraft((prev) => ({
       ...prev,
@@ -583,7 +615,9 @@ function RuleDialog({ projectId }: { projectId: string }) {
         },
       }),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["radar-alert-rules", projectId] });
+      await queryClient.invalidateQueries({
+        queryKey: ["radar-alert-rules", projectId],
+      });
       setOpen(false);
     },
   });
@@ -593,7 +627,9 @@ function RuleDialog({ projectId }: { projectId: string }) {
       sendAlertTest({ data: { projectId, ...input } }),
     onSuccess: (data) => setTests(data.results),
     onError: () =>
-      setTests([{ channel: "prueba", ok: false, error: "No se pudo enviar la prueba." }]),
+      setTests([
+        { channel: "prueba", ok: false, error: "No se pudo enviar la prueba." },
+      ]),
   });
 
   const needsTarget = SCOPES_NEEDING_TARGET.includes(draft.scope);
@@ -641,7 +677,10 @@ function RuleDialog({ projectId }: { projectId: string }) {
             <div className="space-y-1.5">
               <Label>Empezar desde una plantilla</Label>
               <Select
-                items={PRESETS.map((preset) => ({ value: preset.label, label: preset.label }))}
+                items={PRESETS.map((preset) => ({
+                  value: preset.label,
+                  label: preset.label,
+                }))}
                 value=""
                 onValueChange={(value) => {
                   const preset = PRESETS.find((item) => item.label === value);
@@ -675,7 +714,10 @@ function RuleDialog({ projectId }: { projectId: string }) {
             <div className="space-y-4">
               <Step number={1} title="Qué vigilar">
                 <Select
-                  items={Object.entries(SCOPE_LABEL).map(([value, label]) => ({ value, label }))}
+                  items={Object.entries(SCOPE_LABEL).map(([value, label]) => ({
+                    value,
+                    label,
+                  }))}
                   value={draft.scope}
                   onValueChange={(value) =>
                     set({
@@ -697,7 +739,10 @@ function RuleDialog({ projectId }: { projectId: string }) {
                 </Select>
                 {draft.scope === "device" ? (
                   <Select
-                    items={DEVICES.map((value) => ({ value, label: DEVICE_LABEL[value] }))}
+                    items={DEVICES.map((value) => ({
+                      value,
+                      label: DEVICE_LABEL[value],
+                    }))}
                     value={draft.target || "MOBILE"}
                     onValueChange={(value) => set({ target: String(value) })}
                   >
@@ -732,13 +777,17 @@ function RuleDialog({ projectId }: { projectId: string }) {
                   <div className="space-y-1.5">
                     <Label>Métrica</Label>
                     <Select
-                      items={Object.entries(METRIC_LABEL).map(([value, label]) => ({ value, label }))}
+                      items={Object.entries(METRIC_LABEL).map(
+                        ([value, label]) => ({ value, label }),
+                      )}
                       value={draft.metric}
                       onValueChange={(value) => {
                         const metric = value as Metric;
                         set({
                           metric,
-                          condition: VALID_CONDITIONS[metric].includes(draft.condition)
+                          condition: VALID_CONDITIONS[metric].includes(
+                            draft.condition,
+                          )
                             ? draft.condition
                             : VALID_CONDITIONS[metric][0],
                         });
@@ -759,9 +808,14 @@ function RuleDialog({ projectId }: { projectId: string }) {
                   <div className="space-y-1.5">
                     <Label>Condición</Label>
                     <Select
-                      items={conditions.map((value) => ({ value, label: CONDITION_LABEL[value] }))}
+                      items={conditions.map((value) => ({
+                        value,
+                        label: CONDITION_LABEL[value],
+                      }))}
                       value={draft.condition}
-                      onValueChange={(value) => set({ condition: value as Condition })}
+                      onValueChange={(value) =>
+                        set({ condition: value as Condition })
+                      }
                     >
                       <SelectTrigger aria-label="Condición">
                         <SelectValue />
@@ -779,9 +833,11 @@ function RuleDialog({ projectId }: { projectId: string }) {
                 <div className="grid gap-3 sm:grid-cols-3">
                   <div className="space-y-1.5">
                     <Label htmlFor="rule-threshold">
-                      {draft.condition === "drop_pct" || draft.condition === "rise_pct"
+                      {draft.condition === "drop_pct" ||
+                      draft.condition === "rise_pct"
                         ? "Porcentaje (%)"
-                        : draft.condition === "worse_by" || draft.condition === "better_by"
+                        : draft.condition === "worse_by" ||
+                            draft.condition === "better_by"
                           ? "Puestos"
                           : draft.metric === "ctr"
                             ? "Valor (CTR en %)"
@@ -791,15 +847,22 @@ function RuleDialog({ projectId }: { projectId: string }) {
                       id="rule-threshold"
                       inputMode="decimal"
                       value={draft.threshold}
-                      onChange={(event) => set({ threshold: event.target.value })}
+                      onChange={(event) =>
+                        set({ threshold: event.target.value })
+                      }
                     />
                   </div>
                   <div className="space-y-1.5">
                     <Label>Periodo</Label>
                     <Select
-                      items={WINDOWS.map((days) => ({ value: String(days), label: `${days} días` }))}
+                      items={WINDOWS.map((days) => ({
+                        value: String(days),
+                        label: `${days} días`,
+                      }))}
                       value={draft.windowDays}
-                      onValueChange={(value) => set({ windowDays: String(value) })}
+                      onValueChange={(value) =>
+                        set({ windowDays: String(value) })
+                      }
                     >
                       <SelectTrigger aria-label="Periodo">
                         <SelectValue />
@@ -815,13 +878,18 @@ function RuleDialog({ projectId }: { projectId: string }) {
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="rule-min">
-                      Mínimo {draft.metric === "clicks" ? "de clics" : "de impresiones"}
+                      Mínimo{" "}
+                      {draft.metric === "clicks"
+                        ? "de clics"
+                        : "de impresiones"}
                     </Label>
                     <Input
                       id="rule-min"
                       inputMode="decimal"
                       value={draft.minValue}
-                      onChange={(event) => set({ minValue: event.target.value })}
+                      onChange={(event) =>
+                        set({ minValue: event.target.value })
+                      }
                     />
                   </div>
                 </div>
@@ -840,13 +908,24 @@ function RuleDialog({ projectId }: { projectId: string }) {
                     </p>
                   </div>
                   {draft.filters.map((filter, index) => (
-                    <div key={index} className="flex flex-wrap items-center gap-2">
+                    <div
+                      key={index}
+                      className="flex flex-wrap items-center gap-2"
+                    >
                       <Select
-                        items={METRICS.map((value) => ({ value, label: FILTER_METRIC_LABEL[value] }))}
+                        items={METRICS.map((value) => ({
+                          value,
+                          label: FILTER_METRIC_LABEL[value],
+                        }))}
                         value={filter.metric}
-                        onValueChange={(value) => updateFilter(index, { metric: value as Metric })}
+                        onValueChange={(value) =>
+                          updateFilter(index, { metric: value as Metric })
+                        }
                       >
-                        <SelectTrigger size="sm" aria-label="Métrica de la condición">
+                        <SelectTrigger
+                          size="sm"
+                          aria-label="Métrica de la condición"
+                        >
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent className={WIDE_MENU}>
@@ -858,9 +937,13 @@ function RuleDialog({ projectId }: { projectId: string }) {
                         </SelectContent>
                       </Select>
                       <Select
-                        items={Object.entries(OP_LABEL).map(([value, label]) => ({ value, label }))}
+                        items={Object.entries(OP_LABEL).map(
+                          ([value, label]) => ({ value, label }),
+                        )}
                         value={filter.op}
-                        onValueChange={(value) => updateFilter(index, { op: value as Filter["op"] })}
+                        onValueChange={(value) =>
+                          updateFilter(index, { op: value as Filter["op"] })
+                        }
                       >
                         <SelectTrigger size="sm" aria-label="Comparación">
                           <SelectValue />
@@ -878,22 +961,35 @@ function RuleDialog({ projectId }: { projectId: string }) {
                         inputMode="decimal"
                         aria-label="Valor"
                         value={filter.value}
-                        onChange={(event) => updateFilter(index, { value: event.target.value })}
+                        onChange={(event) =>
+                          updateFilter(index, { value: event.target.value })
+                        }
                       />
                       <Select
-                        items={Object.entries(PERIOD_LABEL).map(([value, label]) => ({ value, label }))}
+                        items={Object.entries(PERIOD_LABEL).map(
+                          ([value, label]) => ({ value, label }),
+                        )}
                         value={filter.period}
-                        onValueChange={(value) => updateFilter(index, { period: value as Filter["period"] })}
+                        onValueChange={(value) =>
+                          updateFilter(index, {
+                            period: value as Filter["period"],
+                          })
+                        }
                       >
-                        <SelectTrigger size="sm" aria-label="Periodo de la condición">
+                        <SelectTrigger
+                          size="sm"
+                          aria-label="Periodo de la condición"
+                        >
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent className={WIDE_MENU}>
-                          {Object.entries(PERIOD_LABEL).map(([value, label]) => (
-                            <SelectItem key={value} value={value}>
-                              {label}
-                            </SelectItem>
-                          ))}
+                          {Object.entries(PERIOD_LABEL).map(
+                            ([value, label]) => (
+                              <SelectItem key={value} value={value}>
+                                {label}
+                              </SelectItem>
+                            ),
+                          )}
                         </SelectContent>
                       </Select>
                       <Button
@@ -901,7 +997,11 @@ function RuleDialog({ projectId }: { projectId: string }) {
                         variant="ghost"
                         aria-label="Quitar condición"
                         onClick={() =>
-                          set({ filters: draft.filters.filter((_, i) => i !== index) })
+                          set({
+                            filters: draft.filters.filter(
+                              (_, i) => i !== index,
+                            ),
+                          })
                         }
                       >
                         <Trash2 className="size-3.5" aria-hidden />
@@ -916,7 +1016,12 @@ function RuleDialog({ projectId }: { projectId: string }) {
                         set({
                           filters: [
                             ...draft.filters,
-                            { metric: "impressions", op: "gte", value: "", period: "current" },
+                            {
+                              metric: "impressions",
+                              op: "gte",
+                              value: "",
+                              period: "current",
+                            },
                           ],
                         })
                       }
@@ -931,7 +1036,10 @@ function RuleDialog({ projectId }: { projectId: string }) {
 
             <Step number={3} title="A quién y cómo avisar">
               <div className="flex items-start gap-2 rounded-md bg-muted/40 p-3">
-                <Bell className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
+                <Bell
+                  className="mt-0.5 size-4 shrink-0 text-primary"
+                  aria-hidden
+                />
                 <p>
                   <strong>En la herramienta:</strong> siempre. Lo ve cualquiera
                   que tenga acceso a este proyecto, en Alertas y en una franja
@@ -940,7 +1048,10 @@ function RuleDialog({ projectId }: { projectId: string }) {
               </div>
 
               <div className="space-y-1.5">
-                <Label htmlFor="rule-emails" className="flex items-center gap-1.5">
+                <Label
+                  htmlFor="rule-emails"
+                  className="flex items-center gap-1.5"
+                >
                   <Mail className="size-3.5" aria-hidden />
                   Por correo a
                 </Label>
@@ -958,8 +1069,8 @@ function RuleDialog({ projectId }: { projectId: string }) {
                 ) : (
                   <p className="text-xs text-muted-foreground">
                     Separados por comas. Hasta 10. Hay que configurar antes, una
-                    sola vez para toda la herramienta, el envío de correo
-                    (botón «Canales de aviso» de la página de Alertas).
+                    sola vez para toda la herramienta, el envío de correo (botón
+                    «Canales de aviso» de la página de Alertas).
                   </p>
                 )}
                 {emails.length > 0 && badEmails.length === 0 ? (
@@ -998,8 +1109,12 @@ function RuleDialog({ projectId }: { projectId: string }) {
                       <Button
                         size="xs"
                         variant="outline"
-                        disabled={test.isPending || !isSafeWebhookUrl(url.trim())}
-                        onClick={() => test.mutate({ emails: [], webhook: url.trim() })}
+                        disabled={
+                          test.isPending || !isSafeWebhookUrl(url.trim())
+                        }
+                        onClick={() =>
+                          test.mutate({ emails: [], webhook: url.trim() })
+                        }
                       >
                         <Send className="size-3" aria-hidden />
                         Probar
@@ -1009,7 +1124,11 @@ function RuleDialog({ projectId }: { projectId: string }) {
                         variant="ghost"
                         aria-label="Quitar webhook"
                         onClick={() =>
-                          set({ webhooks: draft.webhooks.filter((_, i) => i !== index) })
+                          set({
+                            webhooks: draft.webhooks.filter(
+                              (_, i) => i !== index,
+                            ),
+                          })
                         }
                       >
                         <Trash2 className="size-3.5" aria-hidden />
@@ -1056,7 +1175,10 @@ function RuleDialog({ projectId }: { projectId: string }) {
           <Button variant="ghost" onClick={() => setOpen(false)}>
             Cancelar
           </Button>
-          <Button disabled={!valid || save.isPending} onClick={() => save.mutate()}>
+          <Button
+            disabled={!valid || save.isPending}
+            onClick={() => save.mutate()}
+          >
             {save.isPending ? "Guardando…" : "Crear regla"}
           </Button>
         </DialogFooter>
@@ -1090,9 +1212,12 @@ const TARGET_PLACEHOLDER: Partial<Record<Scope, string>> = {
 const TARGET_HELP: Partial<Record<Scope, string>> = {
   page: "La dirección completa de la página.",
   query: "La consulta tal cual aparece en Search Console.",
-  pages_matching: "Un trozo de la URL: «/blog/» vigila todas las páginas del blog.",
-  queries_matching: "Vigila todas las consultas que contengan esa palabra o expresión.",
-  country: "Código de 3 letras que usa Search Console: esp, mex, arg, col, usa…",
+  pages_matching:
+    "Un trozo de la URL: «/blog/» vigila todas las páginas del blog.",
+  queries_matching:
+    "Vigila todas las consultas que contengan esa palabra o expresión.",
+  country:
+    "Código de 3 letras que usa Search Console: esp, mex, arg, col, usa…",
 };
 
 /** How e-mail leaves the tool: the sender and the Resend API key. */
@@ -1171,7 +1296,9 @@ function ChannelsDialog({ projectId }: { projectId: string }) {
               autoComplete="off"
               value={key}
               onChange={(event) => setKey(event.target.value)}
-              placeholder={info.data?.hasKey ? "Ya hay una clave guardada" : "re_…"}
+              placeholder={
+                info.data?.hasKey ? "Ya hay una clave guardada" : "re_…"
+              }
             />
             <p className="text-xs text-muted-foreground">
               Se guarda una vez en el servidor, para toda la herramienta, y no

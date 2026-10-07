@@ -6,7 +6,11 @@ import {
   isExpectedGrantFailure,
 } from "@/server/features/gsc/services/GscService";
 import { sumSearchTotals } from "@/server/features/gsc/searchPerformanceReport";
-import { periodInputSchema, resolvePeriods, shiftInDays } from "@/custom/radar/periods";
+import {
+  periodInputSchema,
+  resolvePeriods,
+  shiftInDays,
+} from "@/custom/radar/periods";
 import {
   alignDaily,
   compareDimension,
@@ -19,7 +23,9 @@ import { requireProjectContext } from "@/serverFunctions/middleware";
 const discoverInputSchema = periodInputSchema.extend({
   projectId: z.string().min(1),
   // Search Console reports these Google surfaces apart from web search.
-  type: z.enum(["discover", "googleNews", "news", "image", "video"]).default("discover"),
+  type: z
+    .enum(["discover", "googleNews", "news", "image", "video"])
+    .default("discover"),
 });
 
 const DAILY_ROW_LIMIT = 500;
@@ -54,16 +60,23 @@ export const getDiscoverReport = createServerFn({ method: "POST" })
       });
 
     try {
-      const [daily, prevDaily, pages, prevPages, countries, prevCountries, web] =
-        await Promise.all([
-          fetchRows(["date"], now, DAILY_ROW_LIMIT),
-          fetchRows(["date"], prev, DAILY_ROW_LIMIT),
-          fetchRows(["page"], now, PAGE_ROW_LIMIT),
-          fetchRows(["page"], prev, PAGE_ROW_LIMIT),
-          fetchRows(["country"], now, COUNTRY_ROW_LIMIT),
-          fetchRows(["country"], prev, COUNTRY_ROW_LIMIT),
-          fetchRows(["date"], now, DAILY_ROW_LIMIT, "web"),
-        ]);
+      const [
+        daily,
+        prevDaily,
+        pages,
+        prevPages,
+        countries,
+        prevCountries,
+        web,
+      ] = await Promise.all([
+        fetchRows(["date"], now, DAILY_ROW_LIMIT),
+        fetchRows(["date"], prev, DAILY_ROW_LIMIT),
+        fetchRows(["page"], now, PAGE_ROW_LIMIT),
+        fetchRows(["page"], prev, PAGE_ROW_LIMIT),
+        fetchRows(["country"], now, COUNTRY_ROW_LIMIT),
+        fetchRows(["country"], prev, COUNTRY_ROW_LIMIT),
+        fetchRows(["date"], now, DAILY_ROW_LIMIT, "web"),
+      ]);
 
       const pageRows = mergePageVariants(pages.rows, 0);
       const prevPageRows = mergePageVariants(prevPages.rows, 0);

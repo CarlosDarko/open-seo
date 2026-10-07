@@ -150,7 +150,8 @@ export type Totals = {
 export function subtractTotals(all: Totals, brand: Totals): Totals {
   const clicks = Math.max(0, all.clicks - brand.clicks);
   const impressions = Math.max(0, all.impressions - brand.impressions);
-  const weighted = all.position * all.impressions - brand.position * brand.impressions;
+  const weighted =
+    all.position * all.impressions - brand.position * brand.impressions;
   return {
     clicks,
     impressions,
@@ -233,7 +234,8 @@ export function mergePageVariants(
     keys: group.keys,
     clicks: group.row.clicks,
     impressions: group.row.impressions,
-    ctr: group.row.impressions > 0 ? group.row.clicks / group.row.impressions : 0,
+    ctr:
+      group.row.impressions > 0 ? group.row.clicks / group.row.impressions : 0,
     position:
       group.row.impressions > 0
         ? group.weighted / group.row.impressions
@@ -330,7 +332,9 @@ export function explainChange(row: ChangeRow): ChangeCause {
 
   const gone = row.clicksDelta < 0;
   const positionCause = gone ? positionDelta >= 1 : positionDelta <= -1;
-  const demandCause = gone ? impressionsChange <= -0.15 : impressionsChange >= 0.15;
+  const demandCause = gone
+    ? impressionsChange <= -0.15
+    : impressionsChange >= 0.15;
   const ctrCause = gone ? ctrChange <= -0.2 : ctrChange >= 0.2;
 
   // A worse position or fewer searches lower the CTR as a consequence, so
@@ -420,7 +424,10 @@ export function newAndLostQueries(rows: ChangeRow[], limit = 15) {
       .slice(0, limit),
     lostQueries: rows
       .filter((row) => row.status === "lost" && row.prevImpressions >= 10)
-      .sort((a, b) => b.prevClicks - a.prevClicks || b.prevImpressions - a.prevImpressions)
+      .sort(
+        (a, b) =>
+          b.prevClicks - a.prevClicks || b.prevImpressions - a.prevImpressions,
+      )
       .slice(0, limit),
   };
 }
@@ -429,7 +436,9 @@ export function newAndLostQueries(rows: ChangeRow[], limit = 15) {
 
 // Typical click-through rate by organic position (1..10): the fallback when
 // the site has too little data of its own.
-const GENERIC_CTR = [0.28, 0.15, 0.1, 0.07, 0.05, 0.04, 0.03, 0.025, 0.02, 0.018];
+const GENERIC_CTR = [
+  0.28, 0.15, 0.1, 0.07, 0.05, 0.04, 0.03, 0.025, 0.02, 0.018,
+];
 const BEYOND_TOP_TEN_CTR = 0.01;
 const CURVE_MIN_IMPRESSIONS = 300;
 
@@ -454,7 +463,9 @@ export function ownCtrCurve(rows: GscSearchAnalyticsRow[]): number[] {
     genericClicks += impressions[i] * GENERIC_CTR[i];
   }
   const scale =
-    genericClicks > 0 ? Math.min(Math.max(measuredClicks / genericClicks, 0.2), 1.5) : 1;
+    genericClicks > 0
+      ? Math.min(Math.max(measuredClicks / genericClicks, 0.2), 1.5)
+      : 1;
 
   return GENERIC_CTR.map((generic, i) =>
     impressions[i] >= CURVE_MIN_IMPRESSIONS
@@ -727,7 +738,9 @@ export function alignDaily(
   for (const row of current) {
     const date = row.keys?.[0];
     if (!date) continue;
-    const prevDate = new Date(Date.parse(`${date}T00:00:00Z`) - shiftDays * DAY_MS)
+    const prevDate = new Date(
+      Date.parse(`${date}T00:00:00Z`) - shiftDays * DAY_MS,
+    )
       .toISOString()
       .slice(0, 10);
     const old = before.get(prevDate);

@@ -399,10 +399,20 @@ export function scanTemplates(file, code, onItem) {
       n.templateSpans.forEach((span, i) =>
         parts.push(`{${i + 1}}${span.literal.text}`),
       );
-      onItem({ kind: "template", key: normalizeKey(parts.join("")), node: n, sf });
+      onItem({
+        kind: "template",
+        key: normalizeKey(parts.join("")),
+        node: n,
+        sf,
+      });
       for (const span of n.templateSpans) {
         forEachRenderedString(span.expression, (lit) =>
-          onItem({ kind: "string", key: normalizeKey(lit.text), node: lit, sf }),
+          onItem({
+            kind: "string",
+            key: normalizeKey(lit.text),
+            node: lit,
+            sf,
+          }),
         );
       }
     }

@@ -6,7 +6,11 @@ import {
   isExpectedGrantFailure,
 } from "@/server/features/gsc/services/GscService";
 import { sumSearchTotals } from "@/server/features/gsc/searchPerformanceReport";
-import { periodInputSchema, resolvePeriods, shiftInDays } from "@/custom/radar/periods";
+import {
+  periodInputSchema,
+  resolvePeriods,
+  shiftInDays,
+} from "@/custom/radar/periods";
 import {
   alignDaily,
   attachPageQueries,
@@ -86,7 +90,8 @@ export const getRadarReport = createServerFn({ method: "POST" })
       dimensions: ("date" | "query" | "page" | "device")[],
       period: { startDate: string; endDate: string },
       rowLimit: number,
-    ) => GscService.getPerformance({ projectId, ...period, dimensions, rowLimit });
+    ) =>
+      GscService.getPerformance({ projectId, ...period, dimensions, rowLimit });
 
     try {
       const [
@@ -208,7 +213,8 @@ export const getRadarReport = createServerFn({ method: "POST" })
         brand: {
           hasBrand: tokens.length > 0,
           included: data.includeBrand,
-          source: manualBrand.length > 0 ? ("manual" as const) : ("auto" as const),
+          source:
+            manualBrand.length > 0 ? ("manual" as const) : ("auto" as const),
           terms: manualBrand.length > 0 ? manualBrand : autoTokens,
           autoSuggestion: autoTokens,
           examples: [...splitNow.brand]
@@ -235,7 +241,13 @@ export const getRadarReport = createServerFn({ method: "POST" })
           .slice(0, TOP_PAGES)
           .flatMap((row) =>
             row.keys?.[0]
-              ? [{ url: row.keys[0], clicks: row.clicks, position: row.position }]
+              ? [
+                  {
+                    url: row.keys[0],
+                    clicks: row.clicks,
+                    position: row.position,
+                  },
+                ]
               : [],
           ),
         segments: {
@@ -256,7 +268,8 @@ export const getRadarReport = createServerFn({ method: "POST" })
           device: segmentRows(
             devices.rows,
             prevDevices.rows,
-            (row) => DEVICE_LABEL[row.keys?.[0] ?? ""] ?? row.keys?.[0] ?? "Otro",
+            (row) =>
+              DEVICE_LABEL[row.keys?.[0] ?? ""] ?? row.keys?.[0] ?? "Otro",
           ),
           brand: segmentRows(queries.rows, prevQueries.rows, (row) =>
             isBrandQuery(row.keys?.[0] ?? "", tokens) ? "Marca" : "Sin marca",
@@ -322,7 +335,9 @@ export const getRadarPageSignals = createServerFn({ method: "POST" })
 /** Saves the brand words of a project (empty list = deduce from the domain). */
 export const saveRadarBrand = createServerFn({ method: "POST" })
   .middleware(requireProjectContext)
-  .validator(z.object({ projectId: z.string().min(1), terms: brandTermsSchema }))
+  .validator(
+    z.object({ projectId: z.string().min(1), terms: brandTermsSchema }),
+  )
   .handler(async ({ data, context }) => ({
     terms: await saveBrandTerms(context.projectId, data.terms),
   }));

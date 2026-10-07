@@ -246,11 +246,32 @@ const resolveSelfHostAccess = (
       const allowedEmails = yield* requireAllowedEmails(
         "Set ACCESS_ALLOWED_EMAILS to the comma-separated emails allowed through Cloudflare Access — or set TEAM_DOMAIN and POLICY_AUD to manage the Access application yourself.",
       );
+      // With an own domain (production), the Access login screen is branded:
+      // logo, colours and Spanish texts. The Zero Trust organization is one
+      // per account, so only this stage manages it.
+      if (customDomain && teamDomain) {
+        yield* Cloudflare.Access.Organization("AccessOrganization", {
+          authDomain: teamDomain.replace(/^https?:\/\//, ""),
+          loginDesign: {
+            logoPath:
+              "https://raw.githubusercontent.com/CarlosDarko/open-seo/main/deploy/branding/login-logo.png",
+            backgroundColor: "#ebebeb",
+            headerBgColor: "#ebebeb",
+            textColor: "#1a1a1a",
+            headerText:
+              "**Herramienta SEO**  \nIntroduce tu correo y te enviaremos un código de acceso.",
+            footerText:
+              "Acceso restringido a personas autorizadas · carlosortega.page",
+          },
+        });
+      }
       const application = yield* emailAccessGate({
         policyId: "SelfHostAllowUsers",
         applicationId: "SelfHostAccess",
         policyName: `open-seo ${stage} self-host users`,
-        applicationName: `open-seo ${stage}`,
+        applicationName: customDomain
+          ? "Carlos Ortega · Herramienta SEO"
+          : `open-seo ${stage}`,
         domain: `${workerName(stage)}.${subdomain}`,
         extraDomains: customDomain ? [customDomain] : [],
         emails: allowedEmails,

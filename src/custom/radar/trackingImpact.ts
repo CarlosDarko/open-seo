@@ -62,7 +62,10 @@ export function statsFromRows(
 
 /** The dates to measure for an action done on `doneAt`: the baseline before
  *  it, and the window after it when enough data exists. */
-export function measurementWindows(doneAt: Date | string, today: Date = new Date()) {
+export function measurementWindows(
+  doneAt: Date | string,
+  today: Date = new Date(),
+) {
   const done = dayStart(doneAt);
   const baselineEnd = done - GSC_LAG_DAYS * DAY_MS;
   const baselineStart = baselineEnd - (BASELINE_DAYS - 1) * DAY_MS;
@@ -71,7 +74,11 @@ export function measurementWindows(doneAt: Date | string, today: Date = new Date
   const afterEnd = Math.min(availableEnd, done + MAX_AFTER_DAYS * DAY_MS);
   const afterDays = Math.floor((afterEnd - afterStart) / DAY_MS) + 1;
   return {
-    baseline: { start: iso(baselineStart), end: iso(baselineEnd), days: BASELINE_DAYS },
+    baseline: {
+      start: iso(baselineStart),
+      end: iso(baselineEnd),
+      days: BASELINE_DAYS,
+    },
     after:
       afterDays >= MIN_AFTER_DAYS
         ? { start: iso(afterStart), end: iso(afterEnd), days: afterDays }

@@ -31,10 +31,7 @@ import { AlertsBanner } from "@/custom/radar/client/AlertsBanner";
 import { RadarControls } from "@/custom/radar/client/RadarControls";
 import { PageLink } from "@/custom/radar/client/RadarLinks";
 import { RadarTables } from "@/custom/radar/client/RadarTables";
-import {
-  Segments,
-  type SegmentSet,
-} from "@/custom/radar/client/Segments";
+import { Segments, type SegmentSet } from "@/custom/radar/client/Segments";
 import { useRadarReport } from "@/custom/radar/client/useRadarReport";
 import {
   decimal,
@@ -130,7 +127,9 @@ export function RadarPage({ projectId }: { projectId: string }) {
               ) : (
                 <ChevronDown className="size-4" />
               )}
-              {showData ? "Ocultar los datos completos" : "Ver los datos completos"}
+              {showData
+                ? "Ocultar los datos completos"
+                : "Ver los datos completos"}
             </Button>
             {showData ? <RadarTables report={report} /> : null}
           </section>
@@ -289,9 +288,7 @@ function Kpis({ report }: { report: RadarReport }) {
     {
       label: "Impresiones",
       value: integer.format(totals.impressions),
-      delta: (
-        <Delta now={totals.impressions} before={prevTotals.impressions} />
-      ),
+      delta: <Delta now={totals.impressions} before={prevTotals.impressions} />,
     },
     {
       label: "CTR",
@@ -322,12 +319,12 @@ function Kpis({ report }: { report: RadarReport }) {
               : "Cifras de todo el tráfico"}
         </strong>
         {" · "}
-        {shortDate.format(new Date(`${report.range.startDate}T00:00:00Z`))} –{" "}
-        {shortDate.format(new Date(`${report.range.endDate}T00:00:00Z`))}{" "}
+        {shortDate.format(
+          new Date(`${report.range.startDate}T00:00:00Z`),
+        )} – {shortDate.format(new Date(`${report.range.endDate}T00:00:00Z`))}{" "}
         frente a{" "}
         {shortDate.format(new Date(`${report.period.prevStartDate}T00:00:00Z`))}{" "}
-        –{" "}
-        {shortDate.format(new Date(`${report.period.prevEndDate}T00:00:00Z`))}
+        – {shortDate.format(new Date(`${report.period.prevEndDate}T00:00:00Z`))}
       </p>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {cards.map((card) => (
@@ -350,10 +347,14 @@ function Kpis({ report }: { report: RadarReport }) {
 
 type Tone = "good" | "bad" | "info";
 
-function topShare(segments: Segment[]): { label: string; share: number } | null {
+function topShare(
+  segments: Segment[],
+): { label: string; share: number } | null {
   const total = segments.reduce((sum, segment) => sum + segment.clicks, 0);
   const top = segments[0];
-  return top && total > 0 ? { label: top.label, share: top.clicks / total } : null;
+  return top && total > 0
+    ? { label: top.label, share: top.clicks / total }
+    : null;
 }
 
 function Insights({
@@ -466,7 +467,9 @@ function Insights({
         node: (
           <>
             <strong>{tasks} tareas</strong> en el plan de acción
-            {gain > 0 ? `, unos +${integer.format(gain)} clics estimados` : ""}.{" "}
+            {gain > 0
+              ? `, unos +${integer.format(gain)} clics estimados`
+              : ""}.{" "}
             <Link
               to="/p/$projectId/action-plan"
               params={{ projectId }}

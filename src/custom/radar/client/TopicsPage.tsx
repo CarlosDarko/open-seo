@@ -131,7 +131,10 @@ export function TopicsPage({ projectId }: { projectId: string }) {
             <Button
               variant="outline"
               render={
-                <Link to="/p/$projectId/search-performance" params={{ projectId }} />
+                <Link
+                  to="/p/$projectId/search-performance"
+                  params={{ projectId }}
+                />
               }
             >
               Ir a Search Console
@@ -162,7 +165,10 @@ function Insights({ report }: { report: Report }) {
   const lines = useMemo(() => {
     const out: { tone: "good" | "bad" | "info"; node: ReactNode }[] = [];
     const real = report.topics.filter((topic) => topic.label !== OTHERS);
-    const totalClicks = report.topics.reduce((sum, topic) => sum + topic.clicks, 0);
+    const totalClicks = report.topics.reduce(
+      (sum, topic) => sum + topic.clicks,
+      0,
+    );
     const totalImpressions = report.topics.reduce(
       (sum, topic) => sum + topic.impressions,
       0,
@@ -191,8 +197,9 @@ function Insights({ report }: { report: Report }) {
         tone: "good",
         node: (
           <>
-            Crece más: <strong>«{grow.topic.label}»</strong> ({signed(grow.delta)}{" "}
-            clics{change !== null ? `, ${percent.format(change)}` : ""}).
+            Crece más: <strong>«{grow.topic.label}»</strong> (
+            {signed(grow.delta)} clics
+            {change !== null ? `, ${percent.format(change)}` : ""}).
           </>
         ),
       });
@@ -236,7 +243,10 @@ function Insights({ report }: { report: Report }) {
           topic.impressions / totalImpressions >= 0.02 &&
           topic.nearTopShare >= 0.4,
       )
-      .sort((a, b) => b.nearTopShare * b.impressions - a.nearTopShare * a.impressions)[0];
+      .sort(
+        (a, b) =>
+          b.nearTopShare * b.impressions - a.nearTopShare * a.impressions,
+      )[0];
     if (reach) {
       out.push({
         tone: "good",
@@ -254,9 +264,9 @@ function Insights({ report }: { report: Report }) {
         tone: "info",
         node: (
           <>
-            El {percent.format(report.othersShare)} de las impresiones no
-            encaja en ningún tema. Define tus propios temas con «Mis temas»
-            para agruparlas como tú piensas.
+            El {percent.format(report.othersShare)} de las impresiones no encaja
+            en ningún tema. Define tus propios temas con «Mis temas» para
+            agruparlas como tú piensas.
           </>
         ),
       });
@@ -332,11 +342,18 @@ function TopicsChart({ topics }: { topics: Topic[] }) {
               type="number"
               tickFormatter={(value: number) => integer.format(value)}
             />
-            <ChartYAxis type="category" dataKey="label" width={170} interval={0} />
+            <ChartYAxis
+              type="category"
+              dataKey="label"
+              width={170}
+              interval={0}
+            />
             <ChartTooltip
               content={
                 <ChartTooltipContent
-                  valueFormatter={(value) => `${integer.format(Number(value))} clics`}
+                  valueFormatter={(value) =>
+                    `${integer.format(Number(value))} clics`
+                  }
                 />
               }
             />
@@ -367,9 +384,9 @@ function TopicsTable({ topics }: { topics: Topic[] }) {
       <div className="border-b border-border p-4">
         <h3 className="font-medium">Todos los temas</h3>
         <p className="text-xs text-muted-foreground">
-          Pulsa un tema para ver sus consultas, subtemas y páginas. «Al
-          alcance» es el porcentaje de sus impresiones que están entre las
-          posiciones 4 y 20.
+          Pulsa un tema para ver sus consultas, subtemas y páginas. «Al alcance»
+          es el porcentaje de sus impresiones que están entre las posiciones 4 y
+          20.
         </p>
       </div>
       <Table>
@@ -429,7 +446,9 @@ function TopicsTable({ topics }: { topics: Topic[] }) {
                     {integer.format(topic.impressions)}
                   </TableCell>
                   <TableCell className="text-right tabular-nums">
-                    {topic.impressions > 0 ? decimal.format(topic.position) : "—"}
+                    {topic.impressions > 0
+                      ? decimal.format(topic.position)
+                      : "—"}
                   </TableCell>
                   <TableCell className="text-right tabular-nums">
                     {percent.format(topic.nearTopShare)}
@@ -445,8 +464,15 @@ function TopicsTable({ topics }: { topics: Topic[] }) {
                           </p>
                           <ul className="space-y-1 text-sm">
                             {topic.topQueries.map((item) => (
-                              <li key={item.query} className="flex justify-between gap-3">
-                                <GoogleLink query={item.query} label={item.query} subtle />
+                              <li
+                                key={item.query}
+                                className="flex justify-between gap-3"
+                              >
+                                <GoogleLink
+                                  query={item.query}
+                                  label={item.query}
+                                  subtle
+                                />
                                 <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
                                   {integer.format(item.clicks)} clics · pos.{" "}
                                   {decimal.format(item.position)}
@@ -494,7 +520,8 @@ function TopicsTable({ topics }: { topics: Topic[] }) {
                                   <PageLink url={page.page} />
                                   <p className="text-xs text-muted-foreground tabular-nums">
                                     {integer.format(page.clicks)} clics ·{" "}
-                                    {integer.format(page.impressions)} impresiones
+                                    {integer.format(page.impressions)}{" "}
+                                    impresiones
                                   </p>
                                 </li>
                               ))}
@@ -515,18 +542,16 @@ function TopicsTable({ topics }: { topics: Topic[] }) {
 }
 
 function parseCustom(text: string): { name: string; terms: string[] }[] {
-  return text
-    .split("\n")
-    .flatMap((line) => {
-      const [name, rest] = line.split(":");
-      const terms = (rest ?? "")
-        .split(",")
-        .map((term) => term.trim())
-        .filter((term) => term.length >= 2);
-      return name?.trim().length >= 2 && terms.length > 0
-        ? [{ name: name.trim(), terms }]
-        : [];
-    });
+  return text.split("\n").flatMap((line) => {
+    const [name, rest] = line.split(":");
+    const terms = (rest ?? "")
+      .split(",")
+      .map((term) => term.trim())
+      .filter((term) => term.length >= 2);
+    return name?.trim().length >= 2 && terms.length > 0
+      ? [{ name: name.trim(), terms }]
+      : [];
+  });
 }
 
 /** Lets the user define topics by hand: a name and the words that belong. */
@@ -544,7 +569,9 @@ function CustomTopicsDialog({
     mutationFn: (topics: { name: string; terms: string[] }[]) =>
       saveRadarTopics({ data: { projectId, topics } }),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["radar-topics", projectId] });
+      await queryClient.invalidateQueries({
+        queryKey: ["radar-topics", projectId],
+      });
       setOpen(false);
     },
   });
@@ -555,7 +582,11 @@ function CustomTopicsDialog({
       onOpenChange={(next) => {
         setOpen(next);
         if (next) {
-          setText(custom.map((topic) => `${topic.name}: ${topic.terms.join(", ")}`).join("\n"));
+          setText(
+            custom
+              .map((topic) => `${topic.name}: ${topic.terms.join(", ")}`)
+              .join("\n"),
+          );
         }
       }}
     >
@@ -583,8 +614,9 @@ function CustomTopicsDialog({
           aria-label="Mis temas"
         />
         <p className="text-xs text-muted-foreground">
-          {parsed.length} {parsed.length === 1 ? "tema válido" : "temas válidos"}.
-          Déjalo vacío para volver al agrupado automático.
+          {parsed.length}{" "}
+          {parsed.length === 1 ? "tema válido" : "temas válidos"}. Déjalo vacío
+          para volver al agrupado automático.
         </p>
         <DialogFooter>
           <Button variant="ghost" onClick={() => setOpen(false)}>
@@ -595,7 +627,9 @@ function CustomTopicsDialog({
           </Button>
         </DialogFooter>
         {save.isError ? (
-          <p className="text-sm text-destructive">No se pudo guardar. Prueba de nuevo.</p>
+          <p className="text-sm text-destructive">
+            No se pudo guardar. Prueba de nuevo.
+          </p>
         ) : null}
       </DialogContent>
     </Dialog>

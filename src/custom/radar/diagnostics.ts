@@ -6,9 +6,34 @@ import { normalizeUrl, type PageSignals } from "@/custom/radar/pageSignals";
 export type Finding = { level: "bad" | "warn" | "ok"; text: string };
 
 const STOPWORDS = new Set([
-  "para", "como", "con", "sin", "por", "los", "las", "del", "una", "unos",
-  "unas", "que", "cual", "cuales", "donde", "cuando", "the", "and", "for",
-  "with", "from", "that", "this", "what", "how", "are", "your", "you",
+  "para",
+  "como",
+  "con",
+  "sin",
+  "por",
+  "los",
+  "las",
+  "del",
+  "una",
+  "unos",
+  "unas",
+  "que",
+  "cual",
+  "cuales",
+  "donde",
+  "cuando",
+  "the",
+  "and",
+  "for",
+  "with",
+  "from",
+  "that",
+  "this",
+  "what",
+  "how",
+  "are",
+  "your",
+  "you",
 ]);
 
 const TITLE_MAX = 60;
@@ -18,10 +43,7 @@ const META_MIN = 70;
 const THIN_WORDS = 300;
 
 function plain(text: string): string {
-  return text
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .toLowerCase();
+  return text.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 }
 
 /** The meaningful words of a query, lowercase and without accents. */
@@ -61,7 +83,10 @@ function siteLabel(url: string): string {
 
 /** Findings for a page that should earn more clicks for `query` with its
  *  search snippet (title and meta description). */
-export function snippetFindings(signals: PageSignals, query: string): Finding[] {
+export function snippetFindings(
+  signals: PageSignals,
+  query: string,
+): Finding[] {
   if (!signals.ok) {
     return [
       {
@@ -79,7 +104,10 @@ export function snippetFindings(signals: PageSignals, query: string): Finding[] 
       text: "La página tiene «noindex»: pide a Google que no la muestre. Quítalo si debe posicionar.",
     });
   }
-  if (signals.canonical && signals.canonical !== normalizeUrl(signals.url, signals.url)) {
+  if (
+    signals.canonical &&
+    signals.canonical !== normalizeUrl(signals.url, signals.url)
+  ) {
     findings.push({
       level: "bad",
       text: `Su canónica apunta a otra URL (${signals.canonical}). Google puede estar mostrando esa en su lugar.`,
@@ -131,7 +159,9 @@ export function snippetFindings(signals: PageSignals, query: string): Finding[] 
     const missing = missingWords(meta, words);
     const problems: string[] = [];
     if (meta.length > META_MAX) {
-      problems.push(`mide ${meta.length} caracteres y se corta a los ${META_MAX}`);
+      problems.push(
+        `mide ${meta.length} caracteres y se corta a los ${META_MAX}`,
+      );
     }
     if (meta.length < META_MIN) {
       problems.push(`mide solo ${meta.length}: aprovecha hasta ${META_MAX}`);
@@ -145,7 +175,10 @@ export function snippetFindings(signals: PageSignals, query: string): Finding[] 
             level: "warn",
             text: `Meta descripción actual «${meta}»: ${problems.join("; ")}.`,
           }
-        : { level: "ok", text: `Meta descripción correcta (${meta.length} caracteres).` },
+        : {
+            level: "ok",
+            text: `Meta descripción correcta (${meta.length} caracteres).`,
+          },
     );
   }
   return findings;
@@ -177,7 +210,10 @@ export function pushFindings(signals: PageSignals, query: string): Finding[] {
       text: `El H1 actual «${h1}» no contiene ${quoted(h1Missing)}: acércalo a lo que busca la gente.`,
     });
   } else {
-    findings.push({ level: "ok", text: `El H1 contiene la consulta: «${h1}».` });
+    findings.push({
+      level: "ok",
+      text: `El H1 contiene la consulta: «${h1}».`,
+    });
   }
 
   const titleMissing = missingWords(signals.title, words);
@@ -224,12 +260,16 @@ export function missingLinkSources(
 
 /** Findings for a question the page ranks for: is it already a heading, and
  *  how to answer it so Google can lift the answer. */
-export function questionFindings(signals: PageSignals, query: string): Finding[] {
+export function questionFindings(
+  signals: PageSignals,
+  query: string,
+): Finding[] {
   if (!signals.ok) return snippetFindings(signals, query);
   const words = queryWords(query);
   const headings = [...signals.h1, ...signals.headings];
   const match = headings.find(
-    (heading) => missingWords(heading, words).length <= Math.floor(words.length * 0.2),
+    (heading) =>
+      missingWords(heading, words).length <= Math.floor(words.length * 0.2),
   );
   if (match) {
     return [

@@ -41,26 +41,144 @@ export type Topic = {
 };
 
 const STOPWORDS = new Set([
-  "a", "al", "ante", "con", "de", "del", "el", "en", "es", "la", "las", "lo",
-  "los", "para", "por", "sin", "sobre", "un", "una", "unos", "unas", "y", "o",
-  "e", "u", "que", "se", "su", "sus", "mi", "tu", "me", "te", "le", "les",
-  "nos", "ya", "mas", "muy", "hay", "son", "como", "cual", "cuales", "cuanto",
-  "cuanta", "cuantos", "cuantas", "cuando", "donde", "quien", "quienes",
-  "porque", "pueden", "puede", "puedo", "the", "of", "and", "for", "to", "in",
-  "on", "with", "an", "is", "are", "how", "what", "why", "when", "where",
-  "who", "do", "does", "can", "i", "my", "your", "els", "les", "per", "amb",
-  "i", "com", "quan", "on", "al",
+  "a",
+  "al",
+  "ante",
+  "con",
+  "de",
+  "del",
+  "el",
+  "en",
+  "es",
+  "la",
+  "las",
+  "lo",
+  "los",
+  "para",
+  "por",
+  "sin",
+  "sobre",
+  "un",
+  "una",
+  "unos",
+  "unas",
+  "y",
+  "o",
+  "e",
+  "u",
+  "que",
+  "se",
+  "su",
+  "sus",
+  "mi",
+  "tu",
+  "me",
+  "te",
+  "le",
+  "les",
+  "nos",
+  "ya",
+  "mas",
+  "muy",
+  "hay",
+  "son",
+  "como",
+  "cual",
+  "cuales",
+  "cuanto",
+  "cuanta",
+  "cuantos",
+  "cuantas",
+  "cuando",
+  "donde",
+  "quien",
+  "quienes",
+  "porque",
+  "pueden",
+  "puede",
+  "puedo",
+  "the",
+  "of",
+  "and",
+  "for",
+  "to",
+  "in",
+  "on",
+  "with",
+  "an",
+  "is",
+  "are",
+  "how",
+  "what",
+  "why",
+  "when",
+  "where",
+  "who",
+  "do",
+  "does",
+  "can",
+  "i",
+  "my",
+  "your",
+  "els",
+  "les",
+  "per",
+  "amb",
+  "i",
+  "com",
+  "quan",
+  "on",
+  "al",
 ]);
 
 // Words that describe the kind of search, not its subject: they can sit inside
 // a topic ("requisitos herencia") but never be the topic on their own.
 const GENERIC = new Set([
-  "precio", "precios", "barato", "gratis", "online", "mejor", "mejore",
-  "opinion", "opiniones", "hacer", "sirve", "tipo", "tipos", "ejemplo",
-  "modelo", "plazo", "requisito", "cerca", "espana", "guia", "tutorial",
-  "definicion", "significado", "paso", "pasos", "forma", "formas", "manera",
-  "cuesta", "coste", "costes", "tiene", "tienen", "ser", "esta", "este",
-  "ese", "esa", "esto", "eso", "hace", "dia", "dias", "ano", "anos",
+  "precio",
+  "precios",
+  "barato",
+  "gratis",
+  "online",
+  "mejor",
+  "mejore",
+  "opinion",
+  "opiniones",
+  "hacer",
+  "sirve",
+  "tipo",
+  "tipos",
+  "ejemplo",
+  "modelo",
+  "plazo",
+  "requisito",
+  "cerca",
+  "espana",
+  "guia",
+  "tutorial",
+  "definicion",
+  "significado",
+  "paso",
+  "pasos",
+  "forma",
+  "formas",
+  "manera",
+  "cuesta",
+  "coste",
+  "costes",
+  "tiene",
+  "tienen",
+  "ser",
+  "esta",
+  "este",
+  "ese",
+  "esa",
+  "esto",
+  "eso",
+  "hace",
+  "dia",
+  "dias",
+  "ano",
+  "anos",
 ]);
 
 const MAX_GRAM_WORDS = 3;
@@ -70,10 +188,7 @@ const LENGTH_BONUS = [1, 1, 1.35, 1.5];
 const OTHERS = "Otros temas";
 
 function plain(text: string): string {
-  return text
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .toLowerCase();
+  return text.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 }
 
 /** Folds plurals: "impuestos" and "impuesto" are one word. */
@@ -82,7 +197,11 @@ function stem(word: string): string {
     return `${word.slice(0, -5)}ion`;
   }
   if (word.length > 4 && word.endsWith("ces")) return `${word.slice(0, -3)}z`;
-  if (word.length > 4 && word.endsWith("es") && "dlrznjy".includes(word[word.length - 3])) {
+  if (
+    word.length > 4 &&
+    word.endsWith("es") &&
+    "dlrznjy".includes(word[word.length - 3])
+  ) {
     return word.slice(0, -2);
   }
   if (word.length > 3 && word.endsWith("s")) return word.slice(0, -1);
@@ -95,7 +214,8 @@ function tokenize(query: string): Token[] {
   const tokens: Token[] = [];
   for (const surface of query.toLowerCase().split(/[^\p{L}\p{N}]+/u)) {
     const word = plain(surface);
-    if (word.length < 2 || STOPWORDS.has(word) || /^[0-9]+$/.test(word)) continue;
+    if (word.length < 2 || STOPWORDS.has(word) || /^[0-9]+$/.test(word))
+      continue;
     tokens.push({ stem: stem(word), surface });
   }
   return tokens;
@@ -121,7 +241,11 @@ function containsWords(haystack: string, needle: string): boolean {
 }
 
 function slug(text: string): string {
-  return plain(text).replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "tema";
+  return (
+    plain(text)
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "") || "tema"
+  );
 }
 
 type PreparedRow = {
@@ -191,23 +315,42 @@ export function buildTopics(input: {
   const minSupport = Math.max(3, Math.round(rows.length * 0.004));
   // A topic needs a minimum of visibility to be worth a line: the long tail of
   // tiny groups would only add noise.
-  const allImpressions = rows.reduce((sum, item) => sum + item.row.impressions, 0);
+  const allImpressions = rows.reduce(
+    (sum, item) => sum + item.row.impressions,
+    0,
+  );
   const minImpressions = Math.max(20, Math.round(allImpressions * 0.0005));
 
   const customTopics = (input.custom ?? [])
     .map((topic) => ({
       name: topic.name.trim(),
-      terms: topic.terms.map((term) => tokenize(term).map((t) => t.stem).join(" ")).filter(Boolean),
+      terms: topic.terms
+        .map((term) =>
+          tokenize(term)
+            .map((t) => t.stem)
+            .join(" "),
+        )
+        .filter(Boolean),
     }))
     .filter((topic) => topic.name && topic.terms.length > 0);
 
   const assigned = new Array<number>(rows.length).fill(-1);
-  const chosen: { gram: string; label: string; custom: boolean; name?: string }[] = [];
+  const chosen: {
+    gram: string;
+    label: string;
+    custom: boolean;
+    name?: string;
+  }[] = [];
 
   // 1. The user's own topics.
   customTopics.forEach((topic) => {
     const index = chosen.length;
-    chosen.push({ gram: "", label: topic.name, custom: true, name: topic.name });
+    chosen.push({
+      gram: "",
+      label: topic.name,
+      custom: true,
+      name: topic.name,
+    });
     rows.forEach((item, rowIndex) => {
       if (assigned[rowIndex] !== -1) return;
       if (topic.terms.some((term) => containsWords(item.plainQuery, term))) {
@@ -243,7 +386,10 @@ export function buildTopics(input: {
   for (const item of rows) {
     for (const token of tokenize(item.query)) {
       const forms = surface.get(token.stem) ?? new Map<string, number>();
-      forms.set(token.surface, (forms.get(token.surface) ?? 0) + item.row.impressions + 1);
+      forms.set(
+        token.surface,
+        (forms.get(token.surface) ?? 0) + item.row.impressions + 1,
+      );
       surface.set(token.stem, forms);
     }
   }
@@ -259,7 +405,8 @@ export function buildTopics(input: {
 
   const discovered = new Set<string>();
   while (chosen.length - customTopics.length < MAX_TOPICS) {
-    let best: { gram: string; score: number; impressions: number } | null = null;
+    let best: { gram: string; score: number; impressions: number } | null =
+      null;
     for (const gram of members.keys()) {
       const { impressions, count } = uncovered(gram);
       if (count < minSupport || impressions < minImpressions) continue;
@@ -275,7 +422,10 @@ export function buildTopics(input: {
       for (const gram of members.keys()) {
         if (!gram.includes(" ") || !containsWords(gram, best.gram)) continue;
         const { impressions, count } = uncovered(gram);
-        if (count < minSupport || impressions < best.impressions * SPECIFIC_SHARE) {
+        if (
+          count < minSupport ||
+          impressions < best.impressions * SPECIFIC_SHARE
+        ) {
           continue;
         }
         if (!specific || impressions > specific.impressions) {
@@ -286,7 +436,9 @@ export function buildTopics(input: {
     }
 
     const index = chosen.length;
-    const broader = [...discovered].some((gram) => containsWords(gram, best.gram));
+    const broader = [...discovered].some((gram) =>
+      containsWords(gram, best.gram),
+    );
     chosen.push({
       gram: best.gram,
       label: `${labelOf(best.gram)}${broader ? " (otros)" : ""}`,
@@ -300,7 +452,9 @@ export function buildTopics(input: {
 
   const othersIndex = chosen.length;
   const idOf = (index: number) =>
-    index === othersIndex ? slug(OTHERS) : `${index}-${slug(chosen[index].label)}`;
+    index === othersIndex
+      ? slug(OTHERS)
+      : `${index}-${slug(chosen[index].label)}`;
 
   /** The topic of any query, with the same rules the topics were built with. */
   const indexOfQuery = (query: string): number => {
@@ -332,16 +486,19 @@ export function buildTopics(input: {
     prev: { queries: number; clicks: number; impressions: number };
     pages: Map<string, { clicks: number; impressions: number }>;
   };
-  const accumulators: Accumulator[] = Array.from({ length: othersIndex + 1 }, () => ({
-    clicks: 0,
-    impressions: 0,
-    weighted: 0,
-    near: 0,
-    queries: [],
-    gramCounts: new Map(),
-    prev: { queries: 0, clicks: 0, impressions: 0 },
-    pages: new Map(),
-  }));
+  const accumulators: Accumulator[] = Array.from(
+    { length: othersIndex + 1 },
+    () => ({
+      clicks: 0,
+      impressions: 0,
+      weighted: 0,
+      near: 0,
+      queries: [],
+      gramCounts: new Map(),
+      prev: { queries: 0, clicks: 0, impressions: 0 },
+      pages: new Map(),
+    }),
+  );
 
   rows.forEach((item, rowIndex) => {
     const index = assigned[rowIndex] === -1 ? othersIndex : assigned[rowIndex];
@@ -376,7 +533,10 @@ export function buildTopics(input: {
     pages.set(page, entry);
   }
 
-  const totalImpressions = accumulators.reduce((sum, a) => sum + a.impressions, 0);
+  const totalImpressions = accumulators.reduce(
+    (sum, a) => sum + a.impressions,
+    0,
+  );
   const topics: Topic[] = accumulators
     .map((acc, index): Topic | null => {
       if (acc.queries.length === 0 && acc.prev.queries === 0) return null;
@@ -416,7 +576,9 @@ export function buildTopics(input: {
   return {
     topics,
     othersShare:
-      totalImpressions > 0 && others ? others.impressions / totalImpressions : 0,
+      totalImpressions > 0 && others
+        ? others.impressions / totalImpressions
+        : 0,
     topicOf: (query) => idOf(indexOfQuery(query)),
   };
 }

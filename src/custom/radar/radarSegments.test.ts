@@ -60,14 +60,21 @@ describe("pageTypeClassifier", () => {
   });
 
   it("keeps working on sites without language folders", () => {
-    const plain = ["https://x.com/blog/a", "https://x.com/blog/b", "https://x.com/precios"];
+    const plain = [
+      "https://x.com/blog/a",
+      "https://x.com/blog/b",
+      "https://x.com/precios",
+    ];
     const classify = pageTypeClassifier(plain);
     expect(classify("https://x.com/blog/a")).toBe("/blog/");
     expect(classify("https://x.com/precios")).toBe("Páginas en la raíz");
   });
 
   it("does not mistake a real folder for a language", () => {
-    const classify = pageTypeClassifier(["https://x.com/us/a", "https://x.com/us/b"]);
+    const classify = pageTypeClassifier([
+      "https://x.com/us/a",
+      "https://x.com/us/b",
+    ]);
     expect(classify("https://x.com/us/a")).toBe("/us/");
   });
 });
@@ -81,7 +88,10 @@ describe("languageClassifier", () => {
   });
 
   it("recognises regional variants", () => {
-    const result = languageClassifier(["https://x.com/pt-br/a", "https://x.com/es-es/a"]);
+    const result = languageClassifier([
+      "https://x.com/pt-br/a",
+      "https://x.com/es-es/a",
+    ]);
     expect(result.count).toBe(2);
     expect(result.classify("https://x.com/pt-br/a")).toBe("/pt-br/");
   });
@@ -89,15 +99,19 @@ describe("languageClassifier", () => {
 
 describe("queryIntent", () => {
   it("uses the landing page when the query has no intent words", () => {
-    expect(queryIntent("divorcio express", [], "https://x.com/es/servicios/divorcio")).toBe(
-      "Quieren comprar o contratar",
-    );
-    expect(queryIntent("herencia hacienda", [], "https://x.com/es/blog/herencia")).toBe(
-      "Quieren informarse",
-    );
-    expect(queryIntent("herencia hacienda", [], "https://x.com/es/otra/herencia")).toBe(
-      "Sin intención clara",
-    );
+    expect(
+      queryIntent(
+        "divorcio express",
+        [],
+        "https://x.com/es/servicios/divorcio",
+      ),
+    ).toBe("Quieren comprar o contratar");
+    expect(
+      queryIntent("herencia hacienda", [], "https://x.com/es/blog/herencia"),
+    ).toBe("Quieren informarse");
+    expect(
+      queryIntent("herencia hacienda", [], "https://x.com/es/otra/herencia"),
+    ).toBe("Sin intención clara");
   });
 
   it("lets the words of the query win over the page", () => {
@@ -108,7 +122,9 @@ describe("queryIntent", () => {
 
   it("reads the kind of page from its first folder", () => {
     expect(pageKindOf("https://x.com/blog/a")).toBe("content");
-    expect(pageKindOf("https://x.com/servicios-para-particulares/familia")).toBe("service");
+    expect(
+      pageKindOf("https://x.com/servicios-para-particulares/familia"),
+    ).toBe("service");
     expect(pageKindOf("https://x.com/precios")).toBeNull();
   });
 });

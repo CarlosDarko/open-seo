@@ -4,12 +4,7 @@ import { Button } from "@/client/components/ui/button";
 import { Card, CardContent } from "@/client/components/ui/card";
 import { KIND_META } from "@/custom/radar/client/ActionPlan";
 import { GoogleLink } from "@/custom/radar/client/RadarLinks";
-import {
-  decimal,
-  integer,
-  pathOf,
-  percent,
-} from "@/custom/radar/format";
+import { decimal, integer, pathOf, percent } from "@/custom/radar/format";
 import type { Impact, Verdict } from "@/custom/radar/trackingImpact";
 import {
   undoAction,
@@ -23,7 +18,10 @@ const dateFormat = new Intl.DateTimeFormat("es-ES", {
   timeZone: "Europe/Madrid",
 });
 
-const VERDICT: Record<Verdict, { label: string; className: string; text: string }> = {
+const VERDICT: Record<
+  Verdict,
+  { label: string; className: string; text: string }
+> = {
   mejora: {
     label: "Ha mejorado",
     className: "bg-success/10 text-success",
@@ -170,15 +168,17 @@ export function TrackedList({
   });
 
   if (loading) {
-    return <p className="text-sm text-muted-foreground">Midiendo el impacto…</p>;
+    return (
+      <p className="text-sm text-muted-foreground">Midiendo el impacto…</p>
+    );
   }
   if (items.length === 0) {
     return (
       <Card>
         <CardContent className="py-6 text-sm text-muted-foreground">
-          Todavía no has marcado ninguna tarea como hecha. Cuando lo hagas,
-          aquí verás qué pasó con esa página después del cambio: pasadas dos
-          semanas se compara con lo que había antes y con el conjunto del sitio.
+          Todavía no has marcado ninguna tarea como hecha. Cuando lo hagas, aquí
+          verás qué pasó con esa página después del cambio: pasadas dos semanas
+          se compara con lo que había antes y con el conjunto del sitio.
         </CardContent>
       </Card>
     );
@@ -198,7 +198,11 @@ export function TrackedList({
         const verdict = item.impact ? VERDICT[item.impact.verdict] : null;
         const title =
           item.title ??
-          (item.page ? pathOf(item.page) : item.query ? `«${item.query}»` : meta.label);
+          (item.page
+            ? pathOf(item.page)
+            : item.query
+              ? `«${item.query}»`
+              : meta.label);
         return (
           <Card key={item.id}>
             <CardContent className="space-y-3 py-1">
@@ -227,7 +231,10 @@ export function TrackedList({
                   )}
                   {item.query ? (
                     <p className="text-sm">
-                      <GoogleLink query={item.query} label={`«${item.query}»`} />
+                      <GoogleLink
+                        query={item.query}
+                        label={`«${item.query}»`}
+                      />
                     </p>
                   ) : null}
                 </div>

@@ -113,8 +113,9 @@ export function Segments({ sets }: { sets: SegmentSet[] }) {
               {active.merges.map((merge, index) => (
                 <span key={merge.label}>
                   {index > 0 ? "; " : ""}
-                  <strong className="text-foreground">{merge.label}</strong> ={" "}
-                  {merge.folders.join(", ")}
+                  <strong className="text-foreground">
+                    {merge.label}
+                  </strong> = {merge.folders.join(", ")}
                 </span>
               ))}
               . Se reconocen por palabras equivalentes conocidas.

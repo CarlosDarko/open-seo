@@ -16,7 +16,9 @@ export const customTopicsSchema = z
 
 export type CustomTopics = z.infer<typeof customTopicsSchema>;
 
-export async function getCustomTopics(projectId: string): Promise<CustomTopics> {
+export async function getCustomTopics(
+  projectId: string,
+): Promise<CustomTopics> {
   try {
     const raw = await env.KV.get(keyFor(projectId));
     if (!raw) return [];

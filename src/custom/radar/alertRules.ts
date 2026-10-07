@@ -97,7 +97,12 @@ export type Values = {
   position: number;
 };
 
-export type Item = { label: string; url: string | null; current: Values; previous: Values };
+export type Item = {
+  label: string;
+  url: string | null;
+  current: Values;
+  previous: Values;
+};
 
 export type Triggered = {
   label: string;
@@ -108,7 +113,10 @@ export type Triggered = {
   changePct: number | null;
 };
 
-export function isValidCombination(metric: Metric, condition: Condition): boolean {
+export function isValidCombination(
+  metric: Metric,
+  condition: Condition,
+): boolean {
   return VALID_CONDITIONS[metric].includes(condition);
 }
 
@@ -157,11 +165,17 @@ export function checkItem(rule: Rule, item: Item): Triggered | null {
         ? { ...base, changePct }
         : null;
     case "worse_by":
-      return enough && before > 0 && after > 0 && after - before >= rule.threshold
+      return enough &&
+        before > 0 &&
+        after > 0 &&
+        after - before >= rule.threshold
         ? { ...base, changePct }
         : null;
     case "better_by":
-      return enough && before > 0 && after > 0 && before - after >= rule.threshold
+      return enough &&
+        before > 0 &&
+        after > 0 &&
+        before - after >= rule.threshold
         ? { ...base, changePct }
         : null;
   }
@@ -259,7 +273,10 @@ function conditionText(rule: Rule): string {
 }
 
 const OP_TEXT = { gte: "al menos", lte: "como mucho" } as const;
-const PERIOD_TEXT = { current: "en el periodo actual", previous: "en el periodo anterior" } as const;
+const PERIOD_TEXT = {
+  current: "en el periodo actual",
+  previous: "en el periodo anterior",
+} as const;
 
 export function describeFilter(filter: Filter): string {
   const unit = filter.metric === "ctr" ? " %" : "";
@@ -276,7 +293,9 @@ export function describeRule(rule: Rule): string {
   const filters = (rule.filters ?? []).map(describeFilter);
   const notify = [
     "en la herramienta",
-    ...(rule.notify?.emails.length ? [`por correo a ${rule.notify.emails.join(", ")}`] : []),
+    ...(rule.notify?.emails.length
+      ? [`por correo a ${rule.notify.emails.join(", ")}`]
+      : []),
     ...(rule.notify?.webhooks.length
       ? [`por webhook (${rule.notify.webhooks.length})`]
       : []),
@@ -292,7 +311,15 @@ export function describeRule(rule: Rule): string {
 export function describeTrigger(rule: Rule, hits: Triggered[]): string {
   const days = `${rule.windowDays} días`;
   const what = METRIC_NAME[rule.metric];
-  const single: Scope[] = ["site", "site_brand", "site_nonbrand", "page", "query", "device", "country"];
+  const single: Scope[] = [
+    "site",
+    "site_brand",
+    "site_nonbrand",
+    "page",
+    "query",
+    "device",
+    "country",
+  ];
   if (single.includes(rule.scope)) {
     const hit = hits[0];
     const subject =

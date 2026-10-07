@@ -49,7 +49,9 @@ export async function saveNotifySettings(input: {
   const next: NotifySettings = {
     fromEmail: normalizeFrom(input.fromEmail),
     resendKey:
-      input.resendKey === undefined ? current.resendKey : input.resendKey?.trim() || null,
+      input.resendKey === undefined
+        ? current.resendKey
+        : input.resendKey?.trim() || null,
   };
   if (next.fromEmail === null && next.resendKey === null) {
     await env.KV.delete(SETTINGS_KEY);
@@ -70,9 +72,16 @@ export async function alertsLink(projectId: string): Promise<string | null> {
 
 export type SendResult = { channel: string; ok: boolean; error?: string };
 
-async function sendWebhook(url: string, message: AlertMessage): Promise<SendResult> {
+async function sendWebhook(
+  url: string,
+  message: AlertMessage,
+): Promise<SendResult> {
   if (!isSafeWebhookUrl(url)) {
-    return { channel: url, ok: false, error: "Dirección de webhook no permitida" };
+    return {
+      channel: url,
+      ok: false,
+      error: "Dirección de webhook no permitida",
+    };
   }
   try {
     const response = await fetch(url, {
@@ -99,11 +108,13 @@ async function sendEmail(
     return {
       channel: "correo",
       ok: false,
-      error: "Falta configurar el envío de correo (clave de Resend y remitente)",
+      error:
+        "Falta configurar el envío de correo (clave de Resend y remitente)",
     };
   }
   const to = emails.filter(isValidEmail);
-  if (to.length === 0) return { channel: "correo", ok: false, error: "Sin destinatarios válidos" };
+  if (to.length === 0)
+    return { channel: "correo", ok: false, error: "Sin destinatarios válidos" };
   try {
     const response = await fetch("https://api.resend.com/emails", {
       method: "POST",
@@ -121,14 +132,20 @@ async function sendEmail(
       signal: AbortSignal.timeout(10000),
     });
     if (response.ok) return { channel: "correo", ok: true };
-    const body = (await response.json().catch(() => ({}))) as { message?: string };
+    const body = (await response.json().catch(() => ({}))) as {
+      message?: string;
+    };
     return {
       channel: "correo",
       ok: false,
       error: body.message ?? `Resend respondió ${response.status}`,
     };
   } catch {
-    return { channel: "correo", ok: false, error: "No se pudo conectar con Resend" };
+    return {
+      channel: "correo",
+      ok: false,
+      error: "No se pudo conectar con Resend",
+    };
   }
 }
 
@@ -170,7 +187,8 @@ export async function sendTestNotification(input: {
     link: await alertsLink(input.projectId),
   });
   const results: SendResult[] = [];
-  if (input.emails.length > 0) results.push(await sendEmail(input.emails, message));
+  if (input.emails.length > 0)
+    results.push(await sendEmail(input.emails, message));
   if (input.webhook) results.push(await sendWebhook(input.webhook, message));
   return results;
 }
