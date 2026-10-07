@@ -852,7 +852,7 @@ function MoveList({
       >
         {title} ({integer.format(total)})
       </p>
-      <ul className="space-y-1">
+      <ul className="max-h-44 space-y-1 overflow-y-auto pr-1">
         {moves.map((move) => (
           <li
             key={move.query}
@@ -873,7 +873,8 @@ function MoveList({
       </ul>
       {total > moves.length ? (
         <p className="text-[11px] text-muted-foreground">
-          y {integer.format(total - moves.length)} más, de menos impresiones
+          Mostrando las {integer.format(moves.length)} con más impresiones de{" "}
+          {integer.format(total)}
         </p>
       ) : null}
     </div>

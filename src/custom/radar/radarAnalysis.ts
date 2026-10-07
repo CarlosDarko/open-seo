@@ -668,6 +668,9 @@ export function cannibalizedQueries(
 
 // ------------------------------------------------------- positions mix
 
+/** The most moved queries kept per band and direction (biggest first). */
+const MAX_BAND_MOVES = 100;
+
 /** A query that moved into or out of a position band between periods. */
 export type BandMove = {
   query: string;
@@ -775,8 +778,8 @@ export function positionBands(
     const { entered, left } = moves(index);
     band.enteredCount = entered.length;
     band.leftCount = left.length;
-    band.entered = entered.slice(0, 5);
-    band.left = left.slice(0, 5);
+    band.entered = entered.slice(0, MAX_BAND_MOVES);
+    band.left = left.slice(0, MAX_BAND_MOVES);
   });
   return bands;
 }
