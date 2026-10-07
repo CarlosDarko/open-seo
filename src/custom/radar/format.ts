@@ -1,0 +1,38 @@
+export const integer = new Intl.NumberFormat("es-ES", {
+  maximumFractionDigits: 0,
+});
+export const decimal = new Intl.NumberFormat("es-ES", {
+  minimumFractionDigits: 1,
+  maximumFractionDigits: 1,
+});
+export const percent = new Intl.NumberFormat("es-ES", {
+  style: "percent",
+  minimumFractionDigits: 1,
+  maximumFractionDigits: 1,
+});
+
+export function signed(value: number): string {
+  return `${value > 0 ? "+" : ""}${integer.format(value)}`;
+}
+
+export function relativeChange(now: number, before: number): number | null {
+  return before > 0 ? (now - before) / before : null;
+}
+
+/** "/ruta/de/la/pagina" for a full URL; the URL itself if it cannot be parsed. */
+export function pathOf(url: string): string {
+  try {
+    const parsed = new URL(url);
+    return `${parsed.pathname}${parsed.search}` || "/";
+  } catch {
+    return url;
+  }
+}
+
+export function googleSearchUrl(query: string): string {
+  return `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+}
+
+export function position(value: number | null): string {
+  return value === null ? "—" : decimal.format(value);
+}

@@ -1,0 +1,239 @@
+// Builds the "Plan de acción" from a Radar report: concrete tasks, each with
+// the page and query involved, the numbers behind it and the steps to take.
+// Tasks are grouped by kind instead of ranked against each other, because a
+// lost click, a snippet fix and a cannibalization have impacts that cannot be
+// compared honestly.
+import {
+  decimal,
+  integer,
+  pathOf,
+  percent,
+  position,
+  signed,
+} from "@/custom/radar/format";
+import type { PageChange } from "@/custom/radar/radarAnalysis";
+import type { getRadarReport } from "@/serverFunctions/radar";
+
+export type RadarReport = Extract<
+  Awaited<ReturnType<typeof getRadarReport>>,
+  { connected: true }
+>;
+
+export type ActionKind = "loss" | "snippet" | "push" | "cannibal";
+
+export type Action = {
+  id: string;
+  kind: ActionKind;
+  headline: string;
+  /** What the data says, one fact per line. */
+  lines: string[];
+  /** Steps that do not depend on reading the page. */
+  steps: string[];
+  /** Estimated clicks at stake, when it can be estimated. */
+  gain: number | null;
+  effort: "bajo" | "medio";
+  page: string | null;
+  query: string | null;
+  /** Your strongest other pages: where to add an internal link from. */
+  linkSources: string[];
+  /** Competing pages, owner first (cannibalization only). */
+  pages: { page: string; clicks: number; impressions: number; position: number }[];
+};
+
+export type ActionPlan = {
+  losses: Action[];
+  snippets: Action[];
+  pushes: Action[];
+  cannibals: Action[];
+};
+
+const MIN_LOSS_CLICKS = 2;
+
+function queryList(row: PageChange): string | null {
+  if (row.topQueries.length === 0) return null;
+  const items = row.topQueries.map(
+    (q) =>
+      `«${q.query}» (${signed(q.clicksDelta)} clics, posición ${position(q.prevPosition)} → ${position(q.position)})`,
+  );
+  return `Consultas que más pesan: ${items.join("; ")}.`;
+}
+
+function lossLines(row: PageChange): string[] {
+  const pos = `${position(row.prevPosition)} → ${position(row.position)}`;
+  const impressions = `${integer.format(row.prevImpressions)} → ${integer.format(row.impressions)}`;
+  const lines: string[] = [
+    `${integer.format(row.prevClicks)} clics antes, ${integer.format(row.clicks)} ahora.`,
+  ];
+  switch (row.cause) {
+    case "posicion":
+      lines.push(
+        `Causa probable: ha perdido posición (media ${pos}); otras páginas te han pasado por delante.`,
+      );
+      break;
+    case "demanda":
+      lines.push(
+        `Causa probable: se busca menos (impresiones ${impressions}) con la posición casi igual (${pos}). Suele ser estacionalidad.`,
+      );
+      break;
+    case "ctr": {
+      const ctr = row.impressions > 0 ? row.clicks / row.impressions : 0;
+      const prevCtr =
+        row.prevImpressions > 0 ? row.prevClicks / row.prevImpressions : 0;
+      lines.push(
+        `Causa probable: tu posición (${pos}) y las impresiones (${impressions}) aguantan, pero el CTR baja de ${percent.format(prevCtr)} a ${percent.format(ctr)}: tu fragmento atrae menos o hay resultados nuevos a su alrededor.`,
+      );
+      break;
+    }
+    case "perdida":
+      lines.push("Este periodo no recibe ningún clic de Google.");
+      break;
+    default:
+      lines.push(
+        `Varias cosas a la vez: posición ${pos}, impresiones ${impressions}.`,
+      );
+  }
+  const queries = queryList(row);
+  if (queries) lines.push(queries);
+  return lines;
+}
+
+function lossSteps(row: PageChange): string[] {
+  const topQuery = row.topQueries[0]?.query;
+  const search = topQuery ? `«${topQuery}»` : "su consulta principal";
+  switch (row.cause) {
+    case "posicion":
+      return [
+        `Busca ${search} en Google (enlace de abajo) y compara tu página con las tres primeras: qué secciones, datos o formatos tienen que a ti te faltan.`,
+        "Actualiza el contenido: cifras y fechas actuales, secciones que faltan, ejemplos y preguntas frecuentes.",
+        "Añade enlaces internos hacia ella desde tus páginas con más tráfico.",
+        "Cuando acabes: Search Console → Inspección de URL → «Solicitar indexación».",
+      ];
+    case "demanda":
+      return [
+        "Search Console → Rendimiento → Comparar con el mismo periodo del año pasado: si cae todos los años en estas fechas es estacionalidad y no hay nada roto.",
+        "Si no es estacional, mira el interés del tema en Google Trends.",
+        "Aprovecha para actualizar el contenido antes de la próxima temporada alta.",
+      ];
+    case "ctr":
+      return [
+        `Busca ${search} en Google y mira qué hay por encima de ti (cuadros de IA, vídeos, «Otras preguntas»).`,
+        "Reescribe título y meta descripción para destacar frente a esos resultados (dato, beneficio, año).",
+        "Prueba durante 2-3 semanas y vuelve a mirar el CTR.",
+      ];
+    case "perdida":
+      return [
+        "Comprueba que la URL sigue activa, sin «noindex» ni redirecciones nuevas.",
+        "Inspecciónala en Search Console (Inspección de URL) para ver si Google la indexa.",
+        "Si la borraste a propósito, redirígela con un 301 a la página más parecida.",
+      ];
+    default:
+      return [
+        `Busca ${search} en Google y compara tu página con las tres primeras.`,
+        "Revisa título, meta descripción y contenido; actualiza lo que haya quedado antiguo.",
+      ];
+  }
+}
+
+export function buildActions(report: RadarReport): ActionPlan {
+  const sources = report.topPages.map((page) => page.url);
+
+  const losses: Action[] = report.pageChanges.losers
+    .filter((row) => row.clicksDelta <= -MIN_LOSS_CLICKS)
+    .slice(0, 3)
+    .map((row) => ({
+      id: `loss:${row.key}`,
+      kind: "loss",
+      headline: `${pathOf(row.key)} pierde ${integer.format(-row.clicksDelta)} clics`,
+      lines: lossLines(row),
+      steps: lossSteps(row),
+      gain: -row.clicksDelta,
+      effort: "medio",
+      page: row.key,
+      query: row.topQueries[0]?.query ?? null,
+      linkSources: [],
+      pages: [],
+    }));
+
+  const snippets: Action[] = report.ctrOpportunities
+    .filter((item) => item.page)
+    .slice(0, 5)
+    .map((item) => ({
+      id: `snippet:${item.query}`,
+      kind: "snippet",
+      headline: `Reescribe el título y la meta de ${pathOf(item.page!)} para «${item.query}»`,
+      lines: [
+        `Posición ${decimal.format(item.position)} con ${integer.format(item.impressions)} impresiones, pero solo ${integer.format(item.clicks)} clics (CTR ${percent.format(item.ctr)}).`,
+        `Tu sitio consigue de media ${percent.format(item.expectedCtr)} en esa posición: la diferencia son unos ${integer.format(item.potentialClicks)} clics.`,
+      ],
+      steps: [],
+      gain: item.potentialClicks,
+      effort: "bajo",
+      page: item.page,
+      query: item.query,
+      linkSources: [],
+      pages: [],
+    }));
+
+  const pushes: Action[] = report.nearTop.slice(0, 3).map((item) => ({
+    id: `push:${item.query}`,
+    kind: "push",
+    headline: `Sube «${item.query}» al top 3 con ${pathOf(item.page)}`,
+    lines: [
+      `Posición ${decimal.format(item.position)} con ${integer.format(item.impressions)} impresiones y ${integer.format(item.clicks)} clics.`,
+      `En el top 3 tu sitio consigue de media ${percent.format(report.ctrCurve[2])} de CTR: unos ${integer.format(item.potentialClicks)} clics más (potencial máximo).`,
+    ],
+    steps: [
+      `Busca «${item.query}» en Google (enlace de abajo) y mira qué cubren las tres primeras páginas que tú no cubres.`,
+      "Amplía o reordena el contenido para responder mejor; añade las preguntas y subtemas que aparecen en Google.",
+    ],
+    gain: item.potentialClicks,
+    effort: "medio",
+    page: item.page,
+    query: item.query,
+    linkSources: sources.filter((url) => url !== item.page).slice(0, 3),
+    pages: [],
+  }));
+
+  const cannibals: Action[] = report.cannibalized.slice(0, 3).map((item) => {
+    const [owner, ...others] = item.pages;
+    return {
+      id: `cannibal:${item.query}`,
+      kind: "cannibal",
+      headline: `«${item.query}»: ${item.pages.length} de tus páginas compiten entre sí`,
+      lines: [
+        `Se reparten ${integer.format(item.totalImpressions)} impresiones y ${integer.format(item.totalClicks)} clics.`,
+        `Página propuesta como principal: ${pathOf(owner.page)} (${integer.format(owner.clicks)} clics, posición ${decimal.format(owner.position)}).`,
+      ],
+      steps: [
+        `Decide que ${pathOf(owner.page)} es la página para «${item.query}».`,
+        ...others.map(
+          (other) =>
+            `${pathOf(other.page)}: si trata lo mismo, redirígela con un 301 a ${pathOf(owner.page)} (rescatando lo útil de su contenido); si es otra intención, cambia su título y su H1 para que no compita por «${item.query}».`,
+        ),
+        `Enlaza desde las secundarias a ${pathOf(owner.page)} con el texto «${item.query}», y no uses ese texto para enlazar a las secundarias.`,
+      ],
+      gain: null,
+      effort: "medio",
+      page: owner.page,
+      query: item.query,
+      linkSources: [],
+      pages: item.pages,
+    };
+  });
+
+  return { losses, snippets, pushes, cannibals };
+}
+
+/** Every URL whose on-page signals the plan needs, without repeats. */
+export function signalUrls(plan: ActionPlan): string[] {
+  const urls = new Set<string>();
+  for (const action of [...plan.snippets, ...plan.pushes, ...plan.cannibals]) {
+    if (action.kind === "cannibal") {
+      for (const page of action.pages.slice(0, 2)) urls.add(page.page);
+    } else if (action.page) {
+      urls.add(action.page);
+    }
+    for (const source of action.linkSources) urls.add(source);
+  }
+  return [...urls].slice(0, 16);
+}
