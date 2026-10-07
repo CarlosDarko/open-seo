@@ -254,7 +254,7 @@ export function ActionPlanPage({ projectId }: { projectId: string }) {
                     <strong className="text-foreground">
                       +{integer.format(quickGain)} clics
                     </strong>{" "}
-                    (estimación)
+                    cada {report.period.days} días (estimación)
                   </span>
                 ) : null}
               </div>
@@ -301,6 +301,7 @@ export function ActionPlanPage({ projectId }: { projectId: string }) {
                               action={action}
                               title={taskTitle(action, signals)}
                               onOpen={() => setSelectedId(action.id)}
+                              periodDays={report.period.days}
                             />
                           ))
                         )}
@@ -327,6 +328,7 @@ export function ActionPlanPage({ projectId }: { projectId: string }) {
                       loadingSignals={loading}
                       open
                       hideToggle
+                      periodDays={report.period.days}
                       onToggle={() => undefined}
                       onMarkDone={(title) =>
                         markDone.mutate(

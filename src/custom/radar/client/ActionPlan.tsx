@@ -444,6 +444,7 @@ export function ActionCard({
   onMarkDone,
   marking,
   hideToggle,
+  periodDays,
 }: {
   action: Action;
   signals: Map<string, PageSignals>;
@@ -455,6 +456,8 @@ export function ActionCard({
   marking?: boolean;
   /** Inside the pop-up the detail is always shown and the card is not folded. */
   hideToggle?: boolean;
+  /** Length of the period the figures refer to, to say so on the card. */
+  periodDays?: number;
 }) {
   const meta = KIND_META[action.kind];
   const tone = TONES[meta.tone];
@@ -542,6 +545,7 @@ export function ActionCard({
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
                   {isLoss ? "clics perdidos" : "clics posibles"}
+                  {periodDays ? ` en ${periodDays} días` : ""}
                 </p>
               </>
             ) : (
@@ -799,10 +803,12 @@ export function TaskTile({
   action,
   title,
   onOpen,
+  periodDays,
 }: {
   action: Action;
   title: string;
   onOpen: () => void;
+  periodDays?: number;
 }) {
   const meta = KIND_META[action.kind];
   const tone = TONES[meta.tone];
@@ -813,6 +819,11 @@ export function TaskTile({
       type="button"
       data-task-id={action.id}
       onClick={onOpen}
+      title={
+        action.gain !== null
+          ? `${action.kind === "loss" ? "Clics perdidos" : "Clics que podrías ganar"}${periodDays ? ` en ${periodDays} días` : ""}`
+          : undefined
+      }
       className={`group w-full space-y-2 rounded-lg border border-border border-l-4 bg-card p-3 text-left shadow-xs transition hover:-translate-y-0.5 hover:shadow-md focus-visible:ring-3 focus-visible:ring-ring/50 ${tone.border}`}
     >
       <span className="flex items-center justify-between gap-2">

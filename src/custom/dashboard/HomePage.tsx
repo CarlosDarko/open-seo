@@ -320,7 +320,7 @@ export function HomePage({ projectId }: { projectId: string }) {
                                       {integer.format(action.gain)}
                                     </span>
                                     <span className="block text-[11px] text-muted-foreground">
-                                      {isLoss ? "clics perdidos" : "clics posibles"}
+                                      {isLoss ? "clics perdidos" : "clics posibles"} en {report.period.days} días
                                     </span>
                                   </span>
                                 ) : null}
