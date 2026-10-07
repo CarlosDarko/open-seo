@@ -795,7 +795,6 @@ export function TaskTile({
   const tone = TONES[meta.tone];
   const Icon = meta.icon;
   const isLoss = action.kind === "loss";
-  const path = action.kind === "cannibal" || !action.page ? null : pathOf(action.page);
   return (
     <button
       type="button"
@@ -819,14 +818,12 @@ export function TaskTile({
           </span>
         ) : null}
       </span>
-      <span className="line-clamp-2 block text-sm leading-snug font-medium">
+      <span className="line-clamp-2 block text-sm leading-snug font-semibold">
+        {tileHeadline(action)}
+      </span>
+      <span className="line-clamp-2 block text-xs leading-snug text-muted-foreground">
         {title}
       </span>
-      {path ? (
-        <span className="block truncate font-mono text-[11px] text-muted-foreground">
-          {path}
-        </span>
-      ) : null}
       <span className="flex items-center justify-between gap-2">
         <span className="line-clamp-1 text-xs text-muted-foreground">
           {action.stats
@@ -845,9 +842,32 @@ export function taskTitle(
   action: Action,
   signals: Map<string, PageSignals>,
 ): string {
-  if (action.kind === "cannibal") return `«${action.query ?? ""}»`;
+  if (action.kind === "cannibal") return `${action.pages.length} páginas tuyas compiten`;
   const info = action.page ? signals.get(action.page) : undefined;
   if (info?.ok && info.title) return info.title;
   const path = action.page ? pathOf(action.page) : null;
   return path === "/" ? "Página de inicio" : (path ?? `«${action.query ?? ""}»`);
+}
+
+/** What the task is, in one sentence and without the page address. */
+export function tileHeadline(action: Action): string {
+  const query = action.query ? `«${action.query}»` : "";
+  switch (action.kind) {
+    case "loss":
+      return action.gain !== null
+        ? `Recupera los ${integer.format(action.gain)} clics que ha perdido esta página`
+        : "Averigua por qué esta página pierde clics";
+    case "snippet":
+      return `Reescribe título y meta para ${query}`;
+    case "push":
+      return `Sube ${query} al top 3`;
+    case "question":
+      return `Responde la pregunta ${query}`;
+    case "cannibal":
+      return `Ordena las páginas que compiten por ${query}`;
+    case "traction":
+      return "Refuerza esta página: se ve mucho pero está muy abajo";
+    case "emerging":
+      return `Aprovecha la consulta nueva ${query}`;
+  }
 }
