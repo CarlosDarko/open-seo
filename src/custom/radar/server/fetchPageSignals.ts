@@ -31,6 +31,7 @@ function failed(url: string, error: string): PageSignals {
     title: null,
     metaDescription: null,
     h1: [],
+    headings: [],
     canonical: null,
     noindex: false,
     links: [],

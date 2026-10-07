@@ -1,72 +1,162 @@
 import { useMemo, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { CircleAlert, CircleCheck, TriangleAlert } from "lucide-react";
-import { Badge } from "@/client/components/ui/badge";
 import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/client/components/ui/card";
+  ArrowUpRight,
+  CircleAlert,
+  CircleCheck,
+  CircleHelp,
+  GitMerge,
+  Layers,
+  PenLine,
+  Sparkles,
+  TriangleAlert,
+  TrendingDown,
+  type LucideIcon,
+} from "lucide-react";
+import { Badge } from "@/client/components/ui/badge";
+import { Card, CardContent } from "@/client/components/ui/card";
 import { Skeleton } from "@/client/components/ui/skeleton";
 import {
-  buildActions,
   signalUrls,
   type Action,
-  type RadarReport,
+  type ActionKind,
+  type ActionPlan as Plan,
 } from "@/custom/radar/actions";
 import {
   missingLinkSources,
   pushFindings,
   queryWords,
+  questionFindings,
   snippetFindings,
   type Finding,
 } from "@/custom/radar/diagnostics";
 import { integer, pathOf } from "@/custom/radar/format";
 import type { PageSignals } from "@/custom/radar/pageSignals";
-import {
-  GoogleLink,
-  PageLink,
-} from "@/custom/radar/client/RadarLinks";
+import { GoogleLink, PageLink } from "@/custom/radar/client/RadarLinks";
 import { getRadarPageSignals } from "@/serverFunctions/radar";
 
-const GROUPS = [
-  {
-    key: "losses",
-    title: "Primero: lo que se está perdiendo",
-    help: "Páginas que han perdido clics. Averigua el motivo antes de tocar nada.",
-    badge: "Pérdida",
-  },
-  {
-    key: "snippets",
-    title: "Victorias rápidas: reescribe títulos y metas",
-    help: "Consultas de primera página que reciben menos clics de los que tu sitio suele conseguir en esa posición. Es lo más rápido de arreglar.",
-    badge: "Reescribir",
-  },
-  {
-    key: "pushes",
-    title: "Empuja estas consultas al top 3",
-    help: "Ya estás cerca: con un contenido mejor y más enlaces internos pueden subir.",
-    badge: "Subir",
-  },
-  {
-    key: "cannibals",
-    title: "Ordena las páginas que compiten entre sí",
-    help: "Cuando dos páginas se reparten una consulta, Google duda y ninguna rinde lo que podría.",
-    badge: "Ordenar",
-  },
-] as const;
+type Tone = "destructive" | "primary" | "success" | "info" | "warning";
 
-export function ActionPlan({
-  projectId,
-  report,
-}: {
-  projectId: string;
-  report: RadarReport;
-}) {
-  const plan = useMemo(() => buildActions(report), [report]);
+// Full class names on purpose: Tailwind only keeps classes it can read.
+const TONES: Record<
+  Tone,
+  { border: string; soft: string; text: string; dot: string }
+> = {
+  destructive: {
+    border: "border-l-destructive",
+    soft: "bg-destructive/10",
+    text: "text-destructive",
+    dot: "bg-destructive",
+  },
+  primary: {
+    border: "border-l-primary",
+    soft: "bg-primary/10",
+    text: "text-primary",
+    dot: "bg-primary",
+  },
+  success: {
+    border: "border-l-success",
+    soft: "bg-success/10",
+    text: "text-success",
+    dot: "bg-success",
+  },
+  info: {
+    border: "border-l-info",
+    soft: "bg-info/10",
+    text: "text-info",
+    dot: "bg-info",
+  },
+  warning: {
+    border: "border-l-warning",
+    soft: "bg-warning/10",
+    text: "text-warning",
+    dot: "bg-warning",
+  },
+};
+
+export const KIND_META: Record<
+  ActionKind,
+  {
+    planKey: keyof Plan;
+    icon: LucideIcon;
+    tone: Tone;
+    badge: string;
+    title: string;
+    help: string;
+  }
+> = {
+  loss: {
+    planKey: "losses",
+    icon: TrendingDown,
+    tone: "destructive",
+    badge: "Pérdida",
+    title: "Lo que se está perdiendo",
+    help: "Páginas que han perdido clics. Averigua el motivo antes de tocar nada.",
+  },
+  snippet: {
+    planKey: "snippets",
+    icon: PenLine,
+    tone: "primary",
+    badge: "Reescribir",
+    title: "Reescribe títulos y metas",
+    help: "Consultas de primera página con menos clics de los que tu sitio suele conseguir en esa posición. Es lo más rápido de arreglar.",
+  },
+  push: {
+    planKey: "pushes",
+    icon: ArrowUpRight,
+    tone: "success",
+    badge: "Subir",
+    title: "Empuja al top 3",
+    help: "Ya estás cerca: con mejor contenido y más enlaces internos pueden subir.",
+  },
+  question: {
+    planKey: "questions",
+    icon: CircleHelp,
+    tone: "info",
+    badge: "Responder",
+    title: "Responde preguntas",
+    help: "Preguntas que la gente hace y para las que ya apareces: conviértelas en la respuesta que Google destaca.",
+  },
+  cannibal: {
+    planKey: "cannibals",
+    icon: GitMerge,
+    tone: "warning",
+    badge: "Ordenar",
+    title: "Ordena páginas que compiten",
+    help: "Cuando dos páginas se reparten una consulta, Google duda y ninguna rinde lo que podría.",
+  },
+  traction: {
+    planKey: "traction",
+    icon: Layers,
+    tone: "info",
+    badge: "Reforzar",
+    title: "Refuerza páginas sin tracción",
+    help: "Google las muestra mucho pero muy abajo: el tema está bien y falta calidad, profundidad o enlaces.",
+  },
+  emerging: {
+    planKey: "emerging",
+    icon: Sparkles,
+    tone: "success",
+    badge: "Aprovechar",
+    title: "Aprovecha temas emergentes",
+    help: "Consultas nuevas que empiezan a traerte impresiones: refuérzalas antes de que otros lo hagan.",
+  },
+};
+
+export const KIND_ORDER: ActionKind[] = [
+  "loss",
+  "snippet",
+  "push",
+  "question",
+  "cannibal",
+  "traction",
+  "emerging",
+];
+
+/** Reads the on-page signals of every page the plan mentions, once. */
+export function usePlanSignals(projectId: string, plan: Plan) {
   const urls = useMemo(() => signalUrls(plan), [plan]);
-  const signalsQuery = useQuery({
+  const query = useQuery({
     queryKey: ["radar-signals", projectId, urls],
     queryFn: () => getRadarPageSignals({ data: { projectId, urls } }),
     enabled: urls.length > 0,
@@ -75,52 +165,11 @@ export function ActionPlan({
   const signals = useMemo(
     () =>
       new Map<string, PageSignals>(
-        (signalsQuery.data?.signals ?? []).map((item) => [item.url, item]),
+        (query.data?.signals ?? []).map((item) => [item.url, item]),
       ),
-    [signalsQuery.data],
+    [query.data],
   );
-
-  const total = GROUPS.reduce((sum, group) => sum + plan[group.key].length, 0);
-
-  return (
-    <section className="space-y-4">
-      <div>
-        <h2 className="text-lg font-semibold">Plan de acción</h2>
-        <p className="text-sm text-muted-foreground">
-          Tareas concretas, con la página y la consulta implicadas. Leo el
-          título, la meta descripción y el H1 reales de tu web para decirte qué
-          cambiar.
-        </p>
-      </div>
-      {total === 0 ? (
-        <Card>
-          <CardContent className="py-6 text-sm text-muted-foreground">
-            No hay tareas claras en este periodo: no se detectan pérdidas
-            relevantes ni consultas con potencial suficiente.
-          </CardContent>
-        </Card>
-      ) : null}
-      {GROUPS.map((group) =>
-        plan[group.key].length > 0 ? (
-          <div key={group.key} className="space-y-3">
-            <div>
-              <h3 className="font-medium">{group.title}</h3>
-              <p className="text-xs text-muted-foreground">{group.help}</p>
-            </div>
-            {plan[group.key].map((action) => (
-              <ActionCard
-                key={action.id}
-                action={action}
-                badge={group.badge}
-                signals={signals}
-                loadingSignals={signalsQuery.isPending && urls.length > 0}
-              />
-            ))}
-          </div>
-        ) : null,
-      )}
-    </section>
-  );
+  return { signals, loading: query.isPending && urls.length > 0 };
 }
 
 function FindingRow({ finding }: { finding: Finding }) {
@@ -148,22 +197,29 @@ function findingsFor(
   action: Action,
   signals: Map<string, PageSignals>,
 ): { findings: Finding[]; extra: ReactNode } | null {
-  if (action.kind === "snippet" && action.page && action.query) {
-    const page = signals.get(action.page);
-    return page
-      ? { findings: snippetFindings(page, action.query), extra: null }
-      : null;
+  const page = action.page ? signals.get(action.page) : undefined;
+  if (action.kind === "snippet" && page && action.query) {
+    return { findings: snippetFindings(page, action.query), extra: null };
   }
-  if (action.kind === "push" && action.page && action.query) {
-    const page = signals.get(action.page);
-    if (!page) return null;
+  if (action.kind === "question" && page && action.query) {
+    return { findings: questionFindings(page, action.query), extra: null };
+  }
+  if ((action.kind === "push" || action.kind === "traction") && page) {
     const sources = action.linkSources.flatMap((url) => {
       const source = signals.get(url);
       return source ? [source] : [];
     });
-    const missing = missingLinkSources(action.page, sources);
+    const missing = action.page ? missingLinkSources(action.page, sources) : [];
+    const anchor = action.query ? ` con el texto «${action.query}»` : "";
     return {
-      findings: pushFindings(page, action.query),
+      findings: action.query
+        ? pushFindings(page, action.query)
+        : [
+            {
+              level: "ok",
+              text: `Contenido de ${integer.format(page.wordCount)} palabras.`,
+            },
+          ],
       extra:
         sources.length === 0 ? null : (
           <div className="space-y-1 text-sm">
@@ -172,8 +228,7 @@ function findingsFor(
               <>
                 <p>
                   Estas páginas fuertes de tu web aún no enlazan a{" "}
-                  {pathOf(action.page)}. Añade un enlace con el texto «
-                  {action.query}»:
+                  {pathOf(action.page ?? "")}. Añade un enlace{anchor}:
                 </p>
                 <ul className="space-y-0.5 pl-4">
                   {missing.map((url) => (
@@ -195,78 +250,114 @@ function findingsFor(
   }
   if (action.kind === "cannibal") {
     const findings: Finding[] = [];
-    const words = action.query ? queryWords(action.query) : [];
-    for (const page of action.pages.slice(0, 2)) {
-      const info = signals.get(page.page);
+    for (const item of action.pages.slice(0, 2)) {
+      const info = signals.get(item.page);
       if (!info?.ok) continue;
-      const title = info.title ?? "(sin título)";
       findings.push({
         level: "warn",
-        text: `${pathOf(page.page)} — título «${title}»${info.h1[0] ? `, H1 «${info.h1[0]}»` : ""}.`,
+        text: `${pathOf(item.page)}: título «${info.title ?? "(sin título)"}»${info.h1[0] ? `, H1 «${info.h1[0]}»` : ""}.`,
       });
     }
-    if (findings.length === 2 && words.length > 0) {
-      findings.push({
-        level: "warn",
-        text: "Si los dos títulos y H1 apuntan a la misma consulta, diferencia claramente la intención de cada página o fusiónalas.",
-      });
+    if (findings.length === 2 && action.query) {
+      const words = queryWords(action.query);
+      if (words.length > 0) {
+        findings.push({
+          level: "warn",
+          text: "Si los dos títulos y H1 apuntan a la misma consulta, diferencia la intención de cada página o fusiónalas.",
+        });
+      }
     }
     return findings.length > 0 ? { findings, extra: null } : null;
   }
   return null;
 }
 
-function ActionCard({
+function SectionLabel({ children }: { children: ReactNode }) {
+  return (
+    <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+      {children}
+    </p>
+  );
+}
+
+export function ActionCard({
   action,
-  badge,
   signals,
   loadingSignals,
 }: {
   action: Action;
-  badge: string;
   signals: Map<string, PageSignals>;
   loadingSignals: boolean;
 }) {
-  const needsPage = action.kind !== "loss";
+  const meta = KIND_META[action.kind];
+  const tone = TONES[meta.tone];
+  const Icon = meta.icon;
+  const needsPage = action.kind !== "loss" && action.kind !== "emerging";
   const diagnosis = needsPage ? findingsFor(action, signals) : null;
 
   return (
-    <Card>
-      <CardHeader className="space-y-2">
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="secondary">{badge}</Badge>
-          {action.gain !== null ? (
-            <Badge variant="outline">
-              {action.kind === "loss" ? "−" : "≈ +"}
-              {integer.format(action.gain)} clics
-            </Badge>
-          ) : null}
-          <Badge variant="outline">Esfuerzo {action.effort}</Badge>
+    <Card className={`border-l-4 ${tone.border}`}>
+      <CardContent className="space-y-4 py-1">
+        <div className="flex items-start gap-3">
+          <span
+            className={`flex size-9 shrink-0 items-center justify-center rounded-full ${tone.soft} ${tone.text}`}
+          >
+            <Icon className="size-5" aria-hidden />
+          </span>
+          <div className="min-w-0 flex-1 space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge className={`${tone.soft} ${tone.text} border-0`}>
+                {meta.badge}
+              </Badge>
+              {action.gain !== null ? (
+                <Badge
+                  variant="outline"
+                  className={
+                    action.kind === "loss"
+                      ? "border-destructive/40 text-destructive"
+                      : "border-success/40 text-success"
+                  }
+                >
+                  {action.kind === "loss" ? "−" : "≈ +"}
+                  {integer.format(action.gain)} clics
+                </Badge>
+              ) : null}
+              <Badge variant="outline" className="text-muted-foreground">
+                Esfuerzo {action.effort}
+              </Badge>
+            </div>
+            <h4 className="leading-snug font-semibold">{action.headline}</h4>
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+              {action.kind === "cannibal" ? (
+                action.pages.map((item) => (
+                  <PageLink key={item.page} url={item.page} />
+                ))
+              ) : action.page ? (
+                <PageLink url={action.page} />
+              ) : null}
+              {action.query ? <GoogleLink query={action.query} /> : null}
+            </div>
+          </div>
         </div>
-        <CardTitle className="text-base leading-snug">
-          {action.headline}
-        </CardTitle>
-        <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
-          {action.kind === "cannibal" ? (
-            action.pages.map((page) => (
-              <PageLink key={page.page} url={page.page} />
-            ))
-          ) : action.page ? (
-            <PageLink url={action.page} />
-          ) : null}
-          {action.query ? <GoogleLink query={action.query} /> : null}
+
+        <div className="space-y-1.5">
+          <SectionLabel>Qué dicen los datos</SectionLabel>
+          <ul className="space-y-1.5">
+            {action.lines.map((line) => (
+              <li key={line} className="flex gap-2 text-sm">
+                <span
+                  className={`mt-1.5 size-1.5 shrink-0 rounded-full ${tone.dot}`}
+                  aria-hidden
+                />
+                <span>{line}</span>
+              </li>
+            ))}
+          </ul>
         </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <ul className="list-disc space-y-1 pl-5 text-sm">
-          {action.lines.map((line) => (
-            <li key={line}>{line}</li>
-          ))}
-        </ul>
 
         {needsPage ? (
-          <div className="space-y-2 rounded-md bg-muted/50 p-3">
-            <p className="text-sm font-medium">Qué cambiar en la página</p>
+          <div className="space-y-2 rounded-lg border border-border bg-muted/40 p-3">
+            <SectionLabel>Qué cambiar en la página</SectionLabel>
             {diagnosis ? (
               <ul className="space-y-1.5">
                 {diagnosis.findings.map((finding) => (
@@ -289,11 +380,18 @@ function ActionCard({
         ) : null}
 
         {action.steps.length > 0 ? (
-          <div className="space-y-1">
-            <p className="text-sm font-medium">Pasos</p>
-            <ol className="list-decimal space-y-1 pl-5 text-sm">
-              {action.steps.map((step) => (
-                <li key={step}>{step}</li>
+          <div className="space-y-2">
+            <SectionLabel>Pasos</SectionLabel>
+            <ol className="space-y-2">
+              {action.steps.map((step, index) => (
+                <li key={step} className="flex gap-3 text-sm">
+                  <span
+                    className={`flex size-5 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${tone.soft} ${tone.text}`}
+                  >
+                    {index + 1}
+                  </span>
+                  <span>{step}</span>
+                </li>
               ))}
             </ol>
           </div>

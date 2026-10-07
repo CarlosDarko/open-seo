@@ -35,6 +35,7 @@ const signals = (overrides: Partial<PageSignals> = {}): PageSignals => ({
   metaDescription:
     "Te explicamos paso a paso la adjudicación de herencia, los plazos, los impuestos y los documentos que necesitas.",
   h1: ["Adjudicación de herencia"],
+  headings: [],
   canonical: null,
   noindex: false,
   links: [],

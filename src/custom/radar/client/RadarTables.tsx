@@ -41,13 +41,7 @@ const CAUSE_LABEL: Record<ChangeCause, string> = {
 export function RadarTables({ report }: { report: RadarReport }) {
   const [tab, setTab] = useState<DetailTab>("changes");
   return (
-    <section className="space-y-4">
-      <div>
-        <h2 className="text-lg font-semibold">Todos los datos</h2>
-        <p className="text-sm text-muted-foreground">
-          El detalle completo detrás del plan de acción.
-        </p>
-      </div>
+    <div className="space-y-4">
       <Tabs value={tab} onValueChange={(value) => setTab(value as DetailTab)}>
         <TabsList>
           <TabsTrigger value="changes">Ganadores y perdedores</TabsTrigger>
@@ -67,16 +61,14 @@ export function RadarTables({ report }: { report: RadarReport }) {
             title="Páginas que más ganan"
             rows={report.pageChanges.winners}
           />
-          <div className="grid gap-4 lg:grid-cols-2">
-            <QueryChangeTable
-              title="Consultas que más pierden"
-              rows={report.queryChanges.losers}
-            />
-            <QueryChangeTable
-              title="Consultas que más ganan"
-              rows={report.queryChanges.winners}
-            />
-          </div>
+          <QueryChangeTable
+            title="Consultas que más pierden"
+            rows={report.queryChanges.losers}
+          />
+          <QueryChangeTable
+            title="Consultas que más ganan"
+            rows={report.queryChanges.winners}
+          />
         </div>
       ) : tab === "opportunities" ? (
         <div className="space-y-4">
@@ -88,7 +80,7 @@ export function RadarTables({ report }: { report: RadarReport }) {
             rows={report.nearTop.map((row) => ({
               key: `${row.query}|${row.page}`,
               cells: [
-                <GoogleLink key="q" query={row.query} label={row.query} />,
+                <GoogleLink key="q" query={row.query} label={row.query} subtle />,
                 <PageLink key="p" url={row.page} />,
                 decimal.format(row.position),
                 integer.format(row.impressions),
@@ -104,7 +96,7 @@ export function RadarTables({ report }: { report: RadarReport }) {
             rows={report.ctrOpportunities.map((row) => ({
               key: row.query,
               cells: [
-                <GoogleLink key="q" query={row.query} label={row.query} />,
+                <GoogleLink key="q" query={row.query} label={row.query} subtle />,
                 row.page ? <PageLink key="p" url={row.page} /> : "—",
                 decimal.format(row.position),
                 `${percent.format(row.ctr)} (${percent.format(row.expectedCtr)})`,
@@ -122,7 +114,7 @@ export function RadarTables({ report }: { report: RadarReport }) {
           rows={report.cannibalized.map((row) => ({
             key: row.query,
             cells: [
-              <GoogleLink key="q" query={row.query} label={row.query} />,
+              <GoogleLink key="q" query={row.query} label={row.query} subtle />,
               <ul key="pages" className="space-y-1 text-left">
                 {row.pages.map((page, index) => (
                   <li key={page.page} className="text-xs">
@@ -150,7 +142,7 @@ export function RadarTables({ report }: { report: RadarReport }) {
             rows={report.newQueries.map((row) => ({
               key: row.key,
               cells: [
-                <GoogleLink key="q" query={row.key} label={row.key} />,
+                <GoogleLink key="q" query={row.key} label={row.key} subtle />,
                 position(row.position),
                 integer.format(row.impressions),
               ],
@@ -164,7 +156,7 @@ export function RadarTables({ report }: { report: RadarReport }) {
             rows={report.lostQueries.map((row) => ({
               key: row.key,
               cells: [
-                <GoogleLink key="q" query={row.key} label={row.key} />,
+                <GoogleLink key="q" query={row.key} label={row.key} subtle />,
                 position(row.prevPosition),
                 integer.format(row.prevClicks),
               ],
@@ -172,7 +164,7 @@ export function RadarTables({ report }: { report: RadarReport }) {
           />
         </div>
       )}
-    </section>
+    </div>
   );
 }
 
@@ -225,12 +217,26 @@ function QueryChangeTable({
     <SimpleTable
       title={title}
       empty="Sin cambios relevantes."
-      head={["Consulta", "Posición", "Cambio"]}
+      head={["Consulta", "Posición", "Clics", "Cambio"]}
       rows={rows.map((row) => ({
         key: row.key,
         cells: [
-          <GoogleLink key="q" query={row.key} label={row.key} />,
-          `${position(row.prevPosition)} → ${position(row.position)}`,
+          <div key="q" className="space-y-0.5 text-left">
+            <GoogleLink query={row.key} label={row.key} subtle />
+            {row.status !== "changed" ? (
+              <p className="text-xs text-muted-foreground">
+                {row.status === "lost"
+                  ? "Ya no aparece en Google este periodo"
+                  : "Consulta nueva este periodo"}
+              </p>
+            ) : null}
+          </div>,
+          row.status === "lost"
+            ? `${position(row.prevPosition)} → sin datos`
+            : row.status === "new"
+              ? `nueva → ${position(row.position)}`
+              : `${position(row.prevPosition)} → ${position(row.position)}`,
+          `${integer.format(row.clicks)} (${integer.format(row.prevClicks)})`,
           <span
             key="d"
             className={row.clicksDelta > 0 ? "text-success" : "text-destructive"}
@@ -289,7 +295,9 @@ function SimpleTable({
                 <TableCell
                   key={index}
                   className={
-                    index > 0 ? "text-right align-top tabular-nums" : "align-top"
+                    index > 0
+                      ? "text-right align-top whitespace-nowrap tabular-nums"
+                      : "min-w-64 align-top"
                   }
                 >
                   {cell}

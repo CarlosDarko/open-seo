@@ -19,7 +19,14 @@ export type RadarReport = Extract<
   { connected: true }
 >;
 
-export type ActionKind = "loss" | "snippet" | "push" | "cannibal";
+export type ActionKind =
+  | "loss"
+  | "snippet"
+  | "push"
+  | "question"
+  | "cannibal"
+  | "traction"
+  | "emerging";
 
 export type Action = {
   id: string;
@@ -44,7 +51,10 @@ export type ActionPlan = {
   losses: Action[];
   snippets: Action[];
   pushes: Action[];
+  questions: Action[];
   cannibals: Action[];
+  traction: Action[];
+  emerging: Action[];
 };
 
 const MIN_LOSS_CLICKS = 2;
@@ -221,13 +231,95 @@ export function buildActions(report: RadarReport): ActionPlan {
     };
   });
 
-  return { losses, snippets, pushes, cannibals };
+  const topThree = report.ctrCurve[2];
+  const questions: Action[] = report.questions.slice(0, 5).map((item) => ({
+    id: `question:${item.query}`,
+    kind: "question",
+    headline: `Responde «${item.query}» en ${pathOf(item.page)}`,
+    lines: [
+      `Posición ${decimal.format(item.position)} con ${integer.format(item.impressions)} impresiones y ${integer.format(item.clicks)} clics.`,
+      "Es una pregunta: Google suele destacar una respuesta breve sacada de una página, justo encima de los resultados.",
+    ],
+    steps: [
+      `Pon «${item.query}» como encabezado (H2) de la página, tal cual lo escribe la gente.`,
+      "Justo debajo, responde en 40-60 palabras, sin rodeos: es el formato que Google extrae.",
+      "Después amplía con detalle, ejemplos y, si procede, una lista o una tabla.",
+      "Si reúnes varias preguntas relacionadas, agrúpalas en una sección de preguntas frecuentes con datos estructurados FAQ.",
+    ],
+    gain: Math.max(0, Math.round(item.impressions * topThree - item.clicks)) || null,
+    effort: "bajo",
+    page: item.page,
+    query: item.query,
+    linkSources: [],
+    pages: [],
+  }));
+
+  const traction: Action[] = report.lowTraction.slice(0, 4).map((item) => ({
+    id: `traction:${item.url}`,
+    kind: "traction",
+    headline: `${pathOf(item.url)} se muestra mucho pero muy abajo`,
+    lines: [
+      `${integer.format(item.impressions)} impresiones con posición media ${decimal.format(item.position)} y solo ${integer.format(item.clicks)} clics.`,
+      ...(item.topQuery
+        ? [`Su consulta con más impresiones: «${item.topQuery}».`]
+        : []),
+      "Google la considera relevante para el tema pero no la ve suficientemente buena para subirla.",
+    ],
+    steps: [
+      item.topQuery
+        ? `Busca «${item.topQuery}» en Google y compara profundidad, formato y enfoque con las tres primeras.`
+        : "Busca su tema en Google y compara profundidad, formato y enfoque con las tres primeras.",
+      "Amplía la página: secciones que faltan, datos propios, ejemplos y preguntas frecuentes.",
+      item.topQuery
+        ? `Enlázala desde 3-5 páginas con tráfico usando el texto «${item.topQuery}».`
+        : "Enlázala desde 3-5 páginas con tráfico.",
+      "Si no puedes mejorarla de forma realista, fusiónala con otra más fuerte y redirige con un 301.",
+    ],
+    gain: null,
+    effort: "medio",
+    page: item.url,
+    query: item.topQuery,
+    linkSources: sources.filter((url) => url !== item.url).slice(0, 3),
+    pages: [],
+  }));
+
+  const emerging: Action[] = report.emerging.slice(0, 5).map((item) => ({
+    id: `emerging:${item.query}`,
+    kind: "emerging",
+    headline: `«${item.query}» empieza a traerte impresiones`,
+    lines: [
+      `Es nueva este periodo: ${integer.format(item.impressions)} impresiones con posición ${decimal.format(item.position)}.`,
+      item.page
+        ? `Aparece con ${pathOf(item.page)}.`
+        : "No se ha podido asociar a una página concreta.",
+    ],
+    steps: [
+      item.page
+        ? `Comprueba que ${pathOf(item.page)} responde de verdad a «${item.query}»; si no, añade una sección con ese encabezado.`
+        : `Comprueba qué página debería responder a «${item.query}» y refuérzala.`,
+      "Si no tienes contenido sobre esto y el volumen sigue creciendo, crea una página propia y enlázala desde las relacionadas.",
+    ],
+    gain: null,
+    effort: "bajo",
+    page: item.page,
+    query: item.query,
+    linkSources: [],
+    pages: [],
+  }));
+
+  return { losses, snippets, pushes, questions, cannibals, traction, emerging };
 }
 
 /** Every URL whose on-page signals the plan needs, without repeats. */
 export function signalUrls(plan: ActionPlan): string[] {
   const urls = new Set<string>();
-  for (const action of [...plan.snippets, ...plan.pushes, ...plan.cannibals]) {
+  for (const action of [
+    ...plan.snippets,
+    ...plan.pushes,
+    ...plan.questions,
+    ...plan.cannibals,
+    ...plan.traction,
+  ]) {
     if (action.kind === "cannibal") {
       for (const page of action.pages.slice(0, 2)) urls.add(page.page);
     } else if (action.page) {
@@ -235,5 +327,5 @@ export function signalUrls(plan: ActionPlan): string[] {
     }
     for (const source of action.linkSources) urls.add(source);
   }
-  return [...urls].slice(0, 16);
+  return [...urls].slice(0, 24);
 }

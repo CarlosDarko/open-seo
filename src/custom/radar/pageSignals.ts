@@ -10,6 +10,8 @@ export type PageSignals = {
   title: string | null;
   metaDescription: string | null;
   h1: string[];
+  /** Text of the H2 and H3 headings (first 60). */
+  headings: string[];
   canonical: string | null;
   noindex: boolean;
   /** Internal links found on the page, normalized (see normalizeUrl). */
@@ -103,6 +105,11 @@ export function parsePageSignals(
     .map((match) => cleanText(match[1]))
     .filter(Boolean);
 
+  const headings = [...html.matchAll(/<h[23]\b[^>]*>([\s\S]*?)<\/h[23]>/gi)]
+    .map((match) => cleanText(match[1]))
+    .filter(Boolean)
+    .slice(0, 60);
+
   const host = hostWithoutWww(new URL(url).hostname);
   const links = new Set<string>();
   for (const match of html.matchAll(/<a\b[^>]*>/gi)) {
@@ -127,6 +134,7 @@ export function parsePageSignals(
     metaDescription:
       metaDescription !== null && metaDescription !== "" ? metaDescription : null,
     h1,
+    headings,
     canonical,
     noindex,
     links: [...links],

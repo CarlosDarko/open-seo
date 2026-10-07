@@ -3,6 +3,8 @@ import {
   Bot,
   Brain,
   ChartLine,
+  ListChecks,
+  Newspaper,
   ClipboardCheck,
   FileText,
   Globe,
@@ -44,6 +46,16 @@ const projectNavItems = [
     to: "/p/$projectId/radar" as const,
     label: "SEO Radar",
     icon: Radar,
+  },
+  {
+    to: "/p/$projectId/action-plan" as const,
+    label: "Action Plan",
+    icon: ListChecks,
+  },
+  {
+    to: "/p/$projectId/discover" as const,
+    label: "Discover",
+    icon: Newspaper,
   },
   {
     to: "/p/$projectId/search-performance" as const,
@@ -150,6 +162,8 @@ export function getProjectNavGroups(projectId: string) {
       label: "My Site",
       items: [
         byPath("/p/$projectId/radar"),
+        byPath("/p/$projectId/action-plan"),
+        byPath("/p/$projectId/discover"),
         byPath("/p/$projectId/search-performance"),
         byPath("/p/$projectId/rank-tracking"),
         byPath("/p/$projectId/saved"),

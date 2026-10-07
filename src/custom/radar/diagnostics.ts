@@ -221,3 +221,28 @@ export function missingLinkSources(
     )
     .map((source) => source.url);
 }
+
+/** Findings for a question the page ranks for: is it already a heading, and
+ *  how to answer it so Google can lift the answer. */
+export function questionFindings(signals: PageSignals, query: string): Finding[] {
+  if (!signals.ok) return snippetFindings(signals, query);
+  const words = queryWords(query);
+  const headings = [...signals.h1, ...signals.headings];
+  const match = headings.find(
+    (heading) => missingWords(heading, words).length <= Math.floor(words.length * 0.2),
+  );
+  if (match) {
+    return [
+      {
+        level: "ok",
+        text: `Ya tienes un encabezado sobre esto: «${match}». Revisa que justo debajo haya una respuesta directa de 40-60 palabras.`,
+      },
+    ];
+  }
+  return [
+    {
+      level: "warn",
+      text: `Ningún encabezado (H1, H2 o H3) de la página contiene «${query}». Añádelo tal cual lo escribe la gente y responde justo debajo en 40-60 palabras.`,
+    },
+  ];
+}

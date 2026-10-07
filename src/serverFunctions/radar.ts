@@ -5,11 +5,8 @@ import {
   GscService,
   isExpectedGrantFailure,
 } from "@/server/features/gsc/services/GscService";
-import { resolveDateRange } from "@/server/features/gsc/searchAnalytics";
-import {
-  previousPeriod,
-  sumSearchTotals,
-} from "@/server/features/gsc/searchPerformanceReport";
+import { sumSearchTotals } from "@/server/features/gsc/searchPerformanceReport";
+import { periodInputSchema, resolvePeriods, shiftInDays } from "@/custom/radar/periods";
 import {
   alignDaily,
   attachPageQueries,
@@ -18,7 +15,6 @@ import {
   cannibalizedQueries,
   compareDimension,
   ctrOpportunities,
-  daysBetween,
   isBrandQuery,
   mergePageVariants,
   newAndLostQueries,
@@ -29,48 +25,61 @@ import {
   sumClicks,
   winnersAndLosers,
 } from "@/custom/radar/radarAnalysis";
+import {
+  emergingQueries,
+  lowTractionPages,
+  pageTypeClassifier,
+  queryIntent,
+  questionOpportunities,
+  segmentRows,
+} from "@/custom/radar/radarSegments";
 import { fetchPageSignals } from "@/custom/radar/server/fetchPageSignals";
 import { requireProjectContext } from "@/serverFunctions/middleware";
 
-const radarInputSchema = z.object({
+const radarInputSchema = periodInputSchema.extend({
   projectId: z.string().min(1),
-  range: z.enum(["last_28_days", "last_3_months"]).default("last_28_days"),
   // Brand queries ("carlos ortega") hide how the site does for everything
   // else, so they are left out of the analysis unless asked for.
   includeBrand: z.boolean().default(false),
 });
 
-// One row per day (the longest range is ~92 days) and the top 1000 rows of
+// One row per day (the longest range is ~16 months) and the top 1000 rows of
 // each dimension: GSC's per-call cap.
-const DAILY_ROW_LIMIT = 200;
+const DAILY_ROW_LIMIT = 500;
 const DIMENSION_ROW_LIMIT = 1000;
 // A query needs this many impressions in 28 days to be worth acting on; the
 // bar scales with the length of the period.
 const MIN_IMPRESSIONS_PER_28_DAYS = 50;
 const TOP_PAGES = 6;
 
+const DEVICE_LABEL: Record<string, string> = {
+  MOBILE: "Móvil",
+  DESKTOP: "Ordenador",
+  TABLET: "Tableta",
+};
+
 /**
- * Everything the "Radar SEO" page shows, built from Search Console only (free
- * first-party data): daily trend against the previous period, gains and losses
- * with their probable cause, snippets that underperform for their position
- * (against this site's own CTR curve), queries close to the top three, pages
- * competing for the same query, and the position mix.
+ * Everything the Radar, the action plan and the segment charts show, built
+ * from Search Console only (free first-party data): daily trend, gains and
+ * losses with their probable cause, snippets that underperform for their
+ * position (against this site's own CTR curve), queries close to the top
+ * three, competing pages, questions, thin-traction pages, emerging queries
+ * and the segments by page type, search intent, device and brand.
  */
 export const getRadarReport = createServerFn({ method: "POST" })
   .middleware(requireProjectContext)
   .validator(radarInputSchema)
   .handler(async ({ data, context }) => {
-    const { startDate, endDate } = resolveDateRange({ dateRange: data.range });
-    const prev = previousPeriod(startDate, endDate);
+    const periods = resolvePeriods(data);
+    const { current: now, previous: prev } = periods;
     const projectId = context.projectId;
     const fetchRows = (
-      dimensions: ("date" | "query" | "page")[],
+      dimensions: ("date" | "query" | "page" | "device")[],
       period: { startDate: string; endDate: string },
       rowLimit: number,
     ) => GscService.getPerformance({ projectId, ...period, dimensions, rowLimit });
 
     try {
-      const now = { startDate, endDate };
       const [
         daily,
         prevDaily,
@@ -80,6 +89,8 @@ export const getRadarReport = createServerFn({ method: "POST" })
         prevPages,
         queryPages,
         prevQueryPages,
+        devices,
+        prevDevices,
       ] = await Promise.all([
         fetchRows(["date"], now, DAILY_ROW_LIMIT),
         fetchRows(["date"], prev, DAILY_ROW_LIMIT),
@@ -89,6 +100,8 @@ export const getRadarReport = createServerFn({ method: "POST" })
         fetchRows(["page"], prev, DIMENSION_ROW_LIMIT),
         fetchRows(["query", "page"], now, DIMENSION_ROW_LIMIT),
         fetchRows(["query", "page"], prev, DIMENSION_ROW_LIMIT),
+        fetchRows(["device"], now, 10),
+        fetchRows(["device"], prev, 10),
       ]);
 
       // The same page comes back under several URL variants: merge them.
@@ -111,12 +124,12 @@ export const getRadarReport = createServerFn({ method: "POST" })
       const queryPageRows = keep(mergedQueryPages);
       const prevQueryPageRows = keep(mergedPrevQueryPages);
 
-      const days = daysBetween(endDate, startDate) + 1;
       const minImpressions = Math.max(
         20,
-        Math.round((MIN_IMPRESSIONS_PER_28_DAYS * days) / 28),
+        Math.round((MIN_IMPRESSIONS_PER_28_DAYS * periods.days) / 28),
       );
       const curve = ownCtrCurve(queryRows);
+      const pageByQuery = bestPageByQuery(queryPageRows);
 
       const pageGroups = winnersAndLosers(
         compareDimension(pageRows, prevPageRows),
@@ -125,10 +138,21 @@ export const getRadarReport = createServerFn({ method: "POST" })
         attachPageQueries(rows, queryPageRows, prevQueryPageRows);
       const queryChanges = compareDimension(queryRows, prevQueryRows);
 
+      const classifyPage = pageTypeClassifier(
+        [...pageRows, ...prevPageRows].flatMap((row) => row.keys?.[0] ?? []),
+      );
+
       return {
         connected: true as const,
         siteUrl,
-        range: { startDate, endDate, prevStartDate: prev.startDate },
+        range: { startDate: now.startDate, endDate: now.endDate },
+        period: {
+          compare: periods.compare,
+          fellBack: periods.fellBack,
+          days: periods.days,
+          prevStartDate: prev.startDate,
+          prevEndDate: prev.endDate,
+        },
         totals: sumSearchTotals(daily.rows),
         prevTotals: sumSearchTotals(prevDaily.rows),
         brand: {
@@ -142,7 +166,7 @@ export const getRadarReport = createServerFn({ method: "POST" })
         daily: alignDaily(
           daily.rows,
           prevDaily.rows,
-          daysBetween(startDate, prev.startDate),
+          shiftInDays(now.startDate, prev.startDate),
         ),
         bands: positionBands(queryRows, prevQueryRows),
         ctrCurve: curve,
@@ -154,6 +178,22 @@ export const getRadarReport = createServerFn({ method: "POST" })
               ? [{ url: row.keys[0], clicks: row.clicks, position: row.position }]
               : [],
           ),
+        segments: {
+          pageType: segmentRows(pageRows, prevPageRows, (row) =>
+            classifyPage(row.keys?.[0] ?? ""),
+          ),
+          intent: segmentRows(queries.rows, prevQueries.rows, (row) =>
+            queryIntent(row.keys?.[0] ?? "", tokens),
+          ),
+          device: segmentRows(
+            devices.rows,
+            prevDevices.rows,
+            (row) => DEVICE_LABEL[row.keys?.[0] ?? ""] ?? row.keys?.[0] ?? "Otro",
+          ),
+          brand: segmentRows(queries.rows, prevQueries.rows, (row) =>
+            isBrandQuery(row.keys?.[0] ?? "", tokens) ? "Marca" : "Sin marca",
+          ),
+        },
         pageChanges: {
           winners: withCauses(pageGroups.winners),
           losers: withCauses(pageGroups.losers),
@@ -162,12 +202,20 @@ export const getRadarReport = createServerFn({ method: "POST" })
         ...newAndLostQueries(queryChanges),
         ctrOpportunities: ctrOpportunities(
           queryRows,
-          bestPageByQuery(queryPageRows),
+          pageByQuery,
           curve,
           minImpressions,
         ),
         nearTop: nearTopOpportunities(queryPageRows, curve, minImpressions),
         cannibalized: cannibalizedQueries(queryPageRows),
+        questions: questionOpportunities(queryPageRows, minImpressions),
+        lowTraction: lowTractionPages(pageRows, queryPageRows, minImpressions),
+        emerging: emergingQueries(
+          queryRows,
+          new Set(prevQueryRows.flatMap((row) => row.keys?.[0] ?? [])),
+          pageByQuery,
+          minImpressions,
+        ),
       };
     } catch (error) {
       // "none": no property linked. "reconnect": a property is linked but
@@ -184,7 +232,7 @@ export const getRadarReport = createServerFn({ method: "POST" })
 
 const signalsInputSchema = z.object({
   projectId: z.string().min(1),
-  urls: z.array(z.string().max(2000)).max(16),
+  urls: z.array(z.string().max(2000)).max(24),
 });
 
 /**

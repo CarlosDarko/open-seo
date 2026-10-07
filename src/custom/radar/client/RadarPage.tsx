@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { Bar, BarChart, Line, LineChart } from "recharts";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import {
   ChartGrid,
   ChartXAxis,
@@ -24,34 +24,26 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/client/components/ui/chart";
-import { Label } from "@/client/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/client/components/ui/select";
 import { Skeleton } from "@/client/components/ui/skeleton";
-import { Switch } from "@/client/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger } from "@/client/components/ui/tabs";
-import type { RadarReport } from "@/custom/radar/actions";
-import { ActionPlan } from "@/custom/radar/client/ActionPlan";
+import { buildActions, type RadarReport } from "@/custom/radar/actions";
+import { RadarControls } from "@/custom/radar/client/RadarControls";
+import { PageLink } from "@/custom/radar/client/RadarLinks";
 import { RadarTables } from "@/custom/radar/client/RadarTables";
+import {
+  Segments,
+  type SegmentSet,
+} from "@/custom/radar/client/Segments";
+import { useRadarReport } from "@/custom/radar/client/useRadarReport";
 import {
   decimal,
   integer,
   percent,
   relativeChange,
+  signed,
 } from "@/custom/radar/format";
-import { getRadarReport } from "@/serverFunctions/radar";
-
-type Range = "last_28_days" | "last_3_months";
-
-const RANGE_ITEMS = [
-  { value: "last_28_days", label: "Últimos 28 días" },
-  { value: "last_3_months", label: "Últimos 3 meses" },
-];
+import type { ChangeCause } from "@/custom/radar/radarAnalysis";
+import type { Segment } from "@/custom/radar/radarSegments";
 
 const shortDate = new Intl.DateTimeFormat("es-ES", {
   day: "2-digit",
@@ -74,54 +66,31 @@ const bandsConfig = {
   queries: { label: "Este periodo", color: "var(--primary)" },
 } satisfies ChartConfig;
 
+const CAUSE_SHORT: Record<ChangeCause, string> = {
+  posicion: "por perder posición",
+  demanda: "porque se busca menos",
+  ctr: "por un CTR más bajo",
+  mixto: "por varias causas",
+  nueva: "página nueva",
+  perdida: "sin tráfico ahora",
+};
+
 export function RadarPage({ projectId }: { projectId: string }) {
-  const [range, setRange] = useState<Range>("last_28_days");
-  const [includeBrand, setIncludeBrand] = useState(false);
-  const query = useQuery({
-    queryKey: ["radar", projectId, range, includeBrand],
-    queryFn: () =>
-      getRadarReport({ data: { projectId, range, includeBrand } }),
-    staleTime: 5 * 60_000,
-    placeholderData: keepPreviousData,
-  });
-  const report = query.data?.connected ? query.data : null;
+  const { filters, update, query, report } = useRadarReport(projectId);
+  const [showData, setShowData] = useState(false);
 
   return (
     <div className="mx-auto w-full max-w-6xl space-y-6 px-4 py-6 md:px-6">
       <PageHeader
         title="Radar SEO"
-        description="Qué ha cambiado en Search Console y qué hacer con ello, página por página. Datos gratuitos, sin gasto en DataForSEO."
+        description="El pulso de tu web en Search Console: qué ha cambiado y dónde se mueve el tráfico. Para saber qué hacer, mira el Plan de acción."
         actions={
-          <div className="flex flex-wrap items-center gap-4">
-            {report?.brand.hasBrand ? (
-              <div className="flex items-center gap-2">
-                <Switch
-                  id="radar-brand"
-                  checked={includeBrand}
-                  onCheckedChange={setIncludeBrand}
-                />
-                <Label htmlFor="radar-brand" className="text-sm">
-                  Incluir consultas de marca
-                </Label>
-              </div>
-            ) : null}
-            <Select
-              items={RANGE_ITEMS}
-              value={range}
-              onValueChange={(value) => setRange(value as Range)}
-            >
-              <SelectTrigger size="sm" aria-label="Periodo">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {RANGE_ITEMS.map((item) => (
-                  <SelectItem key={item.value} value={item.value}>
-                    {item.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <RadarControls
+            filters={filters}
+            onChange={update}
+            showBrand={report?.brand.hasBrand}
+            fellBack={report?.period.fellBack}
+          />
         }
       />
 
@@ -139,21 +108,69 @@ export function RadarPage({ projectId }: { projectId: string }) {
         <NotConnected projectId={projectId} reason={query.data.reason} />
       ) : report ? (
         <div
-          className={query.isPlaceholderData ? "opacity-60 transition-opacity" : ""}
+          className={`space-y-6 ${query.isPlaceholderData ? "opacity-60 transition-opacity" : ""}`}
         >
-          <div className="space-y-6">
-            <Summary report={report} />
-            <ActionPlan projectId={projectId} report={report} />
-            <div className="grid gap-4 lg:grid-cols-2">
-              <TrendCard report={report} />
-              <BandsCard report={report} />
-            </div>
-            <RadarTables report={report} />
+          <Kpis report={report} />
+          <Insights projectId={projectId} report={report} />
+          <div className="grid gap-4 lg:grid-cols-2">
+            <TrendCard report={report} />
+            <BandsCard report={report} />
           </div>
+          <Segments sets={segmentSets(report)} />
+          <section className="space-y-3">
+            <Button
+              variant="outline"
+              onClick={() => setShowData((open) => !open)}
+            >
+              {showData ? (
+                <ChevronUp className="size-4" />
+              ) : (
+                <ChevronDown className="size-4" />
+              )}
+              {showData ? "Ocultar los datos completos" : "Ver los datos completos"}
+            </Button>
+            {showData ? <RadarTables report={report} /> : null}
+          </section>
         </div>
       ) : null}
     </div>
   );
+}
+
+function segmentSets(report: RadarReport): SegmentSet[] {
+  const sets: SegmentSet[] = [
+    {
+      key: "pageType",
+      tab: "Tipo de página",
+      title: "Tipo de página",
+      help: "Las secciones de tu web (blog, servicios…), detectadas solas a partir de las URL.",
+      segments: report.segments.pageType,
+    },
+    {
+      key: "intent",
+      tab: "Intención",
+      title: "Intención de búsqueda",
+      help: "Qué busca la gente, deducido de cómo escribe la consulta. Es una clasificación automática por palabras: orientativa.",
+      segments: report.segments.intent,
+    },
+    {
+      key: "device",
+      tab: "Dispositivo",
+      title: "Dispositivo",
+      help: "Desde qué dispositivo llegan tus clics.",
+      segments: report.segments.device,
+    },
+  ];
+  if (report.brand.hasBrand) {
+    sets.push({
+      key: "brand",
+      tab: "Marca / sin marca",
+      title: "Tipo de consulta",
+      help: "Las consultas de marca (quien ya te conoce) frente a las demás (quien te descubre).",
+      segments: report.segments.brand,
+    });
+  }
+  return sets;
 }
 
 function LoadingSkeleton() {
@@ -164,6 +181,7 @@ function LoadingSkeleton() {
           <Skeleton key={index} className="h-24 w-full" />
         ))}
       </div>
+      <Skeleton className="h-40 w-full" />
       <Skeleton className="h-64 w-full" />
     </div>
   );
@@ -247,8 +265,8 @@ function Delta({
   );
 }
 
-function Summary({ report }: { report: RadarReport }) {
-  const { totals, prevTotals, brand } = report;
+function Kpis({ report }: { report: RadarReport }) {
+  const { totals, prevTotals } = report;
   const cards = [
     {
       label: "Clics",
@@ -281,11 +299,14 @@ function Summary({ report }: { report: RadarReport }) {
     },
   ];
   return (
-    <section className="space-y-3">
+    <section className="space-y-2">
       <p className="text-xs text-muted-foreground">
         {shortDate.format(new Date(`${report.range.startDate}T00:00:00Z`))} –{" "}
-        {shortDate.format(new Date(`${report.range.endDate}T00:00:00Z`))},
-        comparado con los mismos días justo antes.
+        {shortDate.format(new Date(`${report.range.endDate}T00:00:00Z`))}{" "}
+        frente a{" "}
+        {shortDate.format(new Date(`${report.period.prevStartDate}T00:00:00Z`))}{" "}
+        –{" "}
+        {shortDate.format(new Date(`${report.period.prevEndDate}T00:00:00Z`))}
       </p>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {cards.map((card) => (
@@ -302,24 +323,174 @@ function Summary({ report }: { report: RadarReport }) {
           </Card>
         ))}
       </div>
-      {brand.hasBrand ? (
-        <p className="text-sm text-muted-foreground">
-          De los clics de las mejores 1000 consultas,{" "}
-          <strong className="text-foreground">
-            {integer.format(brand.clicks)}
-          </strong>{" "}
-          son de marca y{" "}
-          <strong className="text-foreground">
-            {integer.format(brand.otherClicks)}
-          </strong>{" "}
-          sin marca (antes {integer.format(brand.prevClicks)} y{" "}
-          {integer.format(brand.prevOtherClicks)}).{" "}
-          {brand.included
-            ? "El análisis incluye las consultas de marca."
-            : "El análisis las deja fuera para centrarse en lo que puedes mejorar."}
-        </p>
-      ) : null}
     </section>
+  );
+}
+
+type Tone = "good" | "bad" | "info";
+
+function topShare(segments: Segment[]): { label: string; share: number } | null {
+  const total = segments.reduce((sum, segment) => sum + segment.clicks, 0);
+  const top = segments[0];
+  return top && total > 0 ? { label: top.label, share: top.clicks / total } : null;
+}
+
+function Insights({
+  projectId,
+  report,
+}: {
+  projectId: string;
+  report: RadarReport;
+}) {
+  const lines = useMemo(() => {
+    const out: { tone: Tone; node: ReactNode }[] = [];
+    const clicksChange = relativeChange(
+      report.totals.clicks,
+      report.prevTotals.clicks,
+    );
+    if (clicksChange !== null) {
+      const diff = report.totals.clicks - report.prevTotals.clicks;
+      out.push({
+        tone: diff >= 0 ? "good" : "bad",
+        node: (
+          <>
+            Clics <strong>{diff >= 0 ? "al alza" : "a la baja"}</strong>:{" "}
+            {percent.format(Math.abs(clicksChange))} ({signed(diff)}).
+          </>
+        ),
+      });
+    }
+    const { brand } = report;
+    if (brand.hasBrand) {
+      const other = relativeChange(brand.otherClicks, brand.prevOtherClicks);
+      out.push({
+        tone: other !== null && other < 0 ? "bad" : "info",
+        node: (
+          <>
+            Sin marca: <strong>{integer.format(brand.otherClicks)}</strong>{" "}
+            clics
+            {other !== null
+              ? ` (${other > 0 ? "+" : ""}${percent.format(other)})`
+              : ""}
+            . Marca: {integer.format(brand.clicks)}.
+          </>
+        ),
+      });
+    }
+    const loser = report.pageChanges.losers[0];
+    if (loser && loser.clicksDelta < 0) {
+      out.push({
+        tone: "bad",
+        node: (
+          <>
+            Mayor caída: <PageLink url={loser.key} />{" "}
+            <strong>{signed(loser.clicksDelta)}</strong>{" "}
+            {CAUSE_SHORT[loser.cause]}.
+          </>
+        ),
+      });
+    }
+    const winner = report.pageChanges.winners[0];
+    if (winner && winner.clicksDelta > 0) {
+      out.push({
+        tone: "good",
+        node: (
+          <>
+            Mayor subida: <PageLink url={winner.key} />{" "}
+            <strong>{signed(winner.clicksDelta)}</strong>.
+          </>
+        ),
+      });
+    }
+    const page = topShare(report.segments.pageType);
+    const intent = topShare(report.segments.intent);
+    if (page || intent) {
+      out.push({
+        tone: "info",
+        node: (
+          <>
+            Lo que más tráfico trae:{" "}
+            {page ? (
+              <>
+                páginas «{page.label}» ({percent.format(page.share)})
+              </>
+            ) : null}
+            {page && intent ? " y " : ""}
+            {intent ? (
+              <>
+                búsquedas de «{intent.label}» ({percent.format(intent.share)})
+              </>
+            ) : null}
+            .
+          </>
+        ),
+      });
+    }
+    const plan = buildActions(report);
+    const tasks =
+      plan.losses.length +
+      plan.snippets.length +
+      plan.pushes.length +
+      plan.questions.length +
+      plan.cannibals.length +
+      plan.traction.length +
+      plan.emerging.length;
+    const gain = [...plan.snippets, ...plan.pushes, ...plan.questions].reduce(
+      (sum, action) => sum + (action.gain ?? 0),
+      0,
+    );
+    if (tasks > 0) {
+      out.push({
+        tone: "info",
+        node: (
+          <>
+            <strong>{tasks} tareas</strong> en el plan de acción
+            {gain > 0 ? `, unos +${integer.format(gain)} clics estimados` : ""}.{" "}
+            <Link
+              to="/p/$projectId/action-plan"
+              params={{ projectId }}
+              className="font-medium text-primary underline-offset-2 hover:underline"
+            >
+              Ver el plan →
+            </Link>
+          </>
+        ),
+      });
+    }
+    return out;
+  }, [projectId, report]);
+
+  const dot: Record<Tone, string> = {
+    good: "bg-success",
+    bad: "bg-destructive",
+    info: "bg-muted-foreground/60",
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Lo importante</CardTitle>
+      </CardHeader>
+      <CardContent>
+        {lines.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            Aún no hay datos suficientes en este periodo.
+          </p>
+        ) : (
+          <ul className="space-y-2.5">
+            {lines.map((line, index) => (
+              <li key={index} className="flex gap-3 text-sm">
+                <span
+                  className={`mt-1.5 size-2 shrink-0 rounded-full ${dot[line.tone]}`}
+                  aria-hidden
+                />
+                <span>{line.node}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -407,11 +578,15 @@ function BandsCard({ report }: { report: RadarReport }) {
           >
             <ChartGrid />
             <ChartXAxis dataKey="label" minTickGap={4} />
-            <ChartYAxis tickFormatter={(value: number) => integer.format(value)} />
+            <ChartYAxis
+              tickFormatter={(value: number) => integer.format(value)}
+            />
             <ChartTooltip
               content={
                 <ChartTooltipContent
-                  valueFormatter={(value) => `${integer.format(Number(value))} consultas`}
+                  valueFormatter={(value) =>
+                    `${integer.format(Number(value))} consultas`
+                  }
                 />
               }
             />
