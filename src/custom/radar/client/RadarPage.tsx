@@ -8,6 +8,7 @@ import {
   ChevronUp,
   Layers,
   ListChecks,
+  Megaphone,
   Tag,
   TrendingDown,
   TrendingUp,
@@ -43,6 +44,8 @@ import { RadarControls } from "@/custom/radar/client/RadarControls";
 import { PageLink } from "@/custom/radar/client/RadarLinks";
 import { RadarTables } from "@/custom/radar/client/RadarTables";
 import { DailyChart } from "@/custom/radar/client/DailyChart";
+import { useGoogleUpdates } from "@/custom/radar/client/useGoogleUpdates";
+import { updatesBetween } from "@/custom/radar/googleUpdates";
 import { Segments, type SegmentSet } from "@/custom/radar/client/Segments";
 import { useRadarReport } from "@/custom/radar/client/useRadarReport";
 import {
@@ -386,6 +389,13 @@ function Insights({
   const winner = report.pageChanges.winners[0];
   const page = topShare(report.segments.pageType);
   const intent = topShare(report.segments.intent);
+  const googleUpdates = useGoogleUpdates();
+  // Updates in this period or the one before: a drop may follow one of them.
+  const nearUpdates = updatesBetween(
+    googleUpdates.data ?? [],
+    report.period.prevStartDate,
+    report.range.endDate,
+  );
   const plan = useMemo(() => buildActions(report), [report]);
   const tasks =
     plan.losses.length +
@@ -466,6 +476,37 @@ function Insights({
           <span className="mt-1 block space-y-2">
             {page ? <ShareBar kind="Páginas" item={page} /> : null}
             {intent ? <ShareBar kind="Búsquedas" item={intent} /> : null}
+          </span>
+        }
+      />,
+    );
+  }
+  if (nearUpdates.length > 0) {
+    tiles.push(
+      <Tile
+        key="google"
+        tone="info"
+        icon={Megaphone}
+        label="Updates de Google"
+        value={`${nearUpdates.length} en estas fechas`}
+        detail={
+          <span className="block space-y-1">
+            {nearUpdates.slice(0, 3).map((update) => (
+              <a
+                key={update.id}
+                href={update.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block text-xs font-medium text-foreground hover:underline"
+              >
+                {update.label}
+                {update.end ? "" : " · en curso"}
+              </a>
+            ))}
+            <span className="block text-xs">
+              Si una página cae en estas fechas, espera a que termine el
+              despliegue antes de tocarla.
+            </span>
           </span>
         }
       />,

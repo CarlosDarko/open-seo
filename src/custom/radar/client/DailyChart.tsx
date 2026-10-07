@@ -1,6 +1,5 @@
 import { useMemo, useState, type ReactNode } from "react";
-import { Line, LineChart, ReferenceLine } from "recharts";
-import { Check } from "lucide-react";
+import { Line, LineChart, ReferenceArea, ReferenceLine } from "recharts";
 import {
   ChartGrid,
   ChartXAxis,
@@ -21,7 +20,13 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/client/components/ui/tabs";
 import { decimal, integer, percent } from "@/custom/radar/format";
 import type { DailyPoint } from "@/custom/radar/radarAnalysis";
+import { useGoogleUpdates } from "@/custom/radar/client/useGoogleUpdates";
 import { useTrendLines, withTrend } from "@/custom/radar/client/TrendLines";
+import {
+  KIND_SHORT,
+  updatesBetween,
+  type GoogleUpdate,
+} from "@/custom/radar/googleUpdates";
 
 const shortDate = new Intl.DateTimeFormat("es-ES", {
   day: "2-digit",
@@ -133,6 +138,24 @@ export function DailyChart({
   );
 
   const word = trendWord(trendChange, config.reversed);
+  const googleUpdates = useGoogleUpdates();
+  const first = data[0]?.date;
+  const last = data[data.length - 1]?.date;
+  // The updates that overlap the days of the chart, each clamped to days the
+  // chart has (its x axis is made of those dates).
+  const marks = useMemo(() => {
+    if (!first || !last) return [];
+    const dates = data.map((point) => point.date);
+    return updatesBetween(googleUpdates.data ?? [], first, last).map(
+      (update) => ({
+        update,
+        from: dates.find((date) => date >= update.begin) ?? first,
+        to:
+          [...dates].reverse().find((date) => date <= (update.end ?? last)) ??
+          last,
+      }),
+    );
+  }, [googleUpdates.data, data, first, last]);
 
   return (
     <Card>
@@ -222,6 +245,37 @@ export function DailyChart({
                 tooltipType="none"
               />
             ) : null}
+            {lines.showUpdates
+              ? marks.map(({ update, from, to }) => (
+                  <ReferenceArea
+                    key={`area-${update.id}`}
+                    x1={from}
+                    x2={to}
+                    fill="var(--foreground)"
+                    fillOpacity={0.07}
+                    stroke="none"
+                    ifOverflow="hidden"
+                  />
+                ))
+              : null}
+            {lines.showUpdates
+              ? marks.map(({ update, from }) => (
+                  <ReferenceLine
+                    key={`line-${update.id}`}
+                    x={from}
+                    stroke="var(--foreground)"
+                    strokeOpacity={0.55}
+                    strokeWidth={1.5}
+                    label={{
+                      value: KIND_SHORT[update.kind],
+                      position: "insideTopLeft",
+                      fontSize: 10,
+                      fontWeight: 700,
+                      fill: "var(--foreground)",
+                    }}
+                  />
+                ))
+              : null}
           </LineChart>
         </ChartContainer>
 
@@ -238,6 +292,15 @@ export function DailyChart({
             value={mean !== null ? config.format(mean) : undefined}
           />
           <LineSwitch
+            on={lines.showUpdates}
+            onClick={lines.toggleUpdates}
+            color="var(--foreground)"
+            marker
+            label="Updates de Google"
+            value={marks.length > 0 ? String(marks.length) : undefined}
+            hint="Marca en el gráfico los días en que Google lanzó actualizaciones de su algoritmo (fuente: status.search.google.com, al día)."
+          />
+          <LineSwitch
             on={lines.showTrend}
             onClick={lines.toggleTrend}
             color={TREND_COLOR}
@@ -250,8 +313,45 @@ export function DailyChart({
             }
           />
         </div>
+        {lines.showUpdates && marks.length > 0 ? (
+          <UpdatesList updates={marks.map((mark) => mark.update)} />
+        ) : null}
       </CardContent>
     </Card>
+  );
+}
+
+const rangeFormat = new Intl.DateTimeFormat("es-ES", {
+  day: "numeric",
+  month: "short",
+  timeZone: "UTC",
+});
+
+/** The updates drawn on the chart, with their dates and a link to Google. */
+function UpdatesList({ updates }: { updates: GoogleUpdate[] }) {
+  const day = (iso: string) => rangeFormat.format(new Date(`${iso}T00:00:00Z`));
+  return (
+    <ul className="space-y-1 text-xs text-muted-foreground">
+      {updates.map((update) => (
+        <li key={update.id} className="flex flex-wrap items-baseline gap-x-2">
+          <span className="rounded bg-foreground px-1.5 py-0.5 text-[10px] font-bold text-background">
+            {KIND_SHORT[update.kind]}
+          </span>
+          <a
+            href={update.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-medium text-foreground hover:underline"
+          >
+            {update.label}
+          </a>
+          <span>
+            {day(update.begin)}
+            {update.end ? ` – ${day(update.end)}` : " – en curso"}
+          </span>
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -262,6 +362,7 @@ function LineSwitch({
   onClick,
   color,
   dashed,
+  marker,
   label,
   value,
   hint,
@@ -270,6 +371,8 @@ function LineSwitch({
   onClick: () => void;
   color: string;
   dashed?: boolean;
+  /** Draw a vertical mark instead of a line sample. */
+  marker?: boolean;
   label: string;
   value?: string;
   hint?: string;
@@ -283,28 +386,49 @@ function LineSwitch({
       title={hint}
       className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
         on
-          ? "border-foreground/30 bg-card shadow-xs"
+          ? "border-foreground/40 bg-foreground/5 shadow-xs"
           : "border-dashed border-border text-muted-foreground hover:bg-muted/50"
       }`}
     >
-      <svg width="22" height="8" aria-hidden>
-        <line
-          x1="1"
-          y1="4"
-          x2="21"
-          y2="4"
-          stroke={color}
-          strokeWidth="3"
-          strokeLinecap="round"
-          strokeDasharray={dashed ? "5 4" : undefined}
-          opacity={on ? 1 : 0.45}
-        />
+      <svg width="22" height="10" aria-hidden>
+        {marker ? (
+          <>
+            <rect
+              x="6"
+              y="0"
+              width="10"
+              height="10"
+              fill={color}
+              opacity={on ? 0.15 : 0.08}
+            />
+            <line
+              x1="6"
+              y1="0"
+              x2="6"
+              y2="10"
+              stroke={color}
+              strokeWidth="2"
+              opacity={on ? 1 : 0.45}
+            />
+          </>
+        ) : (
+          <line
+            x1="1"
+            y1="4"
+            x2="21"
+            y2="4"
+            stroke={color}
+            strokeWidth="3"
+            strokeLinecap="round"
+            strokeDasharray={dashed ? "5 4" : undefined}
+            opacity={on ? 1 : 0.45}
+          />
+        )}
       </svg>
       {label}
       {on && value ? (
         <strong className="tabular-nums text-foreground">{value}</strong>
       ) : null}
-      {on ? <Check className="size-3 text-foreground" aria-hidden /> : null}
     </button>
   );
 }

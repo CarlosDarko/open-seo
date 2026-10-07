@@ -37,6 +37,8 @@ import {
 import { clicksText, decimal, integer, pathOf } from "@/custom/radar/format";
 import type { PageSignals } from "@/custom/radar/pageSignals";
 import { GoogleLink, PageLink } from "@/custom/radar/client/RadarLinks";
+import { useGoogleUpdates } from "@/custom/radar/client/useGoogleUpdates";
+import { updatesBetween } from "@/custom/radar/googleUpdates";
 import { getRadarPageSignals } from "@/serverFunctions/radar";
 
 type Tone = "destructive" | "primary" | "success" | "info" | "warning";
@@ -471,6 +473,19 @@ export function ActionCard({
   const diagnosis = needsPage ? diagnose(action, signals) : null;
   const verdict = verdictFor(action, diagnosis);
   const isLoss = action.kind === "loss";
+  // A loss may be Google's doing: say so when an update overlaps the two
+  // periods the loss compares.
+  const googleUpdates = useGoogleUpdates();
+  const concurrent =
+    isLoss && periodDays
+      ? updatesBetween(
+          googleUpdates.data ?? [],
+          new Date(Date.now() - 2 * periodDays * 86_400_000)
+            .toISOString()
+            .slice(0, 10),
+          new Date().toISOString().slice(0, 10),
+        )
+      : [];
 
   const linkedPage = action.kind === "cannibal" ? null : action.page;
   const info = linkedPage ? signals.get(linkedPage) : undefined;
@@ -608,6 +623,27 @@ export function ActionCard({
                 Qué hacer
               </p>
               <p className="text-sm leading-relaxed font-medium">{verdict}</p>
+              {concurrent.length > 0 ? (
+                <p className="mt-2 text-sm text-muted-foreground">
+                  <strong className="text-foreground">Ojo:</strong> en estas
+                  fechas Google lanzó{" "}
+                  {concurrent.map((update, index) => (
+                    <span key={update.id}>
+                      {index > 0 ? ", " : ""}
+                      <a
+                        href={update.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-medium text-foreground hover:underline"
+                      >
+                        {update.label}
+                      </a>
+                    </span>
+                  ))}
+                  . Si la caída coincide, espera a que termine el despliegue y
+                  compara antes de tocar nada.
+                </p>
+              ) : null}
             </div>
           </div>
 

@@ -3,6 +3,7 @@ import {
   evaluateAndStore,
   ruleFromRow,
 } from "@/custom/radar/server/alertsEngine";
+import { refreshGoogleUpdates } from "@/custom/radar/server/googleUpdatesStore";
 import {
   deleteEventsOlderThan,
   listRules,
@@ -26,6 +27,9 @@ export async function runDailyRadarAlerts(): Promise<void> {
   if ((await env.KV.get(LAST_RUN_KEY)) === today) return;
   // Claim the day first so overlapping runs do not repeat the work.
   await env.KV.put(LAST_RUN_KEY, today);
+
+  // Google's ranking updates, read once a day so they are always current.
+  await refreshGoogleUpdates();
 
   for (const projectId of await projectsWithRules()) {
     try {

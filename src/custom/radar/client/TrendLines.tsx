@@ -5,19 +5,24 @@ import { useState } from "react";
 // remembered in this browser only.
 const STORAGE_KEY = "radar-trend-lines-v1";
 
-type Choice = { mean: boolean; trend: boolean };
+type Choice = { mean: boolean; trend: boolean; updates: boolean };
 
 function readChoice(): Choice {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as Partial<Choice>;
-      return { mean: parsed.mean === true, trend: parsed.trend === true };
+      return {
+        mean: parsed.mean === true,
+        trend: parsed.trend === true,
+        // Google's updates are shown unless the user turned them off.
+        updates: parsed.updates !== false,
+      };
     }
   } catch {
     // No storage: both lines start hidden.
   }
-  return { mean: false, trend: false };
+  return { mean: false, trend: false, updates: true };
 }
 
 export function useTrendLines() {
@@ -33,8 +38,10 @@ export function useTrendLines() {
   return {
     showMean: choice.mean,
     showTrend: choice.trend,
+    showUpdates: choice.updates,
     toggleMean: () => update({ ...choice, mean: !choice.mean }),
     toggleTrend: () => update({ ...choice, trend: !choice.trend }),
+    toggleUpdates: () => update({ ...choice, updates: !choice.updates }),
   };
 }
 
