@@ -84,6 +84,27 @@ function prevOf(point: DailyPoint, metric: Metric): number | null {
   }
 }
 
+/** Under this change the trend counts as flat. */
+const FLAT_BELOW = 0.05;
+
+/** What the trend line does, in words: the exact change depends on the days
+ *  the period starts and ends on, so the figure stays in the tooltip. */
+function trendWord(
+  change: number | null,
+  reversed: boolean | undefined,
+): { text: string; arrow: string } | undefined {
+  if (change === null) return undefined;
+  if (Math.abs(change) < FLAT_BELOW) return { text: "Estable", arrow: "→" };
+  const up = change > 0;
+  // A lower position is better: going down is improving.
+  if (reversed) {
+    return up
+      ? { text: "Empeora", arrow: "↑" }
+      : { text: "Mejora", arrow: "↓" };
+  }
+  return up ? { text: "Sube", arrow: "↑" } : { text: "Baja", arrow: "↓" };
+}
+
 /** The daily chart shared by the Radar and Discover: clicks, impressions, CTR
  *  or average position against the previous period, with an optional average
  *  and trend line. */
@@ -110,6 +131,8 @@ export function DailyChart({
       ),
     [daily, metric],
   );
+
+  const word = trendWord(trendChange, config.reversed);
 
   return (
     <Card>
@@ -219,9 +242,10 @@ export function DailyChart({
             onClick={lines.toggleTrend}
             color={TREND_COLOR}
             label="Tendencia"
-            value={
+            value={word ? `${word.arrow} ${word.text}` : undefined}
+            hint={
               trendChange !== null
-                ? `${trendChange > 0 ? "+" : ""}${percent.format(trendChange)}`
+                ? `La recta ajustada a los días cambia un ${trendChange > 0 ? "+" : ""}${percent.format(trendChange)} entre el principio y el final del periodo. Es una referencia, no una cifra exacta.`
                 : undefined
             }
           />
@@ -240,6 +264,7 @@ function LineSwitch({
   dashed,
   label,
   value,
+  hint,
 }: {
   on: boolean;
   onClick: () => void;
@@ -247,6 +272,7 @@ function LineSwitch({
   dashed?: boolean;
   label: string;
   value?: string;
+  hint?: string;
 }) {
   return (
     <button
@@ -254,6 +280,7 @@ function LineSwitch({
       role="switch"
       aria-checked={on}
       onClick={onClick}
+      title={hint}
       className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
         on
           ? "border-foreground/30 bg-card shadow-xs"
