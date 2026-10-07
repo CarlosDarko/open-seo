@@ -1,7 +1,8 @@
 import { useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { Line, LineChart } from "recharts";
+import { Line, LineChart, ReferenceLine } from "recharts";
+import { useTrendLines, withTrend } from "@/custom/radar/client/TrendLines";
 import {
   ChartGrid,
   ChartXAxis,
@@ -367,24 +368,29 @@ function Highlights({ report, what }: { report: Report; what: string }) {
 function TrendCard({ report }: { report: Report }) {
   const [metric, setMetric] = useState<"clicks" | "impressions">("clicks");
   const prevKey = metric === "clicks" ? "prevClicks" : "prevImpressions";
+  const lines = useTrendLines();
+  const { data: points, mean } = withTrend(report.daily, metric);
   return (
     <Card>
       <CardHeader className="flex flex-wrap items-center justify-between gap-2">
         <CardTitle>Evolución diaria</CardTitle>
-        <Tabs
-          value={metric}
-          onValueChange={(value) => setMetric(value as typeof metric)}
-        >
-          <TabsList>
-            <TabsTrigger value="clicks">Clics</TabsTrigger>
-            <TabsTrigger value="impressions">Impresiones</TabsTrigger>
-          </TabsList>
-        </Tabs>
+        <div className="flex flex-wrap items-center gap-2">
+          {lines.toggles}
+          <Tabs
+            value={metric}
+            onValueChange={(value) => setMetric(value as typeof metric)}
+          >
+            <TabsList>
+              <TabsTrigger value="clicks">Clics</TabsTrigger>
+              <TabsTrigger value="impressions">Impresiones</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
       </CardHeader>
       <CardContent>
         <ChartContainer config={chartConfig} className="h-60 w-full">
           <LineChart
-            data={report.daily}
+            data={points}
             margin={{ top: 4, right: 8, bottom: 0, left: 0 }}
           >
             <ChartGrid />
@@ -423,6 +429,34 @@ function TrendCard({ report }: { report: Report }) {
               strokeWidth={2}
               dot={false}
             />
+            {lines.showMean && mean !== null ? (
+              <ReferenceLine
+                y={mean}
+                stroke="var(--foreground)"
+                strokeDasharray="2 4"
+                strokeWidth={1.5}
+                ifOverflow="extendDomain"
+                label={{
+                  value: `Media ${integer.format(mean)}`,
+                  position: "insideTopRight",
+                  fontSize: 11,
+                  fill: "var(--foreground)",
+                }}
+              />
+            ) : null}
+            {lines.showTrend ? (
+              <Line
+                dataKey="trend"
+                stroke="var(--foreground)"
+                strokeWidth={1.75}
+                strokeOpacity={0.8}
+                dot={false}
+                activeDot={false}
+                isAnimationActive={false}
+                legendType="none"
+                tooltipType="none"
+              />
+            ) : null}
           </LineChart>
         </ChartContainer>
       </CardContent>
