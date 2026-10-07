@@ -23,10 +23,12 @@ import type { DailyPoint } from "@/custom/radar/radarAnalysis";
 import { useGoogleUpdates } from "@/custom/radar/client/useGoogleUpdates";
 import { useTrendLines, withTrend } from "@/custom/radar/client/TrendLines";
 import {
+  KIND_COLOR,
   KIND_SHORT,
   updatesBetween,
   type GoogleUpdate,
 } from "@/custom/radar/googleUpdates";
+import { OngoingTag, UpdateBadge } from "@/custom/radar/client/UpdateBadge";
 
 const shortDate = new Intl.DateTimeFormat("es-ES", {
   day: "2-digit",
@@ -150,6 +152,10 @@ export function DailyChart({
       (update) => ({
         update,
         from: dates.find((date) => date >= update.begin) ?? first,
+        // Near the right edge the label is drawn to the left of its line.
+        late:
+          dates.indexOf(dates.find((date) => date >= update.begin) ?? first) >
+          dates.length * 0.85,
         to:
           [...dates].reverse().find((date) => date <= (update.end ?? last)) ??
           last,
@@ -251,27 +257,26 @@ export function DailyChart({
                     key={`area-${update.id}`}
                     x1={from}
                     x2={to}
-                    fill="var(--foreground)"
-                    fillOpacity={0.07}
+                    fill={KIND_COLOR[update.kind]}
+                    fillOpacity={0.13}
                     stroke="none"
                     ifOverflow="hidden"
                   />
                 ))
               : null}
             {lines.showUpdates
-              ? marks.map(({ update, from }) => (
+              ? marks.map(({ update, from, late }) => (
                   <ReferenceLine
                     key={`line-${update.id}`}
                     x={from}
-                    stroke="var(--foreground)"
-                    strokeOpacity={0.55}
-                    strokeWidth={1.5}
+                    stroke={KIND_COLOR[update.kind]}
+                    strokeWidth={2}
                     label={{
                       value: KIND_SHORT[update.kind],
-                      position: "insideTopLeft",
+                      position: late ? "insideTopRight" : "insideTopLeft",
                       fontSize: 10,
                       fontWeight: 700,
-                      fill: "var(--foreground)",
+                      fill: KIND_COLOR[update.kind],
                     }}
                   />
                 ))
@@ -327,16 +332,17 @@ const rangeFormat = new Intl.DateTimeFormat("es-ES", {
   timeZone: "UTC",
 });
 
-/** The updates drawn on the chart, with their dates and a link to Google. */
+/** The updates drawn on the chart: kind, name, dates and a link to Google. */
 function UpdatesList({ updates }: { updates: GoogleUpdate[] }) {
   const day = (iso: string) => rangeFormat.format(new Date(`${iso}T00:00:00Z`));
   return (
-    <ul className="space-y-1 text-xs text-muted-foreground">
+    <ul className="space-y-1.5 text-xs text-muted-foreground">
       {updates.map((update) => (
-        <li key={update.id} className="flex flex-wrap items-baseline gap-x-2">
-          <span className="rounded bg-foreground px-1.5 py-0.5 text-[10px] font-bold text-background">
-            {KIND_SHORT[update.kind]}
-          </span>
+        <li
+          key={update.id}
+          className="grid grid-cols-[4rem_1fr] items-baseline gap-x-2 sm:grid-cols-[4rem_1fr_auto]"
+        >
+          <UpdateBadge kind={update.kind} />
           <a
             href={update.url}
             target="_blank"
@@ -345,9 +351,10 @@ function UpdatesList({ updates }: { updates: GoogleUpdate[] }) {
           >
             {update.label}
           </a>
-          <span>
+          <span className="col-start-2 sm:col-start-3">
             {day(update.begin)}
-            {update.end ? ` – ${day(update.end)}` : " – en curso"}
+            {" – "}
+            {update.end ? day(update.end) : <OngoingTag />}
           </span>
         </li>
       ))}

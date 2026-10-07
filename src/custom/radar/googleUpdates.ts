@@ -35,6 +35,16 @@ export const KIND_NAME: Record<GoogleUpdateKind, string> = {
   other: "Update de Google",
 };
 
+/** One colour per kind of update, used on the charts and in the badges. */
+export const KIND_COLOR: Record<GoogleUpdateKind, string> = {
+  core: "#7c3aed",
+  spam: "#ea580c",
+  discover: "#0d9488",
+  helpful: "#0284c7",
+  reviews: "#db2777",
+  other: "#475569",
+};
+
 /** The short tag drawn on the charts. */
 export const KIND_SHORT: Record<GoogleUpdateKind, string> = {
   core: "Core",

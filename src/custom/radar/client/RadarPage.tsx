@@ -44,6 +44,7 @@ import { RadarControls } from "@/custom/radar/client/RadarControls";
 import { PageLink } from "@/custom/radar/client/RadarLinks";
 import { RadarTables } from "@/custom/radar/client/RadarTables";
 import { DailyChart } from "@/custom/radar/client/DailyChart";
+import { OngoingTag, UpdateBadge } from "@/custom/radar/client/UpdateBadge";
 import { useGoogleUpdates } from "@/custom/radar/client/useGoogleUpdates";
 import { updatesBetween } from "@/custom/radar/googleUpdates";
 import { Segments, type SegmentSet } from "@/custom/radar/client/Segments";
@@ -51,7 +52,6 @@ import { useRadarReport } from "@/custom/radar/client/useRadarReport";
 import {
   decimal,
   integer,
-  pathOf,
   percent,
   relativeChange,
   signed,
@@ -410,9 +410,12 @@ function Insights({
     0,
   );
 
-  const tiles: ReactNode[] = [];
+  // The figures go in one row; the richer tiles (shares, Google updates, plan)
+  // in the next, so every row is full and equally tall.
+  const figures: ReactNode[] = [];
+  const details: ReactNode[] = [];
   if (clicksChange !== null) {
-    tiles.push(
+    figures.push(
       <Tile
         key="clicks"
         tone={clicksDiff >= 0 ? "good" : "bad"}
@@ -424,7 +427,7 @@ function Insights({
     );
   }
   if (brand.hasBrand) {
-    tiles.push(
+    figures.push(
       <Tile
         key="brand"
         tone={otherChange !== null && otherChange < 0 ? "bad" : "info"}
@@ -441,7 +444,7 @@ function Insights({
     );
   }
   if (loser && loser.clicksDelta < 0) {
-    tiles.push(
+    figures.push(
       <Tile
         key="loser"
         tone="bad"
@@ -454,7 +457,7 @@ function Insights({
     );
   }
   if (winner && winner.clicksDelta > 0) {
-    tiles.push(
+    figures.push(
       <Tile
         key="winner"
         tone="good"
@@ -466,7 +469,7 @@ function Insights({
     );
   }
   if (page || intent) {
-    tiles.push(
+    details.push(
       <Tile
         key="share"
         tone="info"
@@ -482,28 +485,37 @@ function Insights({
     );
   }
   if (nearUpdates.length > 0) {
-    tiles.push(
+    details.push(
       <Tile
         key="google"
         tone="info"
         icon={Megaphone}
         label="Updates de Google"
-        value={`${nearUpdates.length} en estas fechas`}
+        value={String(nearUpdates.length)}
+        chip="en estas fechas"
         detail={
-          <span className="block space-y-1">
-            {nearUpdates.slice(0, 3).map((update) => (
+          <span className="block space-y-1.5">
+            {nearUpdates.slice(0, 4).map((update) => (
               <a
                 key={update.id}
                 href={update.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="block text-xs font-medium text-foreground hover:underline"
+                className="grid grid-cols-[4rem_1fr] items-center gap-x-2 text-xs hover:underline"
               >
-                {update.label}
-                {update.end ? "" : " · en curso"}
+                <UpdateBadge kind={update.kind} />
+                <span className="min-w-0 truncate font-medium text-foreground">
+                  {update.label}
+                  {update.end ? null : (
+                    <>
+                      {" · "}
+                      <OngoingTag />
+                    </>
+                  )}
+                </span>
               </a>
             ))}
-            <span className="block text-xs">
+            <span className="block pt-1 text-xs">
               Si una página cae en estas fechas, espera a que termine el
               despliegue antes de tocarla.
             </span>
@@ -513,7 +525,7 @@ function Insights({
     );
   }
   if (tasks > 0) {
-    tiles.push(
+    details.push(
       <Tile
         key="plan"
         tone="info"
@@ -547,19 +559,40 @@ function Insights({
         </p>
       </CardHeader>
       <CardContent>
-        {tiles.length === 0 ? (
+        {figures.length + details.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             Aún no hay datos suficientes en este periodo.
           </p>
         ) : (
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {tiles}
+          <div className="space-y-3">
+            {figures.length > 0 ? (
+              <div
+                className={`grid gap-3 sm:grid-cols-2 ${COLUMNS[Math.min(figures.length, 4)]}`}
+              >
+                {figures}
+              </div>
+            ) : null}
+            {details.length > 0 ? (
+              <div
+                className={`grid gap-3 sm:grid-cols-2 ${COLUMNS[Math.min(details.length, 3)]}`}
+              >
+                {details}
+              </div>
+            ) : null}
           </div>
         )}
       </CardContent>
     </Card>
   );
 }
+
+// Full class names so Tailwind keeps them: columns for a row of n tiles.
+const COLUMNS: Record<number, string> = {
+  1: "xl:grid-cols-1",
+  2: "xl:grid-cols-2",
+  3: "xl:grid-cols-3",
+  4: "xl:grid-cols-4",
+};
 
 const TILE_TONES = {
   good: {
@@ -597,7 +630,7 @@ function Tile({
 }) {
   const style = TILE_TONES[tone];
   return (
-    <div className={`rounded-xl border p-3.5 ${style.wash}`}>
+    <div className={`h-full rounded-xl border p-3.5 ${style.wash}`}>
       <div className="flex items-center gap-2.5">
         <span
           className={`flex size-8 shrink-0 items-center justify-center rounded-lg ${style.icon}`}
@@ -627,17 +660,24 @@ function Tile({
   );
 }
 
-/** A page of the site, as a link that opens in a new tab. */
+/** A page of the site, as a link that opens in a new tab: its path alone, on
+ *  one line (the query string with tracking parameters is left out). */
 function PageRef({ url }: { url: string }) {
+  let path = url;
+  try {
+    path = new URL(url).pathname || "/";
+  } catch {
+    // Not a full URL: show it as it is.
+  }
   return (
     <a
       href={url}
       target="_blank"
       rel="noopener noreferrer"
-      className="line-clamp-2 font-mono text-xs break-all text-foreground hover:underline"
+      className="block truncate font-mono text-xs text-foreground hover:underline"
       title={url}
     >
-      {pathOf(url) || url}
+      {path}
     </a>
   );
 }
