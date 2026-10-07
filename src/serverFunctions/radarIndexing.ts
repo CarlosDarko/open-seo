@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { env } from "cloudflare:workers";
 import { z } from "zod";
 import {
   GscNotConnectedError,
@@ -15,6 +16,7 @@ import {
   collectSitemapUrls,
   listGscSitemaps,
 } from "@/custom/radar/server/sitemaps";
+import type { UrlInspectionResult } from "@/server/lib/gscClient";
 import { requireProjectContext } from "@/serverFunctions/middleware";
 
 const PAGE_ROWS = 1000;
@@ -156,12 +158,48 @@ export type InspectedUrl = {
   /** Google chose a different canonical than the page declares. */
   canonicalMismatch: boolean;
   error: string | null;
+  /** The answer was kept from an earlier check (no quota used). */
+  cached: boolean;
 };
 
+// Google answers one URL per request, in 1-3 seconds, with a quota of about
+// 2000 a day and 600 a minute per property. Asking five at a time keeps a
+// batch quick; answers are kept for 12 hours so repeating a check is free.
+const PARALLEL = 5;
+const CACHE_SECONDS = 12 * 60 * 60;
+const inspectCacheKey = (projectId: string, url: string) =>
+  `radar:inspect:${projectId}:${canonicalPageKey(url)}`;
+
+function toInspected(
+  url: string,
+  result: UrlInspectionResult | null,
+  error: string | null,
+): InspectedUrl {
+  const status = result?.indexStatusResult;
+  const google = status?.googleCanonical ?? null;
+  const own = status?.userCanonical ?? null;
+  return {
+    url,
+    verdict: status?.verdict ?? null,
+    coverageState: status?.coverageState ?? null,
+    indexingState: status?.indexingState ?? null,
+    robotsTxtState: status?.robotsTxtState ?? null,
+    pageFetchState: status?.pageFetchState ?? null,
+    lastCrawlTime: status?.lastCrawlTime ?? null,
+    googleCanonical: google,
+    userCanonical: own,
+    canonicalMismatch:
+      Boolean(google && own) &&
+      canonicalPageKey(google as string) !== canonicalPageKey(own as string),
+    error,
+    cached: false,
+  };
+}
+
 /**
- * Asks Google how it sees up to 25 URLs of the site (URL Inspection API: free,
- * with a daily quota of about 2000 per property): indexed or not, why, last
- * crawl and which URL it chose as canonical.
+ * Asks Google how it sees up to 25 URLs of the site (URL Inspection API:
+ * free): indexed or not, why, last crawl and which URL it chose as canonical.
+ * The client sends them in small batches to show progress.
  */
 export const inspectIndexUrls = createServerFn({ method: "POST" })
   .middleware(requireProjectContext)
@@ -176,31 +214,42 @@ export const inspectIndexUrls = createServerFn({ method: "POST" })
     if (!connection) throw new GscNotConnectedError(context.projectId);
     for (const url of data.urls) assertUrlInSite(url, connection.siteUrl);
 
-    const inspected = await GscService.inspectUrls({
-      projectId: context.projectId,
-      urls: data.urls,
-      languageCode: "es",
-    });
-    return {
-      results: inspected.results.map((item): InspectedUrl => {
-        const status = item.result?.indexStatusResult;
-        const google = status?.googleCanonical ?? null;
-        const own = status?.userCanonical ?? null;
-        return {
-          url: item.url,
-          verdict: status?.verdict ?? null,
-          coverageState: status?.coverageState ?? null,
-          indexingState: status?.indexingState ?? null,
-          robotsTxtState: status?.robotsTxtState ?? null,
-          pageFetchState: status?.pageFetchState ?? null,
-          lastCrawlTime: status?.lastCrawlTime ?? null,
-          googleCanonical: google,
-          userCanonical: own,
-          canonicalMismatch:
-            Boolean(google && own) &&
-            canonicalPageKey(google as string) !== canonicalPageKey(own as string),
-          error: item.error ?? null,
-        };
-      }),
-    };
+    const results = new Map<string, InspectedUrl>();
+    const missing: string[] = [];
+    for (const url of data.urls) {
+      const kept = await env.KV.get(inspectCacheKey(context.projectId, url)).catch(
+        () => null,
+      );
+      if (kept) {
+        results.set(url, { ...(JSON.parse(kept) as InspectedUrl), url, cached: true });
+      } else {
+        missing.push(url);
+      }
+    }
+
+    for (let start = 0; start < missing.length; start += PARALLEL) {
+      const batch = missing.slice(start, start + PARALLEL);
+      const answers = await Promise.all(
+        batch.map(async (url) => {
+          const inspected = await GscService.inspectUrls({
+            projectId: context.projectId,
+            urls: [url],
+            languageCode: "es",
+          });
+          const item = inspected.results[0];
+          return toInspected(url, item?.result ?? null, item?.error ?? null);
+        }),
+      );
+      for (const answer of answers) {
+        results.set(answer.url, answer);
+        if (!answer.error) {
+          await env.KV.put(
+            inspectCacheKey(context.projectId, answer.url),
+            JSON.stringify(answer),
+            { expirationTtl: CACHE_SECONDS },
+          ).catch(() => undefined);
+        }
+      }
+    }
+    return { results: data.urls.flatMap((url) => results.get(url) ?? []) };
   });

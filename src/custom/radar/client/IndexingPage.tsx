@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { PageHeader } from "@/client/components/PageHeader";
 import { QueryError } from "@/client/components/QueryState";
 import { Button } from "@/client/components/ui/button";
@@ -25,6 +25,7 @@ import {
 } from "@/serverFunctions/radarIndexing";
 
 const MAX_INSPECT = 25;
+const BATCH = 5;
 
 const COVERAGE_ES: Record<string, string> = {
   "Submitted and indexed": "Enviada e indexada",
@@ -78,16 +79,36 @@ export function IndexingPage({ projectId }: { projectId: string }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [inspected, setInspected] = useState<Map<string, InspectedUrl>>(new Map());
 
-  const inspect = useMutation({
-    mutationFn: (urls: string[]) =>
-      inspectIndexUrls({ data: { projectId, urls: urls.slice(0, MAX_INSPECT) } }),
-    onSuccess: (data) =>
-      setInspected((previous) => {
-        const next = new Map(previous);
-        for (const item of data.results) next.set(item.url, item);
-        return next;
-      }),
-  });
+  // Google answers one URL at a time; they are sent in small batches so the
+  // results appear as they arrive and the progress is visible.
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const [inspectFailed, setInspectFailed] = useState(false);
+  const inspecting = progress !== null;
+  const runInspect = async (urls: string[]) => {
+    const list = urls.slice(0, MAX_INSPECT);
+    setInspectFailed(false);
+    setProgress({ done: 0, total: list.length });
+    try {
+      for (let start = 0; start < list.length; start += BATCH) {
+        const data = await inspectIndexUrls({
+          data: { projectId, urls: list.slice(start, start + BATCH) },
+        });
+        setInspected((previous) => {
+          const next = new Map(previous);
+          for (const item of data.results) next.set(item.url, item);
+          return next;
+        });
+        setProgress({ done: Math.min(start + BATCH, list.length), total: list.length });
+      }
+    } catch {
+      setInspectFailed(true);
+    } finally {
+      setProgress(null);
+    }
+  };
+  const progressText = progress
+    ? `Consultando a Google… ${progress.done} de ${progress.total}`
+    : "";
 
   const data = report.data?.connected ? report.data : null;
   const unseen = data?.unseen ?? [];
@@ -311,12 +332,12 @@ export function IndexingPage({ projectId }: { projectId: string }) {
               <Button
                 size="sm"
                 variant="outline"
-                disabled={inspect.isPending || data.topPages.length === 0}
-                onClick={() => inspect.mutate(data.topPages.slice(0, MAX_INSPECT))}
+                disabled={inspecting || data.topPages.length === 0}
+                onClick={() => void runInspect(data.topPages)}
               >
-                {inspect.isPending ? "Consultando a Google…" : "Comprobar mis páginas principales"}
+                {inspecting ? progressText : "Comprobar mis páginas principales"}
               </Button>
-              {inspect.isError ? (
+              {inspectFailed ? (
                 <p className="mt-2 text-sm text-destructive">
                   No se pudo consultar a Google (puede haber alcanzado la cuota
                   diaria). Prueba más tarde.
@@ -344,11 +365,11 @@ export function IndexingPage({ projectId }: { projectId: string }) {
                 </div>
                 <Button
                   size="sm"
-                  disabled={selectedUrls.length === 0 || inspect.isPending}
-                  onClick={() => inspect.mutate(selectedUrls)}
+                  disabled={selectedUrls.length === 0 || inspecting}
+                  onClick={() => void runInspect(selectedUrls)}
                 >
-                  {inspect.isPending
-                    ? "Consultando…"
+                  {inspecting
+                    ? progressText
                     : `Comprobar ${selectedUrls.length} seleccionadas`}
                 </Button>
               </div>
@@ -476,6 +497,11 @@ function InspectionTable({ results }: { results: InspectedUrl[] }) {
                 </TableCell>
                 <TableCell className="space-y-1 align-top text-sm">
                   <p>{item.error ?? coverageText(item.coverageState)}</p>
+                  {item.cached ? (
+                    <p className="text-xs text-muted-foreground">
+                      Dato guardado de hace menos de 12 horas.
+                    </p>
+                  ) : null}
                   {item.canonicalMismatch ? (
                     <p className="text-xs text-warning">
                       Canónica distinta. Tú declaras {item.userCanonical}; Google
