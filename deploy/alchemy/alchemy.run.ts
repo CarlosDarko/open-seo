@@ -176,6 +176,7 @@ const resolveSelfHostAccess = (
   stage: string,
   provision: boolean,
   workersSubdomain: string,
+  customDomain = "",
 ) =>
   Effect.gen(function* () {
     let teamDomain = yield* optionalVar("TEAM_DOMAIN");
@@ -251,6 +252,7 @@ const resolveSelfHostAccess = (
         policyName: `open-seo ${stage} self-host users`,
         applicationName: `open-seo ${stage}`,
         domain: `${workerName(stage)}.${subdomain}`,
+        extraDomains: customDomain ? [customDomain] : [],
         emails: allowedEmails,
       });
       policyAud = application.aud;
@@ -309,6 +311,10 @@ export default Alchemy.Stack(
   Effect.gen(function* () {
     const stage = yield* Alchemy.Stage;
     const prod = stage === HOSTED_PROD_STAGE;
+    // Own domain for the production self-host stage only (staging keeps its
+    // workers.dev address). The zone must be on this Cloudflare account.
+    const customDomain =
+      stage === "selfhost" ? yield* optionalVar("CUSTOM_DOMAIN_SELFHOST") : "";
     // Fail closed: an unset AUTH_MODE gets the Access-gated mode (matching the
     // app's own default in src/lib/auth-mode.ts), never public hosted signup.
     // hosted/local_noauth must be set explicitly.
@@ -341,7 +347,9 @@ export default Alchemy.Stack(
         );
       }
     } else if (workersSubdomain) {
-      authUrl = `https://${workerName(stage)}.${workersSubdomain}`;
+      authUrl = customDomain
+        ? `https://${customDomain}`
+        : `https://${workerName(stage)}.${workersSubdomain}`;
     } else if (authMode === "hosted") {
       return yield* Effect.die(
         new Error(
@@ -358,6 +366,7 @@ export default Alchemy.Stack(
       stage,
       authMode === "cloudflare_access" && !prod,
       workersSubdomain,
+      customDomain,
     );
 
     // Created once and bound into BOTH workers — they share the same
@@ -427,7 +436,11 @@ export default Alchemy.Stack(
     const app = yield* Cloudflare.Worker("open-seo", {
       name: workerName(stage),
       // Prod serves the real domains; the zone is inferred from the hostname.
-      domain: prod ? ["app.openseo.so", "www.app.openseo.so"] : undefined,
+      domain: prod
+        ? ["app.openseo.so", "www.app.openseo.so"]
+        : customDomain
+          ? [customDomain]
+          : undefined,
       // Prebuilt worker from `vite build` (@cloudflare/vite-plugin). The entry
       // exports the DO + WorkflowEntrypoint classes (re-exported by
       // src/server.ts), which `bundle: false` requires. Sibling chunks under
