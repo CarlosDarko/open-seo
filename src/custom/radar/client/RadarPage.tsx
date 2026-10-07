@@ -411,8 +411,8 @@ function Insights({
           Qué ha pasado, de dónde viene y qué hacer primero.
         </p>
       </CardHeader>
-      <CardContent className="grid gap-6 lg:grid-cols-3 lg:divide-x lg:divide-border">
-        <section className="space-y-3">
+      <CardContent className="grid gap-6 lg:grid-cols-3 lg:divide-x lg:divide-border lg:px-0">
+        <section className="space-y-3 lg:px-6">
           <ColumnTitle>
             {comparable ? "Los clics" : "Clics del periodo"}
           </ColumnTitle>
@@ -451,31 +451,38 @@ function Insights({
           )}
           {brand.hasBrand ? (
             <dl className="space-y-1.5 border-t border-border pt-3 text-sm">
-              <div className="flex items-baseline justify-between gap-2">
-                <dt className="text-muted-foreground">Sin marca</dt>
-                <dd className="tabular-nums">
-                  <strong>{integer.format(brand.otherClicks)}</strong>
-                  {otherChange !== null ? (
-                    <span
-                      className={`ml-1.5 text-xs font-semibold ${otherChange < 0 ? "text-destructive" : "text-success"}`}
-                    >
-                      {otherChange > 0 ? "+" : ""}
-                      {percent.format(otherChange)}
-                    </span>
-                  ) : null}
-                </dd>
-              </div>
-              <div className="flex items-baseline justify-between gap-2">
-                <dt className="text-muted-foreground">Con marca</dt>
-                <dd className="tabular-nums">
-                  <strong>{integer.format(brand.clicks)}</strong>
-                </dd>
-              </div>
+              {[
+                {
+                  label: "Sin marca",
+                  value: brand.otherClicks,
+                  delta: otherChange,
+                },
+                { label: "Con marca", value: brand.clicks, delta: null },
+              ].map((row) => (
+                // The figures share one column and the changes another, so
+                // the numbers of the two rows line up.
+                <div
+                  key={row.label}
+                  className="grid grid-cols-[1fr_auto_4.5rem] items-baseline gap-x-2"
+                >
+                  <dt className="text-muted-foreground">{row.label}</dt>
+                  <dd className="text-right font-bold tabular-nums">
+                    {integer.format(row.value)}
+                  </dd>
+                  <dd
+                    className={`text-right text-xs font-semibold tabular-nums ${row.delta !== null && row.delta < 0 ? "text-destructive" : "text-success"}`}
+                  >
+                    {row.delta !== null
+                      ? `${row.delta > 0 ? "+" : ""}${percent.format(row.delta)}`
+                      : ""}
+                  </dd>
+                </div>
+              ))}
             </dl>
           ) : null}
         </section>
 
-        <section className="space-y-3 lg:pl-6">
+        <section className="space-y-3 lg:px-6">
           <ColumnTitle>
             {comparable ? "Dónde se mueve" : "Dónde llega el tráfico"}
           </ColumnTitle>
@@ -536,7 +543,7 @@ function Insights({
           )}
         </section>
 
-        <section className="space-y-3 lg:pl-6">
+        <section className="space-y-3 lg:px-6">
           <ColumnTitle>Qué hacer primero</ColumnTitle>
           {tasks.length === 0 ? (
             <p className="text-sm text-muted-foreground">
@@ -544,7 +551,7 @@ function Insights({
             </p>
           ) : (
             <ul className="space-y-2.5">
-              {tasks.map((task) => {
+              {tasks.map((task, index) => {
                 const isLoss = task.kind === "loss";
                 return (
                   <li key={task.id}>
@@ -554,8 +561,13 @@ function Insights({
                       rel="noopener noreferrer"
                       className="group flex items-start justify-between gap-3"
                     >
-                      <span className="line-clamp-2 min-w-0 text-sm leading-snug font-medium group-hover:underline">
-                        {tileHeadline(task)}
+                      <span className="flex min-w-0 items-start gap-2">
+                        <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-foreground text-[11px] font-bold text-background tabular-nums">
+                          {index + 1}
+                        </span>
+                        <span className="line-clamp-2 min-w-0 text-sm leading-snug font-medium group-hover:underline">
+                          {tileHeadline(task)}
+                        </span>
                       </span>
                       {task.gain !== null ? (
                         <span
