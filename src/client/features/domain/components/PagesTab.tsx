@@ -11,7 +11,7 @@ import {
   buildPagesSearchUpdate,
   countPageFilterConditions,
 } from "@/client/features/domain/domainFilterUtils";
-import { useDomainPagesQuery } from "@/client/features/domain/hooks/useDomainPagesQuery";
+import { useSortedDomainPagesQuery as useDomainPagesQuery } from "@/custom/domain/useSortedDomainQueries";
 import { useDomainPageFilterPreferences } from "@/client/features/domain/useDomainFilterPreferences";
 import {
   EMPTY_DOMAIN_FILTERS,

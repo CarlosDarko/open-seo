@@ -5,7 +5,15 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadDictionary } from "./dictionary.mjs";
-import { listFiles, normalizeKey, scanSource } from "./scan.mjs";
+import {
+  listFiles,
+  normalizeKey,
+  REGISTRIES,
+  scanRegistry,
+  scanSource,
+  scanTemplates,
+} from "./scan.mjs";
+import { applySourcePatches } from "./patches.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "..", "..");
@@ -14,10 +22,19 @@ const dry = process.argv.includes("--dry");
 const found = new Set();
 for (const dir of ["src/client", "src/routes"]) {
   for (const file of listFiles(path.join(root, dir))) {
-    scanSource(file, fs.readFileSync(file, "utf8"), (text) => {
+    const code = applySourcePatches(fs.readFileSync(file, "utf8"), file);
+    scanSource(file, code, (text) => {
       found.add(normalizeKey(text));
     });
+    scanTemplates(file, code, (item) => found.add(item.key));
   }
+}
+
+for (const registry of REGISTRIES) {
+  const file = path.join(root, registry.file);
+  scanRegistry(file, fs.readFileSync(file, "utf8"), registry.props, (text) => {
+    found.add(normalizeKey(text));
+  });
 }
 
 const stale = new Set(

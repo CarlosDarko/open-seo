@@ -5,7 +5,16 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadDictionary } from "./dictionary.mjs";
-import { listFiles, looksLikeCopy, normalizeKey, scanSource } from "./scan.mjs";
+import {
+  listFiles,
+  looksLikeCopy,
+  normalizeKey,
+  REGISTRIES,
+  scanRegistry,
+  scanSource,
+  scanTemplates,
+} from "./scan.mjs";
+import { applySourcePatches } from "./patches.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "..", "..");
@@ -15,7 +24,7 @@ const found = new Set();
 const foundAll = new Set();
 for (const dir of ["src/client", "src/routes"]) {
   for (const file of listFiles(path.join(root, dir))) {
-    const code = fs.readFileSync(file, "utf8");
+    const code = applySourcePatches(fs.readFileSync(file, "utf8"), file);
     scanSource(file, code, (text, kind) => {
       const key = normalizeKey(text);
       foundAll.add(key);
@@ -23,7 +32,19 @@ for (const dir of ["src/client", "src/routes"]) {
       // positions always count.
       if (ALWAYS.has(kind) || looksLikeCopy(key)) found.add(key);
     });
+    // Templates with ${} are keyed with {1}, {2}... They are only matched
+    // against the dictionary, never listed as missing (most are class names).
+    scanTemplates(file, code, (item) => foundAll.add(item.key));
   }
+}
+
+for (const registry of REGISTRIES) {
+  const file = path.join(root, registry.file);
+  scanRegistry(file, fs.readFileSync(file, "utf8"), registry.props, (text) => {
+    const key = normalizeKey(text);
+    foundAll.add(key);
+    found.add(key);
+  });
 }
 
 const dictionary = loadDictionary(here);

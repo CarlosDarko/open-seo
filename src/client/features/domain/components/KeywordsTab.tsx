@@ -24,7 +24,7 @@ import {
   buildKeywordsSearchUpdate,
   countKeywordFilterConditions,
 } from "@/client/features/domain/domainFilterUtils";
-import { useDomainKeywordsQuery } from "@/client/features/domain/hooks/useDomainKeywordsQuery";
+import { useSortedDomainKeywordsQuery as useDomainKeywordsQuery } from "@/custom/domain/useSortedDomainQueries";
 import { useSaveKeywordsMutation } from "@/client/features/domain/mutations";
 import { useDomainKeywordFilterPreferences } from "@/client/features/domain/useDomainFilterPreferences";
 import {

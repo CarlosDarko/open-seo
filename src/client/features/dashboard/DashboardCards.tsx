@@ -136,12 +136,12 @@ export function AuditHealthCard({
   return (
     <CardShell
       title="Site audit"
-      stamp={`Auditoría del sitio · ${
+      stamp={`Site audit · ${
         audit.status === "completed"
-          ? `${audit.pagesCrawled} páginas rastreadas · ${formatDay(audit.startedAt)}`
+          ? `crawled ${audit.pagesCrawled} pages · ${formatDay(audit.startedAt)}`
           : audit.status === "running"
-            ? "rastreo en curso"
-            : "el último rastreo falló"
+            ? "crawl in progress"
+            : "last crawl failed"
       }`}
       action={
         <Link
@@ -192,19 +192,14 @@ export function AuditHealthCard({
                 </span>
               </span>
               <span className="shrink-0 tabular-nums text-muted-foreground">
-                {issue.count}{" "}
-                <span className="lowercase">
-                  {issue.count === 1 ? "Page" : "Pages"}
-                </span>
+                {issue.count} {issue.count === 1 ? "page" : "pages"}
               </span>
             </li>
           ))}
           {audit.totalIssueTypes > audit.topIssues.length ? (
             <li className="text-xs text-muted-foreground">
-              + {audit.totalIssueTypes - audit.topIssues.length}{" "}
-              {audit.totalIssueTypes - audit.topIssues.length === 1
-                ? "more issue"
-                : "more issues"}
+              + {audit.totalIssueTypes - audit.topIssues.length} more issue
+              {audit.totalIssueTypes - audit.topIssues.length === 1 ? "" : "s"}
             </li>
           ) : null}
           {/* A failed crawl keeps what it found, as the audit page does. */}
@@ -249,8 +244,8 @@ export function BacklinkPulseCard({
   return (
     <CardShell
       title="Backlink pulse"
-      stamp={`Backlinks · captura del ${formatDay(backlinks.capturedAt)}${
-        refreshing ? " · actualizando…" : ""
+      stamp={`Backlinks · snapshot ${formatDay(backlinks.capturedAt)}${
+        refreshing ? " · refreshing…" : ""
       }`}
       action={
         <Link

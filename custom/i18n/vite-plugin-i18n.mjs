@@ -16,8 +16,12 @@ import {
   listFiles,
   normalizeKey,
   parse,
+  REGISTRIES,
+  scanRegistry,
   scanSource,
+  scanTemplates,
 } from "./scan.mjs";
+import { applySourcePatches } from "./patches.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const UI_FILE = /\/src\/(client|routes)\/.+\.tsx?$/;
@@ -48,13 +52,107 @@ export function translateEs() {
     return found;
   }
 
+  function escapeTemplate(text) {
+    return text
+      .replaceAll("\\", "\\\\")
+      .replaceAll("`", "\\`")
+      .replaceAll("${", "\\${");
+  }
+
+  // Rewrites template literals that have a dictionary entry, e.g.
+  // "crawled {1} pages · {2}" => "{1} páginas rastreadas · {2}". Strings shown
+  // by conditionals inside the substitutions are translated first, then
+  // templates innermost-first, so nested templates keep their translations.
+  function translateTemplates(code, file) {
+    let out = code;
+    for (let pass = 0; pass < 8; pass += 1) {
+      const strings = [];
+      const templates = [];
+      scanTemplates(file, out, (item) => {
+        const translated = dictionary.get(item.key, file);
+        if (translated === undefined) return;
+        (item.kind === "string" ? strings : templates).push({
+          ...item,
+          translated,
+        });
+      });
+
+      if (pass === 0 && strings.length > 0) {
+        for (const item of strings.sort(
+          (a, b) => b.node.getStart(b.sf) - a.node.getStart(a.sf),
+        )) {
+          const { lead, trail } = edgeSpace(item.node.text);
+          out =
+            out.slice(0, item.node.getStart(item.sf)) +
+            JSON.stringify(lead + item.translated + trail) +
+            out.slice(item.node.end);
+        }
+        continue;
+      }
+
+      const innermost = templates.filter(
+        (a) =>
+          !templates.some(
+            (b) =>
+              b !== a &&
+              b.node.pos >= a.node.pos &&
+              b.node.end <= a.node.end,
+          ),
+      );
+      if (innermost.length === 0) break;
+      for (const item of innermost.sort((a, b) => b.node.pos - a.node.pos)) {
+        const expressions = item.node.templateSpans.map((span) =>
+          out.slice(span.expression.getStart(item.sf), span.expression.end),
+        );
+        const body = item.translated
+          .split(/(\{\d+\})/)
+          .map((piece) => {
+            const slot = /^\{(\d+)\}$/.exec(piece);
+            if (!slot) return escapeTemplate(piece);
+            const expression = expressions[Number(slot[1]) - 1];
+            return expression === undefined ? "" : `\${${expression}}`;
+          })
+          .join("");
+        out =
+          out.slice(0, item.node.getStart(item.sf)) +
+          "`" +
+          body +
+          "`" +
+          out.slice(item.node.end);
+      }
+    }
+    return out;
+  }
+
   return {
     name: "carlos-ortega-i18n-es",
     enforce: "pre",
-    transform(code, id) {
+    transform(original, id) {
+      let code = original;
       const file = id.split("?")[0].split(path.sep).join("/");
+      const registry = REGISTRIES.find((r) => file.endsWith(`/${r.file}`));
+      if (registry) {
+        const edits = [];
+        scanRegistry(file, code, registry.props, (text, node, sf) => {
+          const translated = dictionary.get(normalizeKey(text), file);
+          if (translated !== undefined) {
+            edits.push({
+              start: node.getStart(sf),
+              end: node.end,
+              text: JSON.stringify(translated),
+            });
+          }
+        });
+        if (edits.length === 0) return null;
+        let out = code;
+        for (const edit of edits.sort((a, b) => b.start - a.start)) {
+          out = out.slice(0, edit.start) + edit.text + out.slice(edit.end);
+        }
+        return { code: out, map: null };
+      }
       if (!UI_FILE.test(file) || file.includes("/node_modules/")) return null;
       dataStrings ??= loadDataStrings();
+      code = translateTemplates(applySourcePatches(code, file), file);
 
       const edits = [];
       scanSource(file, code, (text, kind, node, sf) => {
@@ -88,7 +186,9 @@ export function translateEs() {
         });
       });
 
-      if (edits.length === 0) return null;
+      if (edits.length === 0) {
+        return code === original ? null : { code, map: null };
+      }
       let out = code;
       for (const edit of edits.sort((a, b) => b.start - a.start)) {
         out = out.slice(0, edit.start) + edit.text + out.slice(edit.end);

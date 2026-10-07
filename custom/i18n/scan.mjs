@@ -141,12 +141,9 @@ const COMPARE_OPS = new Set([
 export function isCandidate(s) {
   const t = s.trim();
   if (t.length < 2 || !/[A-Za-z]{2}/.test(t)) return false;
-  if (
-    /^[\/.#@]|:\/\/|^[a-z]+[A-Z]\w*$|^[a-z0-9_.-]+$/.test(t) &&
-    !/\s/.test(t) &&
-    !/^[A-Z]/.test(t)
-  )
-    return false;
+  // Only paths and URLs are skipped: this runs on strings in visible
+  // positions, and a word is only ever translated if the dictionary has it.
+  if (/^[\/.#@]|:\/\//.test(t) && !/\s/.test(t)) return false;
   return true;
 }
 
@@ -212,7 +209,7 @@ function isStructural(n) {
 
 // Calls `found` for every plain string that an expression can render as text:
 // "a", `a`, cond ? "a" : "b", cond && "a", x || "a", x ?? "a".
-function forEachRenderedString(expr, found) {
+export function forEachRenderedString(expr, found) {
   if (ts.isParenthesizedExpression(expr)) {
     forEachRenderedString(expr.expression, found);
   } else if (
@@ -358,4 +355,58 @@ export function parse(file, code) {
 export function scanSource(file, code, onString) {
   const sf = parse(file, code);
   visit(sf, (text, kind, node) => onString(text, kind, node, sf));
+}
+
+// Display text that lives outside the UI folders, in registries of plain
+// objects: the file, and the property names whose string values people see.
+export const REGISTRIES = [
+  {
+    file: "src/shared/audit-issues.ts",
+    props: ["title", "explanation", "howToFix"],
+  },
+];
+
+export function scanRegistry(file, code, props, onString) {
+  const sf = parse(file, code);
+  const walk = (n) => {
+    const value = ts.isPropertyAssignment(n) ? n.initializer : null;
+    if (
+      value &&
+      ts.isIdentifier(n.name) &&
+      props.includes(n.name.text) &&
+      (ts.isStringLiteral(value) || ts.isNoSubstitutionTemplateLiteral(value))
+    ) {
+      onString(value.text, value, sf);
+    }
+    ts.forEachChild(n, walk);
+  };
+  walk(sf);
+}
+
+// Template literals with substitutions (`crawled ${n} pages`) cannot be keyed
+// as plain strings. They are keyed with numbered placeholders instead
+// ("crawled {1} pages"), so translations survive a renamed variable. Strings
+// rendered by the expressions inside them are reported as well.
+// `onItem({ kind: "template" | "string", key, node, sf })`
+export function scanTemplates(file, code, onItem) {
+  const sf = parse(file, code);
+  const walk = (n) => {
+    if (
+      ts.isTemplateExpression(n) &&
+      !ts.isTaggedTemplateExpression(n.parent)
+    ) {
+      const parts = [n.head.text];
+      n.templateSpans.forEach((span, i) =>
+        parts.push(`{${i + 1}}${span.literal.text}`),
+      );
+      onItem({ kind: "template", key: normalizeKey(parts.join("")), node: n, sf });
+      for (const span of n.templateSpans) {
+        forEachRenderedString(span.expression, (lit) =>
+          onItem({ kind: "string", key: normalizeKey(lit.text), node: lit, sf }),
+        );
+      }
+    }
+    ts.forEachChild(n, walk);
+  };
+  walk(sf);
 }
