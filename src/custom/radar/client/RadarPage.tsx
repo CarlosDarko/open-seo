@@ -126,11 +126,11 @@ export function RadarPage({ projectId }: { projectId: string }) {
             <TrendCard report={report} />
             <BandsCard report={report} />
           </div>
-          {report.period.comparable ? <GainLoss report={report} /> : null}
           <Segments
             sets={segmentSets(report)}
             comparable={report.period.comparable}
           />
+          {report.period.comparable ? <GainLoss report={report} /> : null}
           <Card>
             <CardHeader>
               <CardTitle>Más datos</CardTitle>

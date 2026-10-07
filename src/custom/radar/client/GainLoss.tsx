@@ -1,4 +1,5 @@
 import { ArrowDownRight, ArrowUpRight } from "lucide-react";
+import { Card } from "@/client/components/ui/card";
 import {
   Table,
   TableBody,
@@ -39,13 +40,11 @@ const pos = (value: number | null) =>
 
 const TONES = {
   up: {
-    wash: "border-success/25 bg-success/5",
     chip: "bg-success/15 text-success",
     text: "text-success",
     bar: "bg-success",
   },
   down: {
-    wash: "border-destructive/25 bg-destructive/5",
     chip: "bg-destructive/15 text-destructive",
     text: "text-destructive",
     bar: "bg-destructive",
@@ -129,8 +128,8 @@ function MoverCard({
   );
 
   return (
-    <div className={`overflow-hidden rounded-xl border ${tone.wash}`}>
-      <header className="flex items-center justify-between gap-2 px-4 pt-3">
+    <Card className="gap-3 overflow-hidden py-3">
+      <header className="flex items-center justify-between gap-2 px-4">
         <span
           className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold tracking-wide uppercase ${tone.chip}`}
         >
@@ -148,7 +147,7 @@ function MoverCard({
           Sin cambios relevantes.
         </p>
       ) : (
-        <div className="px-2 pb-2">
+        <div className="px-2">
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
@@ -220,6 +219,6 @@ function MoverCard({
           </Table>
         </div>
       )}
-    </div>
+    </Card>
   );
 }
