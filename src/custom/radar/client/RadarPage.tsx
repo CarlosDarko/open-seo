@@ -27,6 +27,7 @@ import {
 import { Skeleton } from "@/client/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/client/components/ui/tabs";
 import { buildActions, type RadarReport } from "@/custom/radar/actions";
+import { AlertsBanner } from "@/custom/radar/client/AlertsBanner";
 import { RadarControls } from "@/custom/radar/client/RadarControls";
 import { PageLink } from "@/custom/radar/client/RadarLinks";
 import { RadarTables } from "@/custom/radar/client/RadarTables";
@@ -111,6 +112,7 @@ export function RadarPage({ projectId }: { projectId: string }) {
         <div
           className={`space-y-6 ${query.isPlaceholderData ? "opacity-60 transition-opacity" : ""}`}
         >
+          <AlertsBanner projectId={projectId} />
           <Kpis report={report} />
           <Insights projectId={projectId} report={report} />
           <div className="grid gap-4 lg:grid-cols-2">

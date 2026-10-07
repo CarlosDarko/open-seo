@@ -2,7 +2,9 @@ import {
   Bookmark,
   Bot,
   Brain,
+  Bell,
   ChartLine,
+  FileSearch,
   ListChecks,
   Newspaper,
   ClipboardCheck,
@@ -13,6 +15,7 @@ import {
   MessageSquare,
   Radar,
   Search,
+  Shapes,
   TrendingUp,
 } from "lucide-react";
 import { linkOptions } from "@tanstack/react-router";
@@ -51,6 +54,21 @@ const projectNavItems = [
     to: "/p/$projectId/action-plan" as const,
     label: "Action Plan",
     icon: ListChecks,
+  },
+  {
+    to: "/p/$projectId/topics" as const,
+    label: "Topics",
+    icon: Shapes,
+  },
+  {
+    to: "/p/$projectId/indexing" as const,
+    label: "Indexing",
+    icon: FileSearch,
+  },
+  {
+    to: "/p/$projectId/alerts" as const,
+    label: "Alerts",
+    icon: Bell,
   },
   {
     to: "/p/$projectId/discover" as const,
@@ -163,6 +181,9 @@ export function getProjectNavGroups(projectId: string) {
       items: [
         byPath("/p/$projectId/radar"),
         byPath("/p/$projectId/action-plan"),
+        byPath("/p/$projectId/topics"),
+        byPath("/p/$projectId/indexing"),
+        byPath("/p/$projectId/alerts"),
         byPath("/p/$projectId/discover"),
         byPath("/p/$projectId/search-performance"),
         byPath("/p/$projectId/rank-tracking"),

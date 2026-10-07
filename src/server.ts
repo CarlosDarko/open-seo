@@ -25,6 +25,7 @@ import {
 } from "@/server/billing/autumn-webhook";
 import { sweepDubReferredOrganizations } from "@/server/referrals/dub";
 import { maybeSendSelfHostHeartbeat } from "@/server/lib/self-host-telemetry";
+import { runDailyRadarAlerts } from "@/custom/radar/server/scheduledAlerts";
 import { handleGdprStorageErasure } from "@/server/gdpr/storage-erasure";
 import { GDPR_STORAGE_ERASURE_PATH } from "@/shared/gdpr-erasure";
 
@@ -200,6 +201,12 @@ export default {
     env: Env,
     _ctx: ExecutionContext,
   ) {
+    // Radar SEO alerts (src/custom/radar): checks once a day, cheap otherwise.
+    _ctx.waitUntil(
+      runDailyRadarAlerts().catch((error) =>
+        console.error("[radar-alerts] daily check failed:", error),
+      ),
+    );
     if (controller.cron === MCP_OAUTH_PURGE_CRON) {
       // Only hosted mode runs the OAuth provider (and has OAUTH_KV bound).
       if (isHostedAuthMode(getAuthMode(env.AUTH_MODE))) {

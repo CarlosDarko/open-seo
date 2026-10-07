@@ -16,6 +16,7 @@ import {
   TrendingDown,
   type LucideIcon,
 } from "lucide-react";
+import { Button } from "@/client/components/ui/button";
 import { Card, CardContent } from "@/client/components/ui/card";
 import { Skeleton } from "@/client/components/ui/skeleton";
 import {
@@ -390,12 +391,17 @@ export function ActionCard({
   loadingSignals,
   open,
   onToggle,
+  onMarkDone,
+  marking,
 }: {
   action: Action;
   signals: Map<string, PageSignals>;
   loadingSignals: boolean;
   open: boolean;
   onToggle: () => void;
+  /** Marks the task as done so its impact can be measured later. */
+  onMarkDone?: (title: string | null) => void;
+  marking?: boolean;
 }) {
   const meta = KIND_META[action.kind];
   const tone = TONES[meta.tone];
@@ -513,7 +519,21 @@ export function ActionCard({
               </p>
             </div>
 
-            <div className="flex justify-end">
+            <div className="flex items-center justify-between gap-2">
+              {onMarkDone ? (
+                <Button
+                  size="xs"
+                  variant="outline"
+                  disabled={marking}
+                  onClick={() => onMarkDone(pageTitle)}
+                  title="Guarda cómo está ahora y mide el efecto en las semanas siguientes"
+                >
+                  <CircleCheck className="size-3" aria-hidden />
+                  {marking ? "Guardando…" : "Marcar como hecha"}
+                </Button>
+              ) : (
+                <span />
+              )}
               <button
                 type="button"
                 aria-expanded={open}

@@ -1,0 +1,92 @@
+import { describe, expect, it } from "vitest";
+import {
+  checkItem,
+  checkRule,
+  describeTrigger,
+  isValidCombination,
+  type Item,
+  type Rule,
+  type Values,
+} from "@/custom/radar/alertRules";
+
+const values = (clicks: number, impressions: number, position = 5): Values => ({
+  clicks,
+  impressions,
+  ctr: impressions > 0 ? clicks / impressions : 0,
+  position,
+});
+
+const rule = (overrides: Partial<Rule>): Rule => ({
+  id: "r",
+  name: "regla",
+  scope: "site",
+  target: null,
+  metric: "clicks",
+  condition: "drop_pct",
+  threshold: 20,
+  windowDays: 7,
+  minValue: 0,
+  ...overrides,
+});
+
+const item = (previous: Values, current: Values, label = "sitio"): Item => ({
+  label,
+  url: null,
+  previous,
+  current,
+});
+
+describe("checkItem", () => {
+  it("fires on a drop of at least the threshold", () => {
+    const hit = checkItem(rule({}), item(values(100, 1000), values(70, 1000)));
+    expect(hit?.changePct).toBeCloseTo(-30, 5);
+    expect(checkItem(rule({}), item(values(100, 1000), values(85, 1000)))).toBeNull();
+  });
+
+  it("ignores items with too little before, to avoid noise", () => {
+    const small = rule({ minValue: 20 });
+    expect(checkItem(small, item(values(5, 100), values(1, 100)))).toBeNull();
+    expect(checkItem(small, item(values(50, 500), values(10, 500)))).not.toBeNull();
+  });
+
+  it("fires 'below' only when the value crosses the line", () => {
+    const below = rule({ metric: "clicks", condition: "below", threshold: 50 });
+    expect(checkItem(below, item(values(80, 1000), values(40, 1000)))).not.toBeNull();
+    expect(checkItem(below, item(values(30, 1000), values(20, 1000)))).toBeNull();
+  });
+
+  it("compares CTR in percent", () => {
+    const ctr = rule({ metric: "ctr", condition: "below", threshold: 2 });
+    expect(checkItem(ctr, item(values(30, 1000), values(10, 1000)))).not.toBeNull();
+  });
+
+  it("detects a position that gets worse by N places", () => {
+    const worse = rule({ metric: "position", condition: "worse_by", threshold: 3 });
+    expect(checkItem(worse, item(values(10, 1000, 4), values(8, 1000, 8)))).not.toBeNull();
+    expect(checkItem(worse, item(values(10, 1000, 4), values(8, 1000, 6)))).toBeNull();
+  });
+});
+
+describe("checkRule and describeTrigger", () => {
+  it("lists the worst items first and writes a readable sentence", () => {
+    const top = rule({ scope: "top_pages", condition: "drop_pct", threshold: 30 });
+    const hits = checkRule(top, [
+      item(values(100, 1000), values(60, 1000), "/a"),
+      item(values(100, 1000), values(20, 1000), "/b"),
+      item(values(100, 1000), values(95, 1000), "/c"),
+    ]);
+    expect(hits.map((hit) => hit.label)).toEqual(["/b", "/a"]);
+    expect(describeTrigger(top, hits)).toContain("2 páginas");
+    expect(describeTrigger(rule({}), checkRule(rule({}), [item(values(100, 1000), values(60, 1000))]))).toContain(
+      "Los clics del sitio",
+    );
+  });
+});
+
+describe("isValidCombination", () => {
+  it("only allows conditions that make sense for the metric", () => {
+    expect(isValidCombination("position", "worse_by")).toBe(true);
+    expect(isValidCombination("position", "drop_pct")).toBe(false);
+    expect(isValidCombination("clicks", "worse_by")).toBe(false);
+  });
+});

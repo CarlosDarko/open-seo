@@ -37,9 +37,12 @@ export function RadarControls({
   filters,
   onChange,
   brand,
+  showBrandSwitch,
   fellBack,
 }: {
   projectId?: string;
+  /** Only the "include brand" switch, for pages without the brand dialog. */
+  showBrandSwitch?: boolean;
   filters: RadarFilters;
   onChange: (patch: Partial<RadarFilters>) => void;
   brand?: RadarReport["brand"];
@@ -124,6 +127,18 @@ export function RadarControls({
               </Label>
             </div>
           ) : null}
+        </div>
+      ) : null}
+      {!brand && showBrandSwitch ? (
+        <div className="flex items-center gap-2">
+          <Switch
+            id="radar-brand-simple"
+            checked={filters.includeBrand}
+            onCheckedChange={(checked) => onChange({ includeBrand: checked })}
+          />
+          <Label htmlFor="radar-brand-simple" className="text-sm">
+            Incluir marca en el análisis
+          </Label>
         </div>
       ) : null}
       {fellBack ? (
