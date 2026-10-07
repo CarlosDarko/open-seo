@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   languageClassifier,
   pageKindOf,
+  buildPageTypes,
   pageTypeClassifier,
   queryIntent,
 } from "@/custom/radar/radarSegments";
@@ -39,9 +40,23 @@ describe("pageTypeClassifier", () => {
       "https://x.com/dienstleistungen/e",
       "https://x.com/diensten/f",
     ]);
-    expect(classify("https://x.com/servicios/c")).toBe("/services/");
-    expect(classify("https://x.com/dienstleistungen/d")).toBe("/services/");
-    expect(classify("https://x.com/diensten/f")).toBe("/services/");
+    expect(classify("https://x.com/servicios/c")).toBe("/servicios/");
+    expect(classify("https://x.com/dienstleistungen/d")).toBe("/servicios/");
+    expect(classify("https://x.com/diensten/f")).toBe("/servicios/");
+  });
+
+  it("reports which folders were merged, and keeps a lone spelling as it is", () => {
+    const { merged, classify } = buildPageTypes([
+      "https://x.com/services/a",
+      "https://x.com/services/b",
+      "https://x.com/servicios/c",
+      "https://x.com/products/p",
+      "https://x.com/products/q",
+    ]);
+    expect(merged).toEqual([
+      { label: "/servicios/", folders: ["/services/", "/servicios/"] },
+    ]);
+    expect(classify("https://x.com/products/p")).toBe("/products/");
   });
 
   it("keeps working on sites without language folders", () => {

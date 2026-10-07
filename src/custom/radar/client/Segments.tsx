@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Info } from "lucide-react";
 import { Bar, BarChart } from "recharts";
 import {
   ChartGrid,
@@ -48,6 +49,8 @@ export type SegmentSet = {
   title: string;
   help: string;
   segments: Segment[];
+  /** Folders merged because they are the same section in other languages. */
+  merges?: { label: string; folders: string[] }[];
 };
 
 /** A sentence that says what the segments show: who brings the clicks and
@@ -101,6 +104,23 @@ export function Segments({ sets }: { sets: SegmentSet[] }) {
           </Tabs>
         </div>
         <p className="text-xs text-muted-foreground">{active.help}</p>
+        {active.merges && active.merges.length > 0 ? (
+          <p className="flex gap-1.5 text-xs text-muted-foreground">
+            <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+            <span>
+              Unidas por ser la misma sección en otro idioma, para no repartir
+              su tráfico en varias barras:{" "}
+              {active.merges.map((merge, index) => (
+                <span key={merge.label}>
+                  {index > 0 ? "; " : ""}
+                  <strong className="text-foreground">{merge.label}</strong> ={" "}
+                  {merge.folders.join(", ")}
+                </span>
+              ))}
+              . Se reconocen por palabras equivalentes conocidas.
+            </span>
+          </p>
+        ) : null}
       </CardHeader>
       <CardContent className="space-y-4">
         {insight ? <p className="text-sm">{insight}</p> : null}

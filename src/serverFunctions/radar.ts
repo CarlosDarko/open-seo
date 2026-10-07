@@ -32,7 +32,7 @@ import {
   emergingQueries,
   languageClassifier,
   lowTractionPages,
-  pageTypeClassifier,
+  buildPageTypes,
   queryIntent,
   questionOpportunities,
   segmentRows,
@@ -186,9 +186,10 @@ export const getRadarReport = createServerFn({ method: "POST" })
       // carry no intent words of their own.
       const landing = bestPageByQuery(mergedQueryPages);
 
-      const classifyPage = pageTypeClassifier(
+      const pageTypes = buildPageTypes(
         [...pageRows, ...prevPageRows].flatMap((row) => row.keys?.[0] ?? []),
       );
+      const classifyPage = pageTypes.classify;
 
       return {
         connected: true as const,
@@ -238,6 +239,7 @@ export const getRadarReport = createServerFn({ method: "POST" })
               : [],
           ),
         segments: {
+          pageTypeMerges: pageTypes.merged,
           pageType: segmentRows(pageRows, prevPageRows, (row) =>
             classifyPage(row.keys?.[0] ?? ""),
           ),

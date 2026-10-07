@@ -148,6 +148,7 @@ function segmentSets(report: RadarReport): SegmentSet[] {
       title: "Tipo de página",
       help: "Las secciones de tu web (blog, servicios…), detectadas solas a partir de las URL.",
       segments: report.segments.pageType,
+      merges: report.segments.pageTypeMerges,
     },
     {
       key: "intent",

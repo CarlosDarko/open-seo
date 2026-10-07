@@ -156,13 +156,24 @@ function folderKey(folder: string): string {
   return group === undefined ? name : `#${group}`;
 }
 
+export type PageTypeMerge = {
+  /** The Spanish name the merged folders are shown under. */
+  label: string;
+  /** The spellings found on the site that were merged into it. */
+  folders: string[];
+};
+
 /** Page type from the URL structure, ignoring the language folder: the first
  *  folder when several pages share it ("/blog/"), the home page (of any
  *  language), pages directly in the root, or other. The folders come from the
- *  site itself, so any site gets its own types; folders that are the same word
- *  in other languages are merged and shown under the spelling the site uses
- *  most. */
-export function pageTypeClassifier(urls: string[]): (url: string) => string {
+ *  site itself, so any site gets its own types. Folders that are the same word
+ *  in other languages are merged and shown under their Spanish name; `merged`
+ *  says which ones were merged so the chart can explain it. A group found in a
+ *  single spelling keeps the site's own folder name. */
+export function buildPageTypes(urls: string[]): {
+  classify: (url: string) => string;
+  merged: PageTypeMerge[];
+} {
   const counts = new Map<string, number>();
   const spellings = new Map<string, Map<string, number>>();
   for (const url of urls) {
@@ -171,15 +182,26 @@ export function pageTypeClassifier(urls: string[]): (url: string) => string {
     const key = folderKey(parts[0]);
     counts.set(key, (counts.get(key) ?? 0) + 1);
     const variants = spellings.get(key) ?? new Map<string, number>();
-    variants.set(parts[0], (variants.get(parts[0]) ?? 0) + 1);
+    const spelling = parts[0].toLowerCase();
+    variants.set(spelling, (variants.get(spelling) ?? 0) + 1);
     spellings.set(key, variants);
   }
   const label = new Map<string, string>();
+  const merged: PageTypeMerge[] = [];
   for (const [key, variants] of spellings) {
     const best = [...variants.entries()].sort((x, y) => y[1] - x[1])[0][0];
-    label.set(key, `/${best}/`);
+    if (key.startsWith("#") && variants.size > 1) {
+      const spanish = FOLDER_GROUPS[Number(key.slice(1))][0];
+      label.set(key, `/${spanish}/`);
+      merged.push({
+        label: `/${spanish}/`,
+        folders: [...variants.keys()].sort().map((name) => `/${name}/`),
+      });
+    } else {
+      label.set(key, `/${best}/`);
+    }
   }
-  return (url) => {
+  const classify = (url: string): string => {
     const parts = withoutLanguage(pathParts(url));
     if (parts.length === 0) return "Inicio";
     if (parts.length === 1) return "Páginas en la raíz";
@@ -188,6 +210,11 @@ export function pageTypeClassifier(urls: string[]): (url: string) => string {
       ? (label.get(key) ?? `/${parts[0]}/`)
       : OTHER_PAGES;
   };
+  return { classify, merged };
+}
+
+export function pageTypeClassifier(urls: string[]): (url: string) => string {
+  return buildPageTypes(urls).classify;
 }
 
 // --------------------------------------------------------------- intent
