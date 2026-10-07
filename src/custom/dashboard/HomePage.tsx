@@ -540,7 +540,7 @@ function ChangeList({
             <li key={row.key} className="flex items-baseline justify-between gap-2">
               <span className="flex min-w-0 gap-1.5">
                 <span
-                  className={`w-4 shrink-0 text-right text-xs font-semibold tabular-nums ${tone}`}
+                  className="w-4 shrink-0 text-right text-xs font-semibold text-foreground tabular-nums"
                 >
                   {index + 1}.
                 </span>
