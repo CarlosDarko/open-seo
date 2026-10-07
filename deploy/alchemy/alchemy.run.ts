@@ -269,9 +269,7 @@ const resolveSelfHostAccess = (
         policyId: "SelfHostAllowUsers",
         applicationId: "SelfHostAccess",
         policyName: `open-seo ${stage} self-host users`,
-        applicationName: customDomain
-          ? "Carlos Ortega · Herramienta SEO"
-          : `open-seo ${stage}`,
+        applicationName: customDomain ? "Metrics" : `open-seo ${stage}`,
         domain: `${workerName(stage)}.${subdomain}`,
         extraDomains: customDomain ? [customDomain] : [],
         emails: allowedEmails,
