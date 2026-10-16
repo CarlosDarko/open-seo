@@ -36,6 +36,9 @@ declare namespace Cloudflare {
     POSTHOG_HOST?: string;
     BETTER_AUTH_SECRET?: string;
     BETTER_AUTH_URL?: string;
+    // Encrypts saved Shopify crawler signatures. Kept separate from
+    // BETTER_AUTH_SECRET so the audit worker never holds the auth secret.
+    CRAWLER_ACCESS_SECRET?: string;
     DATABASE_PROVIDER?: "d1" | "postgres";
     HYPERDRIVE?: {
       connectionString: string;
@@ -62,7 +65,10 @@ declare namespace Cloudflare {
     // DataForSEO API Basic auth value (base64 of login:password)
     DATAFORSEO_API_KEY: string;
     AI_VISIBILITY_WORKFLOW: Workflow<
-      ({ runId: string } | { setupProjectId: string }) & {
+      (
+        | { runId: string }
+        | { setupProjectId: string; runSeededTracking?: boolean }
+      ) & {
         customer: {
           organizationId: string;
           userId: string;
