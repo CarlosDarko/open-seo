@@ -50,10 +50,68 @@ function summaryOf(row: Row, snapshot: ReportSnapshot): ReportSummary {
   };
 }
 
+/** Reports saved by an earlier version lack some fields: fill them in so the
+ *  current design can always draw them (a refresh brings the real data). */
+export function normalizeSnapshot(
+  raw: Partial<ReportSnapshot>,
+): ReportSnapshot {
+  const empty = { clicks: 0, impressions: 0, ctr: 0, position: 0 };
+  return {
+    version: 3,
+    generatedAt: raw.generatedAt ?? new Date().toISOString(),
+    siteUrl: raw.siteUrl ?? "",
+    range: raw.range ?? { startDate: "2000-01-01", endDate: "2000-01-01" },
+    period: raw.period ?? {
+      compare: "previous",
+      comparable: false,
+      days: 28,
+      prevStartDate: "",
+      prevEndDate: "",
+    },
+    scope: raw.scope ?? "todo",
+    totals: raw.totals ?? empty,
+    prevTotals: raw.prevTotals ?? empty,
+    daily: raw.daily ?? [],
+    brand: raw.brand ?? {
+      hasBrand: false,
+      clicks: 0,
+      prevClicks: 0,
+      otherClicks: 0,
+      prevOtherClicks: 0,
+    },
+    topQueries: raw.topQueries ?? [],
+    topPages: (raw.topPages ?? []).map((page) => ({
+      ...page,
+      prevClicks: page.prevClicks ?? 0,
+    })),
+    pageClicksTotal: raw.pageClicksTotal ?? 0,
+    pageWinners: raw.pageWinners ?? [],
+    pageLosers: raw.pageLosers ?? [],
+    queryWinners: raw.queryWinners ?? [],
+    queryLosers: raw.queryLosers ?? [],
+    newQueries: raw.newQueries ?? 0,
+    lostQueries: raw.lostQueries ?? 0,
+    bands: (raw.bands ?? []).map((band) => ({
+      ...band,
+      entered: band.entered ?? [],
+      left: band.left ?? [],
+    })),
+    segments: {
+      device: raw.segments?.device ?? [],
+      pageType: raw.segments?.pageType ?? [],
+      intent: raw.segments?.intent ?? [],
+    },
+    opportunities: raw.opportunities ?? [],
+    updates: raw.updates ?? [],
+    topics: raw.topics ?? [],
+    health: raw.health ?? null,
+    discover: raw.discover ?? null,
+  };
+}
+
 function fullOf(row: Row): ReportFull {
-  const snapshot = parseJson<ReportSnapshot>(
-    row.snapshot_json,
-    {} as ReportSnapshot,
+  const snapshot = normalizeSnapshot(
+    parseJson<Partial<ReportSnapshot>>(row.snapshot_json, {}),
   );
   const notes = {
     ...EMPTY_NOTES,
@@ -116,7 +174,9 @@ export async function listReports(projectId: string): Promise<ReportSummary[]> {
   return results.map((row) =>
     summaryOf(
       row,
-      parseJson<ReportSnapshot>(row.snapshot_json, {} as ReportSnapshot),
+      normalizeSnapshot(
+        parseJson<Partial<ReportSnapshot>>(row.snapshot_json, {}),
+      ),
     ),
   );
 }

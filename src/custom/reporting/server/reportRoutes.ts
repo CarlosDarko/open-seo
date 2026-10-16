@@ -40,11 +40,27 @@ function htmlResponse(html: string): Response {
   });
 }
 
+/** A report that cannot be drawn must say so, not answer with a bare 500. */
+function renderSafely(
+  report: Parameters<typeof renderReportDocument>[0],
+  mode: "public" | "preview",
+): Response {
+  try {
+    return htmlResponse(renderReportDocument(report, mode));
+  } catch (error) {
+    console.error("[client-report] render failed", report.id, error);
+    return textResponse(
+      "No se ha podido mostrar este informe. Abre el editor y pulsa «Actualizar datos».",
+      500,
+    );
+  }
+}
+
 export async function renderPublicReport(token: string): Promise<Response> {
   if (!SHARE_TOKEN_PATTERN.test(token)) return textResponse(NOT_FOUND, 404);
   const report = await getReportByToken(token);
   if (!report || !report.shared) return textResponse(NOT_FOUND, 404);
-  return htmlResponse(renderReportDocument(report, "public"));
+  return renderSafely(report, "public");
 }
 
 export async function renderReportPreview(
@@ -65,5 +81,5 @@ export async function renderReportPreview(
     context.organizationId,
   );
   if (!project) return textResponse(NOT_FOUND, 404);
-  return htmlResponse(renderReportDocument(report, "preview"));
+  return renderSafely(report, "preview");
 }

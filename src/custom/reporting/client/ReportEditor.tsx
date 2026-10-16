@@ -233,8 +233,7 @@ function Editor({
                     {report.shared ? "Enlace activo" : "Solo lo ves tú"}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    Cualquiera con el enlace puede leerlo y marcar tareas, sin
-                    iniciar sesión.
+                    Cualquiera con el enlace puede verlo, sin iniciar sesión.
                   </p>
                 </div>
                 <Switch
