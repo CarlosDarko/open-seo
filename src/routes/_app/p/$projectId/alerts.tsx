@@ -8,5 +8,5 @@ export const Route = createFileRoute("/_app/p/$projectId/alerts")({
 
 function AlertsPageRoute() {
   const { projectId } = Route.useParams();
-  return <AlertsPage projectId={projectId} />;
+  return <AlertsPage key={projectId} projectId={projectId} />;
 }

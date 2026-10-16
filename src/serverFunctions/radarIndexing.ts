@@ -118,6 +118,7 @@ export const getIndexReport = createServerFn({ method: "POST" })
           files: collected.files,
           truncated: collected.truncated,
           failed: collected.failed,
+          perFile: collected.perFile,
         },
         counts: {
           inSitemap: sitemapByKey.size,

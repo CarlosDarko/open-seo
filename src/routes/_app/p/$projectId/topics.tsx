@@ -8,5 +8,5 @@ export const Route = createFileRoute("/_app/p/$projectId/topics")({
 
 function TopicsPageRoute() {
   const { projectId } = Route.useParams();
-  return <TopicsPage projectId={projectId} />;
+  return <TopicsPage key={projectId} projectId={projectId} />;
 }

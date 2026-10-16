@@ -4,7 +4,7 @@ import { assertUrlInSite } from "@/custom/radar/pageSignals";
 import { parseRobotsSitemaps, parseSitemap } from "@/custom/radar/sitemap";
 
 const GSC_API_BASE = "https://www.googleapis.com/webmasters/v3";
-const FETCH_TIMEOUT_MS = 8000;
+const FETCH_TIMEOUT_MS = 20_000;
 const MAX_FILES = 12;
 const MAX_URLS = 5000;
 const MAX_BYTES = 5_000_000;
@@ -71,7 +71,18 @@ export async function listGscSitemaps(input: {
   );
 }
 
+/** Reads a text file; tries twice because a busy WordPress often answers the
+ *  first request of a big sitemap too slowly. */
 async function fetchText(url: string, siteUrl: string): Promise<string | null> {
+  return (
+    (await fetchTextOnce(url, siteUrl)) ?? (await fetchTextOnce(url, siteUrl))
+  );
+}
+
+async function fetchTextOnce(
+  url: string,
+  siteUrl: string,
+): Promise<string | null> {
   try {
     assertUrlInSite(url, siteUrl);
     const response = await fetch(url, {
@@ -110,6 +121,8 @@ export type CollectedSitemaps = {
   truncated: boolean;
   /** Sitemaps that could not be read. */
   failed: string[];
+  /** URLs found in each file read, to compare with what Search Console reports. */
+  perFile: { url: string; urls: number }[];
 };
 
 /** Reads the URLs listed in the sitemaps: the ones submitted in Search Console,
@@ -133,6 +146,7 @@ export async function collectSitemapUrls(
   const seen = new Set<string>();
   const urls = new Set<string>();
   const failed: string[] = [];
+  const perFile: { url: string; urls: number }[] = [];
   let files = 0;
   let truncated = false;
   let level = roots.map((url) => ({ url, depth: 0 }));
@@ -149,6 +163,7 @@ export async function collectSitemapUrls(
         continue;
       }
       const parsed = parseSitemap(xml);
+      if (parsed.urls.length > 0) perFile.push({ url, urls: parsed.urls.length });
       for (const page of parsed.urls) {
         if (urls.size >= MAX_URLS) {
           truncated = true;
@@ -164,5 +179,5 @@ export async function collectSitemapUrls(
     level = next;
   }
   if (level.length > 0) truncated = true;
-  return { urls: [...urls], files, truncated, failed };
+  return { urls: [...urls], files, truncated, failed, perFile };
 }

@@ -105,7 +105,12 @@ function day(value: string | null): string {
   return Number.isNaN(date.getTime()) ? "—" : dateFormat.format(date);
 }
 
+/** Keyed by project so what was checked for one project never shows in another. */
 export function IndexingPage({ projectId }: { projectId: string }) {
+  return <IndexingContent key={projectId} projectId={projectId} />;
+}
+
+function IndexingContent({ projectId }: { projectId: string }) {
   const report = useQuery({
     queryKey: ["radar-index", projectId],
     queryFn: () => getIndexReport({ data: { projectId } }),
@@ -191,6 +196,13 @@ export function IndexingPage({ projectId }: { projectId: string }) {
     });
   }, [data, inspected, crawl]);
 
+  const submittedTotal = (data?.sitemaps ?? [])
+    .filter((item) => !item.isIndex)
+    .reduce((sum, item) => sum + item.submitted, 0);
+  const readByFile = new Map(
+    (data?.read.perFile ?? []).map((item) => [item.url, item.urls]),
+  );
+
   const toggle = (url: string) =>
     setSelected((previous) => {
       const next = new Set(previous);
@@ -271,7 +283,14 @@ export function IndexingPage({ projectId }: { projectId: string }) {
             <>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 {[
-                  { label: "URLs en el sitemap", value: data.counts.inSitemap },
+                  {
+                    label: "URLs en el sitemap",
+                    value: data.counts.inSitemap,
+                    hint:
+                      submittedTotal > data.counts.inSitemap * 1.05
+                        ? `Search Console cuenta ${integer.format(submittedTotal)} enviadas: mira la pestaña Sitemap`
+                        : undefined,
+                  },
                   {
                     label: "Páginas con impresiones (3 meses)",
                     value: data.counts.pagesWithImpressions,
@@ -332,6 +351,23 @@ export function IndexingPage({ projectId }: { projectId: string }) {
                 </Card>
               ) : null}
 
+              {data.read.failed.length > 0 && data.counts.inSitemap > 0 ? (
+                <Card>
+                  <CardContent className="space-y-1 text-sm">
+                    <p className="font-medium text-warning">
+                      No he podido leer {data.read.failed.length}{" "}
+                      {data.read.failed.length === 1 ? "sitemap" : "sitemaps"},
+                      así que las cifras están incompletas.
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {data.read.failed.slice(0, 5).join(" · ")}. Suele ser que
+                      la web tarda mucho en responder o bloquea las visitas
+                      automáticas; vuelve a cargar la página.
+                    </p>
+                  </CardContent>
+                </Card>
+              ) : null}
+
               {data.read.truncated ? (
                 <p className="text-xs text-muted-foreground">
                   El sitemap es muy grande: se han leído {data.read.files}{" "}
@@ -376,6 +412,14 @@ export function IndexingPage({ projectId }: { projectId: string }) {
                       label: "URLs enviadas",
                       value: (sitemap) => sitemap.submitted,
                       render: (sitemap) => integer.format(sitemap.submitted),
+                    },
+                    {
+                      label: "URLs leídas aquí",
+                      value: (sitemap) => readByFile.get(sitemap.path) ?? 0,
+                      render: (sitemap) =>
+                        sitemap.isIndex
+                          ? "—"
+                          : integer.format(readByFile.get(sitemap.path) ?? 0),
                     },
                     {
                       label: "Errores",

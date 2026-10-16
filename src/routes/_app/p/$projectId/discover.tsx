@@ -8,5 +8,5 @@ export const Route = createFileRoute("/_app/p/$projectId/discover")({
 
 function DiscoverRoute() {
   const { projectId } = Route.useParams();
-  return <DiscoverPage projectId={projectId} />;
+  return <DiscoverPage key={projectId} projectId={projectId} />;
 }

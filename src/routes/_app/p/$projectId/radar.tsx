@@ -8,5 +8,5 @@ export const Route = createFileRoute("/_app/p/$projectId/radar")({
 
 function RadarRoute() {
   const { projectId } = Route.useParams();
-  return <RadarPage projectId={projectId} />;
+  return <RadarPage key={projectId} projectId={projectId} />;
 }
