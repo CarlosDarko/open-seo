@@ -22,13 +22,34 @@ import {
   TableHeader,
   TableRow,
 } from "@/client/components/ui/table";
+import {
+  CrawlHealthPanel,
+  pageProblems,
+} from "@/custom/radar/client/CrawlHealthPanel";
+import {
+  FindingsCard,
+  InspectionSummary,
+} from "@/custom/radar/client/IndexOverview";
 import { PageLink } from "@/custom/radar/client/RadarLinks";
+import {
+  buildFindings,
+  inspectionStats,
+  type CrawlTab,
+} from "@/custom/radar/crawlStats";
 import { integer, percent } from "@/custom/radar/format";
+import type { CrawlHealth } from "@/serverFunctions/radarCrawl";
 import {
   getIndexReport,
   inspectIndexUrls,
   type InspectedUrl,
 } from "@/serverFunctions/radarIndexing";
+
+const TABS: { id: CrawlTab; label: string }[] = [
+  { id: "resumen", label: "Resumen" },
+  { id: "sitemap", label: "Sitemap" },
+  { id: "google", label: "Páginas clave en Google" },
+  { id: "servidor", label: "Servidor y robots.txt" },
+];
 
 const MAX_INSPECT = 25;
 const BATCH = 5;
@@ -90,6 +111,8 @@ export function IndexingPage({ projectId }: { projectId: string }) {
     queryFn: () => getIndexReport({ data: { projectId } }),
     staleTime: 10 * 60_000,
   });
+  const [tab, setTab] = useState<CrawlTab>("resumen");
+  const [crawl, setCrawl] = useState<CrawlHealth | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [inspected, setInspected] = useState<Map<string, InspectedUrl>>(
     new Map(),
@@ -140,6 +163,34 @@ export function IndexingPage({ projectId }: { projectId: string }) {
     [unseen, selected],
   );
 
+  const findings = useMemo(() => {
+    if (!data) return [];
+    return buildFindings({
+      inSitemap: data.counts.inSitemap,
+      unseen: data.counts.unseen,
+      notInSitemap: data.counts.notInSitemap,
+      sitemapErrors: data.sitemaps.reduce((sum, item) => sum + item.errors, 0),
+      inspection:
+        inspected.size > 0 ? inspectionStats([...inspected.values()]) : null,
+      crawl: crawl
+        ? {
+            homeBlocked: crawl.robots.homeBlocked,
+            blockedPages: crawl.pages.filter(
+              (page) => page.blockedByRobots || page.noindexHeader,
+            ).length,
+            slowPages: crawl.pages.filter(
+              (page) => page.ttfbMs !== null && page.ttfbMs >= 1500,
+            ).length,
+            problemPages: crawl.pages.filter(
+              (page) => pageProblems(page).length > 0,
+            ).length,
+            pages: crawl.pages.length,
+            robotsFound: crawl.robots.found,
+          }
+        : null,
+    });
+  }, [data, inspected, crawl]);
+
   const toggle = (url: string) =>
     setSelected((previous) => {
       const next = new Set(previous);
@@ -151,8 +202,8 @@ export function IndexingPage({ projectId }: { projectId: string }) {
   return (
     <div className="mx-auto w-full max-w-6xl space-y-6 px-4 py-6 md:px-6">
       <PageHeader
-        title="Indexación y sitemap"
-        description="Qué URLs publicas en el sitemap, cuáles ve Google de verdad y por qué otras no aparecen. Cruza tu sitemap con Search Console (últimos 3 meses) y usa la Inspección de URL de Google. Gratis."
+        title="Rastreo e indexación"
+        description="Cómo te encuentra, rastrea e indexa Google: tu sitemap frente a Search Console, lo que Google dice de tus páginas clave y cómo responde tu servidor. Gratis."
       />
 
       {report.isError ? (
@@ -194,322 +245,378 @@ export function IndexingPage({ projectId }: { projectId: string }) {
         </Card>
       ) : data ? (
         <>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {[
-              { label: "URLs en el sitemap", value: data.counts.inSitemap },
-              {
-                label: "Páginas con impresiones (3 meses)",
-                value: data.counts.pagesWithImpressions,
-              },
-              {
-                label: "En el sitemap sin ninguna impresión",
-                value: data.counts.unseen,
-                hint:
-                  data.counts.inSitemap > 0
-                    ? `${percent.format(data.counts.unseen / data.counts.inSitemap)} del sitemap`
-                    : undefined,
-              },
-              {
-                label: "Con impresiones pero fuera del sitemap",
-                value: data.counts.notInSitemap,
-              },
-            ].map((card) => (
-              <Card key={card.label}>
-                <CardContent className="space-y-1">
-                  <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-                    {card.label}
-                  </p>
-                  <p className="text-2xl leading-tight font-semibold tabular-nums">
-                    {integer.format(card.value)}
-                  </p>
-                  {card.hint ? (
-                    <p className="text-xs text-muted-foreground">{card.hint}</p>
-                  ) : null}
-                </CardContent>
-              </Card>
+          <div
+            role="tablist"
+            className="flex flex-wrap gap-1 rounded-lg bg-muted p-1"
+          >
+            {TABS.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                role="tab"
+                aria-selected={tab === item.id}
+                onClick={() => setTab(item.id)}
+                className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                  tab === item.id
+                    ? "bg-card text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {item.label}
+              </button>
             ))}
           </div>
 
-          {data.counts.inSitemap === 0 ? (
-            <Card>
-              <CardContent className="space-y-1 py-6 text-sm">
-                <p className="font-medium">
-                  No he encontrado URLs en tu sitemap.
-                </p>
-                <p className="text-muted-foreground">
-                  Si no tienes sitemap, créalo y envíalo en Search Console
-                  (Sitemaps): ayuda a Google a descubrir tus páginas. Si lo
-                  tienes, comprueba que está en /sitemap.xml o declarado en
-                  robots.txt
-                  {data.read.failed.length > 0
-                    ? ` (no se pudo leer: ${data.read.failed.slice(0, 2).join(", ")})`
-                    : ""}
-                  .
-                </p>
-              </CardContent>
-            </Card>
-          ) : null}
-
-          {data.read.truncated ? (
-            <p className="text-xs text-muted-foreground">
-              El sitemap es muy grande: se han leído {data.read.files} archivos
-              y como máximo 5.000 URLs.
-            </p>
-          ) : null}
-
-          <TableCard>
-            <div className="border-b border-border p-4">
-              <h3 className="font-medium">Sitemaps enviados a Google</h3>
-              <p className="text-xs text-muted-foreground">
-                Lo que Search Console dice de cada sitemap que has enviado.
-              </p>
-            </div>
-            <DataTable
-              rows={data.sitemaps}
-              rowKey={(sitemap) => sitemap.path}
-              empty="No hay ningún sitemap enviado en Search Console. Envíalo en «Sitemaps» para que Google lo lea con regularidad."
-              columns={[
-                {
-                  label: "Sitemap",
-                  text: true,
-                  value: (sitemap) => sitemap.path,
-                  render: (sitemap) => (
-                    <>
-                      <PageLink url={sitemap.path} />
-                      {sitemap.isIndex ? (
-                        <span className="ml-1 text-xs text-muted-foreground">
-                          (índice)
-                        </span>
+          {tab === "resumen" ? (
+            <>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                {[
+                  { label: "URLs en el sitemap", value: data.counts.inSitemap },
+                  {
+                    label: "Páginas con impresiones (3 meses)",
+                    value: data.counts.pagesWithImpressions,
+                  },
+                  {
+                    label: "En el sitemap sin ninguna impresión",
+                    value: data.counts.unseen,
+                    hint:
+                      data.counts.inSitemap > 0
+                        ? `${percent.format(data.counts.unseen / data.counts.inSitemap)} del sitemap`
+                        : undefined,
+                  },
+                  {
+                    label: "Con impresiones pero fuera del sitemap",
+                    value: data.counts.notInSitemap,
+                  },
+                ].map((card) => (
+                  <Card key={card.label}>
+                    <CardContent className="space-y-1">
+                      <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                        {card.label}
+                      </p>
+                      <p className="text-2xl leading-tight font-semibold tabular-nums">
+                        {integer.format(card.value)}
+                      </p>
+                      {card.hint ? (
+                        <p className="text-xs text-muted-foreground">
+                          {card.hint}
+                        </p>
                       ) : null}
-                    </>
-                  ),
-                },
-                {
-                  label: "Última lectura",
-                  value: (sitemap) => sitemap.lastDownloaded,
-                  render: (sitemap) => day(sitemap.lastDownloaded),
-                  className: "text-right whitespace-nowrap tabular-nums",
-                },
-                {
-                  label: "URLs enviadas",
-                  value: (sitemap) => sitemap.submitted,
-                  render: (sitemap) => integer.format(sitemap.submitted),
-                },
-                {
-                  label: "Errores",
-                  value: (sitemap) => sitemap.errors,
-                  render: (sitemap) => (
-                    <span
-                      className={
-                        sitemap.errors > 0
-                          ? "font-semibold text-destructive"
-                          : ""
-                      }
-                    >
-                      {integer.format(sitemap.errors)}
-                    </span>
-                  ),
-                },
-                {
-                  label: "Avisos",
-                  value: (sitemap) => sitemap.warnings,
-                  render: (sitemap) => (
-                    <span
-                      className={sitemap.warnings > 0 ? "text-warning" : ""}
-                    >
-                      {integer.format(sitemap.warnings)}
-                    </span>
-                  ),
-                },
-              ]}
-            />
-          </TableCard>
-
-          {data.sections.length > 0 ? (
-            <TableCard>
-              <div className="border-b border-border p-4">
-                <h3 className="font-medium">Dónde está el problema</h3>
-                <p className="text-xs text-muted-foreground">
-                  Las secciones de tu sitemap con más URLs que Google no muestra
-                  nunca. Un porcentaje alto en una sección apunta a contenido
-                  ignorado o sin indexar.
-                </p>
+                    </CardContent>
+                  </Card>
+                ))}
               </div>
-              <DataTable
-                rows={data.sections}
-                rowKey={(section) => section.label}
-                initial={{ col: 3, dir: "desc" }}
-                columns={[
-                  {
-                    label: "Sección",
-                    text: true,
-                    value: (section) => section.label,
-                    render: (section) => section.label,
-                    className: "",
-                  },
-                  {
-                    label: "En el sitemap",
-                    value: (section) => section.inSitemap,
-                    render: (section) => integer.format(section.inSitemap),
-                  },
-                  {
-                    label: "Sin impresiones",
-                    value: (section) => section.unseen,
-                    render: (section) => integer.format(section.unseen),
-                  },
-                  {
-                    label: "Porcentaje",
-                    value: (section) => section.unseen / section.inSitemap,
-                    render: (section) => (
-                      <span
-                        className={
-                          section.unseen / section.inSitemap > 0.5
-                            ? "font-semibold text-destructive"
-                            : ""
-                        }
-                      >
-                        {percent.format(section.unseen / section.inSitemap)}
-                      </span>
-                    ),
-                  },
-                ]}
-              />
-            </TableCard>
+              <FindingsCard findings={findings} onGo={setTab} />
+            </>
           ) : null}
 
-          <Card>
-            <CardHeader className="space-y-1">
-              <CardTitle>Tus 20 páginas con más tráfico</CardTitle>
-              <p className="text-xs text-muted-foreground">
-                Comprueba cómo las ve Google: indexación, última visita y si
-                eligió otra URL como canónica (un problema silencioso).
-              </p>
-            </CardHeader>
-            <CardContent>
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={inspecting || data.topPages.length === 0}
-                onClick={() => void runInspect(data.topPages)}
-              >
-                {inspecting
-                  ? progressText
-                  : "Comprobar mis páginas principales"}
-              </Button>
-              {inspectFailed ? (
-                <p className="mt-2 text-sm text-destructive">
-                  No se pudo consultar a Google (puede haber alcanzado la cuota
-                  diaria). Prueba más tarde.
+          {tab === "sitemap" ? (
+            <>
+              {data.counts.inSitemap === 0 ? (
+                <Card>
+                  <CardContent className="space-y-1 py-6 text-sm">
+                    <p className="font-medium">
+                      No he encontrado URLs en tu sitemap.
+                    </p>
+                    <p className="text-muted-foreground">
+                      Si no tienes sitemap, créalo y envíalo en Search Console
+                      (Sitemaps): ayuda a Google a descubrir tus páginas. Si lo
+                      tienes, comprueba que está en /sitemap.xml o declarado en
+                      robots.txt
+                      {data.read.failed.length > 0
+                        ? ` (no se pudo leer: ${data.read.failed.slice(0, 2).join(", ")})`
+                        : ""}
+                      .
+                    </p>
+                  </CardContent>
+                </Card>
+              ) : null}
+
+              {data.read.truncated ? (
+                <p className="text-xs text-muted-foreground">
+                  El sitemap es muy grande: se han leído {data.read.files}{" "}
+                  archivos y como máximo 5.000 URLs.
                 </p>
               ) : null}
-            </CardContent>
-          </Card>
 
-          {inspected.size > 0 ? (
-            <InspectionTable results={[...inspected.values()]} />
-          ) : null}
-
-          {unseen.length > 0 ? (
-            <TableCard>
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border p-4">
-                <div>
-                  <h3 className="font-medium">
-                    En el sitemap pero sin ninguna impresión en 3 meses
-                  </h3>
+              <TableCard>
+                <div className="border-b border-border p-4">
+                  <h3 className="font-medium">Sitemaps enviados a Google</h3>
                   <p className="text-xs text-muted-foreground">
-                    Candidatas a no estar indexadas o a ser ignoradas por
-                    Google. Marca hasta {MAX_INSPECT} y comprueba qué dice
-                    Google de cada una.
+                    Lo que Search Console dice de cada sitemap que has enviado.
                   </p>
                 </div>
-                <Button
-                  size="sm"
-                  disabled={selectedUrls.length === 0 || inspecting}
-                  onClick={() => void runInspect(selectedUrls)}
-                >
-                  {inspecting
-                    ? progressText
-                    : `Comprobar ${selectedUrls.length} seleccionadas`}
-                </Button>
-              </div>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-8" />
-                    <TableHead>URL</TableHead>
-                    <TableHead>Sección</TableHead>
-                    <TableHead>Qué dice Google</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {unseen.map((item) => {
-                    const result = inspected.get(item.url);
-                    return (
-                      <TableRow key={item.url}>
-                        <TableCell>
-                          <Checkbox
-                            checked={selected.has(item.url)}
-                            onCheckedChange={() => toggle(item.url)}
-                            aria-label={`Seleccionar ${item.url}`}
-                          />
-                        </TableCell>
-                        <TableCell className="min-w-72">
-                          <PageLink url={item.url} />
-                        </TableCell>
-                        <TableCell className="whitespace-nowrap text-muted-foreground">
-                          {item.section}
-                        </TableCell>
-                        <TableCell className="text-sm">
-                          {result
-                            ? result.error
-                              ? result.error
-                              : coverageText(result.coverageState)
-                            : "—"}
-                        </TableCell>
+                <DataTable
+                  rows={data.sitemaps}
+                  rowKey={(sitemap) => sitemap.path}
+                  empty="No hay ningún sitemap enviado en Search Console. Envíalo en «Sitemaps» para que Google lo lea con regularidad."
+                  columns={[
+                    {
+                      label: "Sitemap",
+                      text: true,
+                      value: (sitemap) => sitemap.path,
+                      render: (sitemap) => (
+                        <>
+                          <PageLink url={sitemap.path} />
+                          {sitemap.isIndex ? (
+                            <span className="ml-1 text-xs text-muted-foreground">
+                              (índice)
+                            </span>
+                          ) : null}
+                        </>
+                      ),
+                    },
+                    {
+                      label: "Última lectura",
+                      value: (sitemap) => sitemap.lastDownloaded,
+                      render: (sitemap) => day(sitemap.lastDownloaded),
+                      className: "text-right whitespace-nowrap tabular-nums",
+                    },
+                    {
+                      label: "URLs enviadas",
+                      value: (sitemap) => sitemap.submitted,
+                      render: (sitemap) => integer.format(sitemap.submitted),
+                    },
+                    {
+                      label: "Errores",
+                      value: (sitemap) => sitemap.errors,
+                      render: (sitemap) => (
+                        <span
+                          className={
+                            sitemap.errors > 0
+                              ? "font-semibold text-destructive"
+                              : ""
+                          }
+                        >
+                          {integer.format(sitemap.errors)}
+                        </span>
+                      ),
+                    },
+                    {
+                      label: "Avisos",
+                      value: (sitemap) => sitemap.warnings,
+                      render: (sitemap) => (
+                        <span
+                          className={sitemap.warnings > 0 ? "text-warning" : ""}
+                        >
+                          {integer.format(sitemap.warnings)}
+                        </span>
+                      ),
+                    },
+                  ]}
+                />
+              </TableCard>
+
+              {data.sections.length > 0 ? (
+                <TableCard>
+                  <div className="border-b border-border p-4">
+                    <h3 className="font-medium">Dónde está el problema</h3>
+                    <p className="text-xs text-muted-foreground">
+                      Las secciones de tu sitemap con más URLs que Google no
+                      muestra nunca. Un porcentaje alto en una sección apunta a
+                      contenido ignorado o sin indexar.
+                    </p>
+                  </div>
+                  <DataTable
+                    rows={data.sections}
+                    rowKey={(section) => section.label}
+                    initial={{ col: 3, dir: "desc" }}
+                    columns={[
+                      {
+                        label: "Sección",
+                        text: true,
+                        value: (section) => section.label,
+                        render: (section) => section.label,
+                        className: "",
+                      },
+                      {
+                        label: "En el sitemap",
+                        value: (section) => section.inSitemap,
+                        render: (section) => integer.format(section.inSitemap),
+                      },
+                      {
+                        label: "Sin impresiones",
+                        value: (section) => section.unseen,
+                        render: (section) => integer.format(section.unseen),
+                      },
+                      {
+                        label: "Porcentaje",
+                        value: (section) => section.unseen / section.inSitemap,
+                        render: (section) => (
+                          <span
+                            className={
+                              section.unseen / section.inSitemap > 0.5
+                                ? "font-semibold text-destructive"
+                                : ""
+                            }
+                          >
+                            {percent.format(section.unseen / section.inSitemap)}
+                          </span>
+                        ),
+                      },
+                    ]}
+                  />
+                </TableCard>
+              ) : null}
+
+              {unseen.length > 0 ? (
+                <TableCard>
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border p-4">
+                    <div>
+                      <h3 className="font-medium">
+                        En el sitemap pero sin ninguna impresión en 3 meses
+                      </h3>
+                      <p className="text-xs text-muted-foreground">
+                        Candidatas a no estar indexadas o a ser ignoradas por
+                        Google. Marca hasta {MAX_INSPECT} y comprueba qué dice
+                        Google de cada una.
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      disabled={selectedUrls.length === 0 || inspecting}
+                      onClick={() =>
+                        void runInspect(selectedUrls).then(() =>
+                          setTab("google"),
+                        )
+                      }
+                    >
+                      {inspecting
+                        ? progressText
+                        : `Comprobar ${selectedUrls.length} seleccionadas`}
+                    </Button>
+                  </div>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-8" />
+                        <TableHead>URL</TableHead>
+                        <TableHead>Sección</TableHead>
+                        <TableHead>Qué dice Google</TableHead>
                       </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </TableCard>
+                    </TableHeader>
+                    <TableBody>
+                      {unseen.map((item) => {
+                        const result = inspected.get(item.url);
+                        return (
+                          <TableRow key={item.url}>
+                            <TableCell>
+                              <Checkbox
+                                checked={selected.has(item.url)}
+                                onCheckedChange={() => toggle(item.url)}
+                                aria-label={`Seleccionar ${item.url}`}
+                              />
+                            </TableCell>
+                            <TableCell className="min-w-72">
+                              <PageLink url={item.url} />
+                            </TableCell>
+                            <TableCell className="whitespace-nowrap text-muted-foreground">
+                              {item.section}
+                            </TableCell>
+                            <TableCell className="text-sm">
+                              {result
+                                ? result.error
+                                  ? result.error
+                                  : coverageText(result.coverageState)
+                                : "—"}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </TableCard>
+              ) : null}
+
+              {data.notInSitemap.length > 0 ? (
+                <TableCard>
+                  <div className="border-b border-border p-4">
+                    <h3 className="font-medium">
+                      Con impresiones pero fuera del sitemap
+                    </h3>
+                    <p className="text-xs text-muted-foreground">
+                      Páginas que Google ya muestra y que no declaras. Si son
+                      páginas que quieres posicionar, añádelas al sitemap; si
+                      son parámetros o duplicados, revisa su canónica.
+                    </p>
+                  </div>
+                  <DataTable
+                    rows={data.notInSitemap}
+                    rowKey={(item) => item.url}
+                    columns={[
+                      {
+                        label: "URL",
+                        text: true,
+                        value: (item) => item.url,
+                        render: (item) => <PageLink url={item.url} />,
+                        className: "min-w-72",
+                      },
+                      {
+                        label: "Impresiones",
+                        value: (item) => item.impressions,
+                        render: (item) => integer.format(item.impressions),
+                      },
+                      {
+                        label: "Clics",
+                        value: (item) => item.clicks,
+                        render: (item) => integer.format(item.clicks),
+                      },
+                    ]}
+                  />
+                </TableCard>
+              ) : null}
+            </>
           ) : null}
 
-          {data.notInSitemap.length > 0 ? (
-            <TableCard>
-              <div className="border-b border-border p-4">
-                <h3 className="font-medium">
-                  Con impresiones pero fuera del sitemap
-                </h3>
-                <p className="text-xs text-muted-foreground">
-                  Páginas que Google ya muestra y que no declaras. Si son
-                  páginas que quieres posicionar, añádelas al sitemap; si son
-                  parámetros o duplicados, revisa su canónica.
-                </p>
-              </div>
-              <DataTable
-                rows={data.notInSitemap}
-                rowKey={(item) => item.url}
-                columns={[
-                  {
-                    label: "URL",
-                    text: true,
-                    value: (item) => item.url,
-                    render: (item) => <PageLink url={item.url} />,
-                    className: "min-w-72",
-                  },
-                  {
-                    label: "Impresiones",
-                    value: (item) => item.impressions,
-                    render: (item) => integer.format(item.impressions),
-                  },
-                  {
-                    label: "Clics",
-                    value: (item) => item.clicks,
-                    render: (item) => integer.format(item.clicks),
-                  },
-                ]}
-              />
-            </TableCard>
+          {tab === "google" ? (
+            <>
+              <Card>
+                <CardHeader className="space-y-1">
+                  <CardTitle>Tus 20 páginas con más tráfico</CardTitle>
+                  <p className="text-xs text-muted-foreground">
+                    Pregunta a Google cómo las ve: si están indexadas, cuándo
+                    las rastreó por última vez y si eligió otra URL como
+                    canónica (un problema silencioso).
+                  </p>
+                </CardHeader>
+                <CardContent>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={inspecting || data.topPages.length === 0}
+                    onClick={() => void runInspect(data.topPages)}
+                  >
+                    {inspecting
+                      ? progressText
+                      : inspected.size > 0
+                        ? "Volver a comprobar"
+                        : "Comprobar mis páginas principales"}
+                  </Button>
+                  {inspectFailed ? (
+                    <p className="mt-2 text-sm text-destructive">
+                      No se pudo consultar a Google (puede haber alcanzado la
+                      cuota diaria). Prueba más tarde.
+                    </p>
+                  ) : null}
+                </CardContent>
+              </Card>
+              {inspected.size > 0 ? (
+                <>
+                  <InspectionSummary
+                    stats={inspectionStats([...inspected.values()])}
+                  />
+                  <InspectionTable results={[...inspected.values()]} />
+                </>
+              ) : null}
+            </>
+          ) : null}
+
+          {tab === "servidor" ? (
+            <CrawlHealthPanel
+              projectId={projectId}
+              result={crawl}
+              onResult={setCrawl}
+            />
           ) : null}
         </>
       ) : null}

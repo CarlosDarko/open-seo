@@ -1008,7 +1008,7 @@ function HealthCard({
         <HealthTile
           icon={FileSearch}
           tone="success"
-          title="Indexación y sitemap"
+          title="Rastreo e indexación"
           action={
             <Button
               size="xs"
