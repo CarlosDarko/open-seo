@@ -19,6 +19,7 @@ import {
 } from "@/custom/radar/server/radarDb";
 import { buildRadarReport } from "@/custom/radar/server/radarReport";
 import { buildTopicsReport } from "@/custom/radar/server/topicsReport";
+import { buildInsights } from "@/custom/reporting/insights";
 import { buildVerdict } from "@/custom/reporting/narrative";
 import {
   deleteReport,
@@ -438,7 +439,7 @@ const notesPatch = {
     .max(4000)
     .optional()
     .describe(
-      "Personal message at the top of the report, in the consultant's voice (Spanish). Replaces the previous one.",
+      "Personal message after the cover, in the consultant's voice (Spanish). Replaces the previous one.",
     ),
   sectionNotes: z
     .record(z.string(), z.string().max(2000))
@@ -450,17 +451,6 @@ const notesPatch = {
     .array(z.string())
     .optional()
     .describe("Section ids to leave out. Replaces the previous list."),
-  addTasks: z
-    .array(
-      z.object({
-        title: z.string().min(1).max(200),
-        detail: z.string().max(1000).default(""),
-      }),
-    )
-    .max(20)
-    .optional()
-    .describe("Extra tasks for the checklist, after the automatic ones."),
-  removeTaskIds: z.array(z.string()).optional(),
   nextSteps: z
     .string()
     .max(4000)
@@ -479,17 +469,29 @@ const reportBrief = (
   range: report.range,
   createdAt: report.createdAt,
   updatedAt: report.updatedAt,
-  tasks: { done: report.tasksDone, total: report.tasksTotal },
   previewUrl: `${baseUrl}/rv/${report.id}`,
   editUrl: `${baseUrl}/p/${report.projectId}/reporting/${report.id}`,
   clientUrl: report.shared ? `${baseUrl}/c/${report.token}` : null,
 });
 
+/** The findings an agent can rewrite in its own words. */
+const insightBrief = (
+  report: NonNullable<Awaited<ReturnType<typeof getReport>>>,
+) =>
+  buildInsights(report.snapshot).map((item) => ({
+    id: item.id,
+    tone: item.tone,
+    title: item.title,
+    body: item.body,
+    upside: item.upside,
+    stats: item.stats,
+  }));
+
 const reportingList = defineTool({
   name: "reporting_list",
   title: "Client reports: list",
   description:
-    "Lists the project's client reports (online pages with charts and a checklist, not PDFs): title, client, period, whether the public link is on and how many checklist tasks the client has ticked. Read only.",
+    "Lists the project's client reports (online web pages with interactive charts, not PDFs): title, client, period, whether the public link is on, and the links. Read only.",
   input: {},
   path: ({ projectId }: { projectId: string }) => `/p/${projectId}/reporting`,
   run: async ({ projectId }, context) => ({
@@ -500,7 +502,6 @@ const reportingList = defineTool({
       shared: report.shared,
       range: report.range,
       createdAt: report.createdAt,
-      tasks: { done: report.tasksDone, total: report.tasksTotal },
       editUrl: `${context.baseUrl}/p/${projectId}/reporting/${report.id}`,
       clientUrl: report.shared ? `${context.baseUrl}/c/${report.token}` : null,
     })),
@@ -511,7 +512,7 @@ const reportingCreate = defineTool({
   name: "reporting_create",
   title: "Client reports: create",
   description:
-    "Creates a client report from Search Console data (free): headline numbers and verdict, interactive trend chart, what moved, position bands, segments, opportunities, a checklist action plan and Google updates in the period. It starts private. Returns the report with the automatic verdict and the task list so you can then write the personal message, section notes and extra tasks with reporting_update. Typical flow: reporting_create → read verdict/tasks (and radar_* tools for more depth) → reporting_update with your commentary in Spanish → reporting_share only if the user asks to send it.",
+    "Creates a client report from Search Console data (free), as a branded web page: cover with the headline numbers, findings that cross the data (traffic vs impressions vs position, Google updates against the daily trend, where the change comes from, concentration, brand dependence), interactive trend chart, positions, topics, audience split, weekly rhythm, opportunities, technical health and Discover. It starts private. Returns the automatic verdict and the findings so you can write the personal message and section notes with reporting_update. Tone: honest but constructive; every finding already carries an encouraging angle. Typical flow: reporting_create → read verdict and insights (use radar_* tools for more depth) → reporting_update with commentary in Spanish → reporting_share only if the user asks to send it.",
   input: {
     title: z
       .string()
@@ -538,13 +539,7 @@ const reportingCreate = defineTool({
       created: true,
       report: reportBrief(report, context.baseUrl),
       verdict: buildVerdict(report.snapshot),
-      tasks: report.snapshot.tasks.map((task) => ({
-        id: task.id,
-        title: task.title,
-        kind: task.kind,
-        effort: task.effort,
-        gain: task.gain,
-      })),
+      insights: insightBrief(report),
     };
   },
 });
@@ -553,7 +548,7 @@ const reportingGet = defineTool({
   name: "reporting_get",
   title: "Client reports: read one",
   description:
-    "Reads a client report: its notes, the automatic verdict, headline numbers, the tasks with who ticked them and when, and the links. Read only. The snapshot's full data is not returned; use radar_* tools for deeper analysis.",
+    "Reads a client report: its notes, the automatic verdict, the findings, headline numbers and the links. Read only. The snapshot's full data is not returned; use radar_* tools for deeper analysis.",
   input: { reportId: reportIdSchema },
   path: ({ projectId }: { projectId: string }) => `/p/${projectId}/reporting`,
   run: async ({ projectId, reportId }, context) => {
@@ -564,26 +559,9 @@ const reportingGet = defineTool({
       report: reportBrief(report, context.baseUrl),
       notes: report.notes,
       verdict: buildVerdict(report.snapshot),
+      insights: insightBrief(report),
       totals: report.snapshot.totals,
       prevTotals: report.snapshot.prevTotals,
-      tasks: [
-        ...report.snapshot.tasks.map((task) => ({
-          id: task.id,
-          title: task.title,
-          kind: task.kind,
-          effort: task.effort,
-          gain: task.gain,
-          done: report.checks[task.id] ?? null,
-        })),
-        ...report.notes.extraTasks.map((task) => ({
-          id: task.id,
-          title: task.title,
-          kind: "extra",
-          effort: null,
-          gain: null,
-          done: report.checks[task.id] ?? null,
-        })),
-      ],
     };
   },
 });
@@ -592,7 +570,7 @@ const reportingUpdate = defineTool({
   name: "reporting_update",
   title: "Client reports: write notes",
   description:
-    "Edits a client report's texts: title, client name, the personal message at the top, notes under sections, hidden sections, extra checklist tasks and next steps. Only the fields you pass change. Write for the client in clear Spanish, no jargon. Does not change the numbers (use reporting_refresh) or the sharing state (use reporting_share).",
+    "Edits a client report's texts: title, client name, the personal message after the cover, notes under sections, hidden sections and next steps. Only the fields you pass change. Write for the client in clear, warm Spanish, no jargon, honest but always with a constructive angle. Does not change the numbers (use reporting_refresh) or the sharing state (use reporting_share).",
   input: { reportId: reportIdSchema, ...notesPatch },
   write: "write",
   path: ({ projectId }: { projectId: string }) => `/p/${projectId}/reporting`,
@@ -604,20 +582,10 @@ const reportingUpdate = defineTool({
       if (text.trim()) sectionNotes[id] = text;
       else delete sectionNotes[id];
     }
-    const removed = new Set(patch.removeTaskIds ?? []);
-    const extraTasks = [
-      ...report.notes.extraTasks.filter((task) => !removed.has(task.id)),
-      ...(patch.addTasks ?? []).map((task) => ({
-        id: `extra:${crypto.randomUUID().slice(0, 8)}`,
-        title: task.title,
-        detail: task.detail,
-      })),
-    ];
     const notes: ReportNotes = {
       message: patch.message ?? report.notes.message,
       sectionNotes,
       hidden: patch.hidden ?? report.notes.hidden,
-      extraTasks,
       nextSteps: patch.nextSteps ?? report.notes.nextSteps,
     };
     await updateReport(projectId, reportId, {
@@ -637,7 +605,7 @@ const reportingRefresh = defineTool({
   name: "reporting_refresh",
   title: "Client reports: refresh the numbers",
   description:
-    "Rebuilds a report's data from Search Console for the same dates. Notes, ticks and the public link stay; ticks of tasks that no longer exist are dropped. Free.",
+    "Rebuilds a report's data from Search Console for the same dates. Notes and the public link stay. Free.",
   input: { reportId: reportIdSchema },
   write: "write",
   path: ({ projectId }: { projectId: string }) => `/p/${projectId}/reporting`,
@@ -663,7 +631,7 @@ const reportingShare = defineTool({
   name: "reporting_share",
   title: "Client reports: turn the public link on or off",
   description:
-    "Turns a report's public link on or off. With it on, anyone holding the link can read the report and tick tasks without signing in. Only turn it on when the user explicitly asks to share or send the report; never infer permission. Returns the client URL when on.",
+    "Turns a report's public link on or off. With it on, anyone holding the link can read the report without signing in. Only turn it on when the user explicitly asks to share or send the report; never infer permission. Returns the client URL when on.",
   input: {
     reportId: reportIdSchema,
     shared: z.boolean().describe("true = public link on, false = off."),

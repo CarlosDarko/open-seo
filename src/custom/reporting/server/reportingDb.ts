@@ -1,7 +1,6 @@
 import { env } from "cloudflare:workers";
 import {
   EMPTY_NOTES,
-  type ReportChecks,
   type ReportFull,
   type ReportNotes,
   type ReportSnapshot,
@@ -36,9 +35,7 @@ function parseJson<T>(text: string, fallback: T): T {
   }
 }
 
-function summaryOf(row: Row, snapshot: ReportSnapshot, checks: ReportChecks) {
-  const total = snapshot.tasks.length;
-  const done = snapshot.tasks.filter((task) => checks[task.id]).length;
+function summaryOf(row: Row, snapshot: ReportSnapshot): ReportSummary {
   return {
     id: row.id,
     projectId: row.project_id,
@@ -50,9 +47,7 @@ function summaryOf(row: Row, snapshot: ReportSnapshot, checks: ReportChecks) {
     updatedAt: row.updated_at,
     createdBy: row.created_by,
     range: snapshot.range,
-    tasksTotal: total,
-    tasksDone: done,
-  } satisfies ReportSummary;
+  };
 }
 
 function fullOf(row: Row): ReportFull {
@@ -60,23 +55,11 @@ function fullOf(row: Row): ReportFull {
     row.snapshot_json,
     {} as ReportSnapshot,
   );
-  const checks = parseJson<ReportChecks>(row.checks_json, {});
   const notes = {
     ...EMPTY_NOTES,
     ...parseJson<ReportNotes>(row.notes_json, EMPTY_NOTES),
   };
-  const base = summaryOf(row, snapshot, checks);
-  const extra = notes.extraTasks.length;
-  return {
-    ...base,
-    tasksTotal: base.tasksTotal + extra,
-    tasksDone:
-      base.tasksDone +
-      notes.extraTasks.filter((task) => checks[task.id]).length,
-    snapshot,
-    notes,
-    checks,
-  };
+  return { ...summaryOf(row, snapshot), snapshot, notes };
 }
 
 /** 32 URL-safe characters: the same shape upstream uses for share tokens. */
@@ -130,23 +113,12 @@ export async function listReports(projectId: string): Promise<ReportSummary[]> {
   )
     .bind(projectId)
     .all<Row>();
-  return results.map((row) => {
-    const full = fullOf(row);
-    return {
-      id: full.id,
-      projectId: full.projectId,
-      token: full.token,
-      title: full.title,
-      clientName: full.clientName,
-      shared: full.shared,
-      createdAt: full.createdAt,
-      updatedAt: full.updatedAt,
-      createdBy: full.createdBy,
-      range: full.range,
-      tasksTotal: full.tasksTotal,
-      tasksDone: full.tasksDone,
-    };
-  });
+  return results.map((row) =>
+    summaryOf(
+      row,
+      parseJson<ReportSnapshot>(row.snapshot_json, {} as ReportSnapshot),
+    ),
+  );
 }
 
 export async function getReport(
@@ -218,53 +190,18 @@ export async function updateReport(
   return (result.meta.changes ?? 0) > 0;
 }
 
-/** Replaces the numbers of a report with a fresh snapshot; notes, ticks and
- *  the link stay. Ticks of tasks that no longer exist are dropped. */
+/** Replaces the numbers of a report with a fresh snapshot; notes and the link stay. */
 export async function replaceSnapshot(
   projectId: string,
   id: string,
   snapshot: ReportSnapshot,
 ): Promise<boolean> {
-  const report = await getReport(projectId, id);
-  if (!report) return false;
-  const known = new Set([
-    ...snapshot.tasks.map((task) => task.id),
-    ...report.notes.extraTasks.map((task) => task.id),
-  ]);
-  const checks = Object.fromEntries(
-    Object.entries(report.checks).filter(([key]) => known.has(key)),
-  );
   const result = await env.DB.prepare(
-    `UPDATE client_reports SET snapshot_json = ?, checks_json = ?, updated_at = ? WHERE project_id = ? AND id = ?`,
+    `UPDATE client_reports SET snapshot_json = ?, updated_at = ? WHERE project_id = ? AND id = ?`,
   )
-    .bind(
-      JSON.stringify(snapshot),
-      JSON.stringify(checks),
-      new Date().toISOString(),
-      projectId,
-      id,
-    )
+    .bind(JSON.stringify(snapshot), new Date().toISOString(), projectId, id)
     .run();
   return (result.meta.changes ?? 0) > 0;
-}
-
-export async function setCheck(
-  report: ReportFull,
-  taskId: string,
-  done: boolean,
-  by: "cliente" | "consultor",
-): Promise<ReportChecks | null> {
-  const known =
-    report.snapshot.tasks.some((task) => task.id === taskId) ||
-    report.notes.extraTasks.some((task) => task.id === taskId);
-  if (!known) return null;
-  const checks = { ...report.checks };
-  if (done) checks[taskId] = { at: new Date().toISOString(), by };
-  else delete checks[taskId];
-  await env.DB.prepare(`UPDATE client_reports SET checks_json = ? WHERE id = ?`)
-    .bind(JSON.stringify(checks), report.id)
-    .run();
-  return checks;
 }
 
 export async function deleteReport(

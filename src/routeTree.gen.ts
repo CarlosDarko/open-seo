@@ -43,7 +43,6 @@ import { Route as AuthenticatedOnboardingIndexRouteImport } from './routes/_auth
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ApiAutumnSplatRouteImport } from './routes/api/autumn/$'
 import { Route as CTokenIndexRouteImport } from './routes/c/$token/index'
-import { Route as CTokenCheckRouteImport } from './routes/c/$token/check'
 import { Route as STokenIndexRouteImport } from './routes/s/$token/index'
 import { Route as STokenOgDotpngRouteImport } from './routes/s/$token/og[.]png'
 import { Route as STokenRawRouteImport } from './routes/s/$token/raw'
@@ -252,11 +251,6 @@ const ApiAutumnSplatRoute = ApiAutumnSplatRouteImport.update({
 const CTokenIndexRoute = CTokenIndexRouteImport.update({
   id: '/c/$token/',
   path: '/c/$token/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const CTokenCheckRoute = CTokenCheckRouteImport.update({
-  id: '/c/$token/check',
-  path: '/c/$token/check',
   getParentRoute: () => rootRouteImport,
 } as any)
 const STokenIndexRoute = STokenIndexRouteImport.update({
@@ -503,7 +497,6 @@ export interface FileRoutesByFullPath {
   '/settings/organization': typeof AppSettingsOrganizationRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/autumn/$': typeof ApiAutumnSplatRoute
-  '/c/$token/check': typeof CTokenCheckRoute
   '/s/$token/og.png': typeof STokenOgDotpngRoute
   '/s/$token/raw': typeof STokenRawRoute
   '/settings/': typeof AppSettingsIndexRoute
@@ -574,7 +567,6 @@ export interface FileRoutesByTo {
   '/settings/organization': typeof AppSettingsOrganizationRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/autumn/$': typeof ApiAutumnSplatRoute
-  '/c/$token/check': typeof CTokenCheckRoute
   '/s/$token/og.png': typeof STokenOgDotpngRoute
   '/s/$token/raw': typeof STokenRawRoute
   '/settings': typeof AppSettingsIndexRoute
@@ -648,7 +640,6 @@ export interface FileRoutesById {
   '/_app/settings/organization': typeof AppSettingsOrganizationRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/autumn/$': typeof ApiAutumnSplatRoute
-  '/c/$token/check': typeof CTokenCheckRoute
   '/s/$token/og.png': typeof STokenOgDotpngRoute
   '/s/$token/raw': typeof STokenRawRoute
   '/_app/settings/': typeof AppSettingsIndexRoute
@@ -723,7 +714,6 @@ export interface FileRouteTypes {
     | '/settings/organization'
     | '/api/auth/$'
     | '/api/autumn/$'
-    | '/c/$token/check'
     | '/s/$token/og.png'
     | '/s/$token/raw'
     | '/settings/'
@@ -794,7 +784,6 @@ export interface FileRouteTypes {
     | '/settings/organization'
     | '/api/auth/$'
     | '/api/autumn/$'
-    | '/c/$token/check'
     | '/s/$token/og.png'
     | '/s/$token/raw'
     | '/settings'
@@ -867,7 +856,6 @@ export interface FileRouteTypes {
     | '/_app/settings/organization'
     | '/api/auth/$'
     | '/api/autumn/$'
-    | '/c/$token/check'
     | '/s/$token/og.png'
     | '/s/$token/raw'
     | '/_app/settings/'
@@ -927,7 +915,6 @@ export interface RootRouteChildren {
   RvReportIdRoute: typeof RvReportIdRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiAutumnSplatRoute: typeof ApiAutumnSplatRoute
-  CTokenCheckRoute: typeof CTokenCheckRoute
   STokenOgDotpngRoute: typeof STokenOgDotpngRoute
   STokenRawRoute: typeof STokenRawRoute
   CTokenIndexRoute: typeof CTokenIndexRoute
@@ -1174,13 +1161,6 @@ declare module '@tanstack/react-router' {
       path: '/c/$token'
       fullPath: '/c/$token/'
       preLoaderRoute: typeof CTokenIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/c/$token/check': {
-      id: '/c/$token/check'
-      path: '/c/$token/check'
-      fullPath: '/c/$token/check'
-      preLoaderRoute: typeof CTokenCheckRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/s/$token/': {
@@ -1667,7 +1647,6 @@ const rootRouteChildren: RootRouteChildren = {
   RvReportIdRoute: RvReportIdRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiAutumnSplatRoute: ApiAutumnSplatRoute,
-  CTokenCheckRoute: CTokenCheckRoute,
   STokenOgDotpngRoute: STokenOgDotpngRoute,
   STokenRawRoute: STokenRawRoute,
   CTokenIndexRoute: CTokenIndexRoute,

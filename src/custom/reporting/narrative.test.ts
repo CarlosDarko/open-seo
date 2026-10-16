@@ -18,31 +18,27 @@ const base = {
   prevTotals: { clicks: 1000, impressions: 40000, ctr: 0.025, position: 12 },
   pageWinners: [],
   pageLosers: [],
+  bands: [],
+  newQueries: 0,
   opportunities: [],
-  updates: [],
-  tasks: [],
 } as unknown as ReportSnapshot;
 
 describe("buildVerdict", () => {
-  it("calls a rise of more than 5 % a good period", () => {
+  it("calls a rise of more than 5 % a good period and celebrates it", () => {
     const verdict = buildVerdict(base);
     expect(verdict.tone).toBe("good");
     expect(verdict.headline).toContain("20,0 % más");
+    expect(verdict.lining).toContain("Tu tráfico crece");
   });
 
-  it("flags a fall of 20 % or more as bad and names the biggest loser", () => {
+  it("tells a fall straight but always leaves something encouraging", () => {
     const verdict = buildVerdict({
       ...base,
       totals: { ...base.totals, clicks: 700 },
-      pageLosers: [
-        {
-          key: "https://example.com/guia/",
-          clicksDelta: -90,
-        },
-      ] as ReportSnapshot["pageLosers"],
     });
     expect(verdict.tone).toBe("bad");
-    expect(verdict.points.join(" ")).toContain("/guia/");
+    expect(verdict.headline).toContain("margen claro de recuperación");
+    expect(verdict.lining.length).toBeGreaterThan(10);
   });
 
   it("only states the totals when there is nothing to compare with", () => {

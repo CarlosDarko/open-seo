@@ -1,28 +1,32 @@
 // Builds the frozen data of a client report from the Radar analysis: headline
-// numbers, trend, what moved, where the queries rank, who brings the traffic,
-// the opportunities and the action plan, all trimmed to what a client reads.
+// numbers, trend, what moved and why, where the queries rank, who brings the
+// traffic and the opportunities, all trimmed to what a client reads.
 import { GscService } from "@/server/features/gsc/services/GscService";
-import { buildActions, type Action } from "@/custom/radar/actions";
 import { updatesBetween } from "@/custom/radar/googleUpdates";
 import {
+  canonicalPageKey,
   isBrandQuery,
+  mergePageVariants,
   normalizeBrandTerms,
 } from "@/custom/radar/radarAnalysis";
 import type { PeriodInput } from "@/custom/radar/periods";
 import { getGoogleUpdates } from "@/custom/radar/server/googleUpdatesStore";
+import { buildDiscoverReport } from "@/custom/radar/server/discoverReport";
+import { buildIndexReport } from "@/custom/radar/server/indexReport";
 import { buildRadarReport } from "@/custom/radar/server/radarReport";
+import { buildTopicsReport } from "@/custom/radar/server/topicsReport";
 import type {
+  BandMove,
   ChangeLine,
+  PageLine,
+  QueryMove,
   ReportSnapshot,
-  ReportTask,
   SegmentLine,
 } from "@/custom/reporting/types";
 
 export type SnapshotResult =
   | { ok: true; snapshot: ReportSnapshot }
   | { ok: false; reason: "none" | "reconnect" };
-
-const TASKS = 12;
 
 function changeLine(row: {
   key: string;
@@ -33,6 +37,7 @@ function changeLine(row: {
   prevPosition: number | null;
   status: "new" | "lost" | "changed";
   cause?: string;
+  topQueries?: QueryMove[];
 }): ChangeLine {
   return {
     key: row.key,
@@ -43,6 +48,12 @@ function changeLine(row: {
     prevPosition: row.prevPosition,
     status: row.status,
     cause: row.cause,
+    queries: row.topQueries?.slice(0, 3).map((item) => ({
+      query: item.query,
+      clicksDelta: item.clicksDelta,
+      position: item.position,
+      prevPosition: item.prevPosition,
+    })),
   };
 }
 
@@ -64,44 +75,18 @@ function segmentLines(
   }));
 }
 
-function task(action: Action): ReportTask {
-  return {
-    id: action.id,
-    kind: action.kind,
-    title: action.headline,
-    subtitle: action.subtitle,
-    stats: action.stats,
-    lines: action.lines,
-    steps: action.steps,
-    gain: action.gain,
-    effort: action.effort,
-    page: action.page,
-    query: action.query,
-  };
-}
-
-/** The most useful tasks first: those with the most clicks at stake, then
- *  the easy ones. */
-function pickTasks(plan: ReturnType<typeof buildActions>): ReportTask[] {
-  const all = [
-    ...plan.losses,
-    ...plan.snippets,
-    ...plan.pushes,
-    ...plan.cannibals,
-    ...plan.questions,
-    ...plan.traction,
-    ...plan.emerging,
-  ];
-  const effortRank = { bajo: 0, medio: 1, alto: 2 } as const;
-  return all
-    .sort(
-      (a, b) =>
-        (b.gain ?? 0) - (a.gain ?? 0) ||
-        effortRank[a.effort] - effortRank[b.effort],
-    )
-    .slice(0, TASKS)
-    .map(task);
-}
+const moves = (
+  rows: {
+    query: string;
+    position: number | null;
+    prevPosition: number | null;
+  }[],
+): BandMove[] =>
+  rows.slice(0, 4).map((row) => ({
+    query: row.query,
+    position: row.position,
+    prevPosition: row.prevPosition,
+  }));
 
 export async function buildReportSnapshot(
   projectId: string,
@@ -117,13 +102,33 @@ export async function buildReportSnapshot(
     report.brand.source === "manual"
       ? normalizeBrandTerms(report.brand.terms)
       : report.brand.terms;
-  const queries = await GscService.getPerformance({
-    projectId,
-    startDate: report.range.startDate,
-    endDate: report.range.endDate,
-    dimensions: ["query"],
-    rowLimit: 200,
-  });
+  const comparable = report.period.comparable;
+  const [queries, pages, prevPages] = await Promise.all([
+    GscService.getPerformance({
+      projectId,
+      startDate: report.range.startDate,
+      endDate: report.range.endDate,
+      dimensions: ["query"],
+      rowLimit: 200,
+    }),
+    GscService.getPerformance({
+      projectId,
+      startDate: report.range.startDate,
+      endDate: report.range.endDate,
+      dimensions: ["page"],
+      rowLimit: 1000,
+    }),
+    comparable
+      ? GscService.getPerformance({
+          projectId,
+          startDate: report.period.prevStartDate,
+          endDate: report.period.prevEndDate,
+          dimensions: ["page"],
+          rowLimit: 1000,
+        })
+      : Promise.resolve(null),
+  ]);
+
   const topQueries = queries.rows
     .flatMap((row) => {
       const query = row.keys?.[0];
@@ -141,24 +146,61 @@ export async function buildReportSnapshot(
     .sort((a, b) => b.clicks - a.clicks || b.impressions - a.impressions)
     .slice(0, 12);
 
+  const pageRows = mergePageVariants(pages.rows, 0);
+  const prevByKey = new Map(
+    mergePageVariants(prevPages?.rows ?? [], 0).flatMap((row) =>
+      row.keys?.[0]
+        ? [[canonicalPageKey(row.keys[0]), row.clicks] as const]
+        : [],
+    ),
+  );
+  const pageClicksTotal = pageRows.reduce((sum, row) => sum + row.clicks, 0);
+  const topPages: PageLine[] = [...pageRows]
+    .sort((a, b) => b.clicks - a.clicks)
+    .slice(0, 8)
+    .flatMap((row) =>
+      row.keys?.[0]
+        ? [
+            {
+              url: row.keys[0],
+              clicks: row.clicks,
+              prevClicks: prevByKey.get(canonicalPageKey(row.keys[0])) ?? 0,
+            },
+          ]
+        : [],
+    );
+
+  const extras = await Promise.all([
+    buildTopicsReport(projectId, {
+      ...input,
+      includeBrand: false,
+      projectId,
+    }).catch(() => null),
+    buildIndexReport(projectId).catch(() => null),
+    buildDiscoverReport(projectId, {
+      ...input,
+      type: "discover",
+      projectId,
+    }).catch(() => null),
+  ]);
+  const [topicsReport, indexReport, discoverReport] = extras;
+
   const updates = updatesBetween(
     await getGoogleUpdates(),
     report.range.startDate,
     report.range.endDate,
   );
 
-  const plan = buildActions(report);
-
   return {
     ok: true,
     snapshot: {
-      version: 1,
+      version: 3,
       generatedAt: new Date().toISOString(),
       siteUrl: report.siteUrl,
       range: report.range,
       period: {
         compare: report.period.compare,
-        comparable: report.period.comparable,
+        comparable,
         days: report.period.days,
         prevStartDate: report.period.prevStartDate,
         prevEndDate: report.period.prevEndDate,
@@ -167,8 +209,16 @@ export async function buildReportSnapshot(
       totals: report.totals,
       prevTotals: report.prevTotals,
       daily: report.daily,
+      brand: {
+        hasBrand: report.brand.hasBrand,
+        clicks: report.brand.clicks,
+        prevClicks: report.brand.prevClicks,
+        otherClicks: report.brand.otherClicks,
+        prevOtherClicks: report.brand.prevOtherClicks,
+      },
       topQueries,
-      topPages: report.topPages,
+      topPages,
+      pageClicksTotal,
       pageWinners: report.pageChanges.winners.slice(0, 6).map(changeLine),
       pageLosers: report.pageChanges.losers.slice(0, 6).map(changeLine),
       queryWinners: report.queryChanges.winners.slice(0, 6).map(changeLine),
@@ -181,6 +231,8 @@ export async function buildReportSnapshot(
         prevQueries: band.prevQueries,
         clicks: band.clicks,
         prevClicks: band.prevClicks,
+        entered: moves(band.entered),
+        left: moves(band.left),
       })),
       segments: {
         device: segmentLines(report.segments.device),
@@ -207,8 +259,52 @@ export async function buildReportSnapshot(
           kind: "push" as const,
         })),
       ],
-      tasks: pickTasks(plan),
       updates,
+      topics:
+        topicsReport && topicsReport.connected
+          ? topicsReport.topics.slice(0, 8).map((topic) => ({
+              label: topic.label,
+              clicks: topic.clicks,
+              prevClicks: topic.prev.clicks,
+              impressions: topic.impressions,
+              position: topic.position,
+              queries: topic.queries,
+              nearTopShare: topic.nearTopShare,
+              topQueries: topic.topQueries.slice(0, 3).map((item) => ({
+                query: item.query,
+                clicks: item.clicks,
+                position: item.position,
+              })),
+            }))
+          : [],
+      health:
+        indexReport && indexReport.connected
+          ? {
+              inSitemap: indexReport.counts.inSitemap,
+              pagesWithImpressions: indexReport.counts.pagesWithImpressions,
+              unseen: indexReport.counts.unseen,
+              notInSitemap: indexReport.counts.notInSitemap,
+              sitemapErrors: indexReport.sitemaps.reduce(
+                (sum, item) => sum + item.errors,
+                0,
+              ),
+            }
+          : null,
+      discover:
+        discoverReport &&
+        discoverReport.connected &&
+        discoverReport.totals.clicks > 0
+          ? {
+              clicks: discoverReport.totals.clicks,
+              prevClicks: discoverReport.prevTotals.clicks,
+              impressions: discoverReport.totals.impressions,
+              topPages: discoverReport.topPages.slice(0, 4).map((page) => ({
+                url: page.url,
+                clicks: page.clicks,
+                prevClicks: page.prevClicks,
+              })),
+            }
+          : null,
     },
   };
 }

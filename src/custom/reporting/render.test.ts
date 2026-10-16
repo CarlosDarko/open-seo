@@ -7,8 +7,18 @@ import {
   type ReportSnapshot,
 } from "@/custom/reporting/types";
 
+const daily = Array.from({ length: 28 }, (_, index) => ({
+  date: new Date(Date.UTC(2026, 8, 18 + index)).toISOString().slice(0, 10),
+  clicks: 40 + index,
+  impressions: 1400 + index * 10,
+  position: 11,
+  prevClicks: 35 + index,
+  prevImpressions: 1300,
+  prevPosition: 12,
+}));
+
 const snapshot = {
-  version: 1,
+  version: 3,
   generatedAt: "2026-10-16T10:00:00.000Z",
   siteUrl: "sc-domain:example.com",
   range: { startDate: "2026-09-18", endDate: "2026-10-15" },
@@ -22,53 +32,115 @@ const snapshot = {
   scope: "sin marca",
   totals: { clicks: 1200, impressions: 40000, ctr: 0.03, position: 11.2 },
   prevTotals: { clicks: 1000, impressions: 38000, ctr: 0.026, position: 12.4 },
-  daily: [
+  daily,
+  brand: {
+    hasBrand: true,
+    clicks: 300,
+    prevClicks: 280,
+    otherClicks: 900,
+    prevOtherClicks: 720,
+  },
+  topQueries: [
+    { query: "seo local", clicks: 90, impressions: 2000, position: 4.2 },
+  ],
+  topPages: [
+    { url: "https://example.com/a/", clicks: 400, prevClicks: 300 },
+    { url: "https://example.com/b/", clicks: 200, prevClicks: 210 },
+    { url: "https://example.com/c/", clicks: 100, prevClicks: 90 },
+  ],
+  pageClicksTotal: 1100,
+  pageWinners: [
     {
-      date: "2026-09-18",
-      clicks: 40,
-      impressions: 1400,
-      position: 11,
-      prevClicks: 35,
-      prevImpressions: 1300,
-      prevPosition: 12,
-    },
-    {
-      date: "2026-09-19",
-      clicks: 44,
-      impressions: 1500,
-      position: 11,
-      prevClicks: null,
-      prevImpressions: null,
-      prevPosition: null,
+      key: "https://example.com/a/",
+      clicks: 400,
+      prevClicks: 300,
+      clicksDelta: 100,
+      position: 5,
+      prevPosition: 7,
+      status: "changed",
+      queries: [
+        { query: "seo local", clicksDelta: 60, position: 4, prevPosition: 6 },
+      ],
     },
   ],
-  topQueries: [],
-  topPages: [],
-  pageWinners: [],
   pageLosers: [],
   queryWinners: [],
   queryLosers: [],
-  newQueries: 3,
-  lostQueries: 1,
-  bands: [],
-  segments: { device: [], pageType: [], intent: [] },
-  opportunities: [],
-  tasks: [
+  newQueries: 12,
+  lostQueries: 3,
+  bands: [
     {
-      id: "loss:https://example.com/a",
-      kind: "loss",
-      title: "/a pierde 30 clics",
-      subtitle: "Revisa la página",
-      stats: [],
-      lines: ["Dato"],
-      steps: ["Paso uno"],
-      gain: 30,
-      effort: "medio",
-      page: "https://example.com/a",
-      query: null,
+      label: "Posiciones 1-3",
+      queries: 30,
+      prevQueries: 24,
+      clicks: 600,
+      prevClicks: 500,
+      entered: [{ query: "seo madrid", position: 2.8, prevPosition: 5.1 }],
+      left: [],
     },
   ],
-  updates: [],
+  segments: {
+    device: [
+      {
+        label: "Móvil",
+        clicks: 800,
+        prevClicks: 650,
+        impressions: 30000,
+        share: 0.67,
+      },
+      {
+        label: "Ordenador",
+        clicks: 400,
+        prevClicks: 350,
+        impressions: 10000,
+        share: 0.33,
+      },
+    ],
+    pageType: [],
+    intent: [],
+  },
+  opportunities: [
+    {
+      query: "agencia seo",
+      page: "https://example.com/servicios/",
+      position: 5,
+      impressions: 4000,
+      clicks: 80,
+      potentialClicks: 150,
+      kind: "push",
+    },
+  ],
+  updates: [
+    {
+      id: "u1",
+      kind: "core",
+      label: "Core update (septiembre de 2026)",
+      title: "Core",
+      begin: "2026-09-24",
+      end: "2026-10-06",
+      url: "https://status.search.google.com",
+    },
+  ],
+  topics: [
+    {
+      label: "seo local",
+      clicks: 500,
+      prevClicks: 400,
+      impressions: 9000,
+      position: 6,
+      queries: 40,
+      nearTopShare: 0.5,
+      topQueries: [{ query: "seo local madrid", clicks: 50, position: 3 }],
+    },
+  ],
+  health: {
+    inSitemap: 100,
+    pagesWithImpressions: 120,
+    unseen: 10,
+    notInSitemap: 5,
+    sitemapErrors: 0,
+  },
+  discover: null,
 } as unknown as ReportSnapshot;
 
 const report: ReportFull = {
@@ -82,11 +154,8 @@ const report: ReportFull = {
   updatedAt: "2026-10-16T10:00:00.000Z",
   createdBy: null,
   range: snapshot.range,
-  tasksTotal: 1,
-  tasksDone: 0,
   snapshot,
   notes: { ...EMPTY_NOTES, message: "Hola </script><b>x</b>" },
-  checks: {},
 };
 
 describe("renderReportDocument", () => {
@@ -105,24 +174,29 @@ describe("renderReportDocument", () => {
       );
     expect(match).not.toBeNull();
     const data = JSON.parse(match?.[1] ?? "{}");
-    expect(data.cfg.checkUrl).toBe(`/c/${report.token}/check`);
-    expect(data.cfg.by).toBe("cliente");
-    expect(data.daily).toHaveLength(2);
+    expect(data.daily).toHaveLength(28);
+    expect(data.updates[0].short).toBe("Core");
   });
 
-  it("marks who ticks in the preview as the consultant", () => {
-    expect(renderReportDocument(report, "preview")).toContain(
-      '"by":"consultor"',
-    );
+  it("builds the findings, topics and technical sections and the brand", () => {
+    for (const id of ["hallazgos", "evolucion", "temas", "tecnico"]) {
+      expect(html).toContain(`id="${id}"`);
+    }
+    expect(html).toContain("<svg");
+    expect(html).toContain("carlosortega.page");
+  });
+
+  it("always shows an encouraging reading under each finding", () => {
+    expect(html).toContain('class="up"');
   });
 
   it("leaves out the sections the consultant hides", () => {
     const hidden = renderReportDocument(
-      { ...report, notes: { ...report.notes, hidden: ["tareas"] } },
+      { ...report, notes: { ...report.notes, hidden: ["temas"] } },
       "public",
     );
-    expect(hidden).not.toContain('id="tareas"');
-    expect(html).toContain('id="tareas"');
+    expect(hidden).not.toContain('id="temas"');
+    expect(html).toContain('id="temas"');
   });
 
   it("ships a browser script that is valid JavaScript", () => {

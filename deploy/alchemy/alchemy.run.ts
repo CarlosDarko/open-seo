@@ -306,6 +306,9 @@ const dataEnv = {
   GOOGLE_CLIENT_SECRET: optionalSecret("GOOGLE_CLIENT_SECRET"),
   OPENROUTER_API_KEY: optionalSecret("OPENROUTER_API_KEY"),
   OPENROUTER_MODEL: optionalVar("OPENROUTER_MODEL"),
+  // Fork: optional AI drafting of client reports (src/custom/reporting).
+  ANTHROPIC_API_KEY: optionalSecret("ANTHROPIC_API_KEY"),
+  REPORT_AI_MODEL: optionalVar("REPORT_AI_MODEL"),
   CONTEXT_API_KEY: optionalSecret("CONTEXT_API_KEY"),
   AUTUMN_SECRET_KEY: optionalSecret("AUTUMN_SECRET_KEY"),
   AUTUMN_WEBHOOK_SECRET: optionalSecret("AUTUMN_WEBHOOK_SECRET"),

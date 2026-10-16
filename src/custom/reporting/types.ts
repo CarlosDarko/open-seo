@@ -1,9 +1,8 @@
 // Shapes shared by the client-report builder, the renderer and the MCP tools.
 // A report is a frozen snapshot of the Search Console analysis (so the link
 // the client holds never changes under their feet) plus what the consultant
-// writes and what gets ticked.
+// writes on top.
 import type { DailyPoint } from "@/custom/radar/radarAnalysis";
-import type { Action } from "@/custom/radar/actions";
 import type { GoogleUpdate } from "@/custom/radar/googleUpdates";
 
 export type Totals = {
@@ -21,6 +20,13 @@ export type SegmentLine = {
   share: number;
 };
 
+export type QueryMove = {
+  query: string;
+  clicksDelta: number;
+  position: number | null;
+  prevPosition: number | null;
+};
+
 export type ChangeLine = {
   key: string;
   clicks: number;
@@ -29,7 +35,15 @@ export type ChangeLine = {
   position: number | null;
   prevPosition: number | null;
   cause?: string;
+  /** The queries that explain most of a page's change. */
+  queries?: QueryMove[];
   status: "new" | "lost" | "changed";
+};
+
+export type BandMove = {
+  query: string;
+  position: number | null;
+  prevPosition: number | null;
 };
 
 export type BandLine = {
@@ -38,6 +52,8 @@ export type BandLine = {
   prevQueries: number;
   clicks: number;
   prevClicks: number;
+  entered: BandMove[];
+  left: BandMove[];
 };
 
 export type OpportunityLine = {
@@ -50,23 +66,26 @@ export type OpportunityLine = {
   kind: "snippet" | "push";
 };
 
-/** One thing to do, with the steps, as the client sees it in the checklist. */
-export type ReportTask = {
-  id: string;
-  kind: Action["kind"];
-  title: string;
-  subtitle: string;
-  stats: { label: string; value: string }[];
-  lines: string[];
-  steps: string[];
-  gain: number | null;
-  effort: Action["effort"];
-  page: string | null;
-  query: string | null;
+export type PageLine = {
+  url: string;
+  clicks: number;
+  prevClicks: number;
+};
+
+export type TopicLine = {
+  label: string;
+  clicks: number;
+  prevClicks: number;
+  impressions: number;
+  position: number;
+  queries: number;
+  /** Share of the topic that sits in positions 4 to 20 (within reach). */
+  nearTopShare: number;
+  topQueries: { query: string; clicks: number; position: number }[];
 };
 
 export type ReportSnapshot = {
-  version: 1;
+  version: 3;
   generatedAt: string;
   siteUrl: string;
   range: { startDate: string; endDate: string };
@@ -81,13 +100,23 @@ export type ReportSnapshot = {
   totals: Totals;
   prevTotals: Totals;
   daily: DailyPoint[];
+  /** Brand vs everything else, in clicks. */
+  brand: {
+    hasBrand: boolean;
+    clicks: number;
+    prevClicks: number;
+    otherClicks: number;
+    prevOtherClicks: number;
+  };
   topQueries: {
     query: string;
     clicks: number;
     impressions: number;
     position: number;
   }[];
-  topPages: { url: string; clicks: number; position: number }[];
+  /** The pages with most clicks (all queries) and the clicks of every page. */
+  topPages: PageLine[];
+  pageClicksTotal: number;
   pageWinners: ChangeLine[];
   pageLosers: ChangeLine[];
   queryWinners: ChangeLine[];
@@ -101,20 +130,33 @@ export type ReportSnapshot = {
     intent: SegmentLine[];
   };
   opportunities: OpportunityLine[];
-  tasks: ReportTask[];
   updates: GoogleUpdate[];
+  topics: TopicLine[];
+  /** Sitemap against Google; null when it could not be read. */
+  health: {
+    inSitemap: number;
+    pagesWithImpressions: number;
+    unseen: number;
+    notInSitemap: number;
+    sitemapErrors: number;
+  } | null;
+  /** Google Discover traffic; null when the site gets none. */
+  discover: {
+    clicks: number;
+    prevClicks: number;
+    impressions: number;
+    topPages: PageLine[];
+  } | null;
 };
 
 /** What the consultant adds on top of the numbers. */
 export type ReportNotes = {
-  /** Personal message at the top, in the consultant's voice. */
+  /** Personal message after the cover, in the consultant's voice. */
   message: string;
   /** Free text under a section, by section id. */
   sectionNotes: Record<string, string>;
   /** Sections left out of the document. */
   hidden: string[];
-  /** Tasks added by hand (they go after the automatic ones). */
-  extraTasks: { id: string; title: string; detail: string }[];
   /** Next steps in plain text, one per line. */
   nextSteps: string;
 };
@@ -123,26 +165,22 @@ export const EMPTY_NOTES: ReportNotes = {
   message: "",
   sectionNotes: {},
   hidden: [],
-  extraTasks: [],
   nextSteps: "",
 };
 
-/** Task id → who ticked it and when. */
-export type ReportChecks = Record<
-  string,
-  { at: string; by: "cliente" | "consultor" }
->;
-
 /** The sections a report can show, in order. */
 export const REPORT_SECTIONS = [
-  { id: "resumen", label: "Resumen ejecutivo" },
-  { id: "evolucion", label: "Evolución" },
-  { id: "cambios", label: "Qué ha subido y qué ha bajado" },
-  { id: "posiciones", label: "Dónde posicionas" },
-  { id: "segmentos", label: "Quién te trae el tráfico" },
+  { id: "hallazgos", label: "Lo esencial (hallazgos)" },
+  { id: "evolucion", label: "Evolución y cambios de Google" },
+  { id: "origen", label: "De dónde viene el cambio" },
+  { id: "posiciones", label: "Posicionamiento" },
+  { id: "temas", label: "Temas" },
+  { id: "consultas", label: "Búsquedas estrella" },
+  { id: "reparto", label: "Quién te trae el tráfico" },
+  { id: "semana", label: "Patrón semanal" },
   { id: "oportunidades", label: "Oportunidades" },
-  { id: "tareas", label: "Plan de acción" },
-  { id: "google", label: "Cambios de Google en el periodo" },
+  { id: "tecnico", label: "Salud técnica (sitemap e indexación)" },
+  { id: "discover", label: "Google Discover" },
   { id: "proximos", label: "Próximos pasos" },
 ] as const;
 
@@ -159,12 +197,9 @@ export type ReportSummary = {
   updatedAt: string;
   createdBy: string | null;
   range: { startDate: string; endDate: string };
-  tasksTotal: number;
-  tasksDone: number;
 };
 
 export type ReportFull = ReportSummary & {
   snapshot: ReportSnapshot;
   notes: ReportNotes;
-  checks: ReportChecks;
 };

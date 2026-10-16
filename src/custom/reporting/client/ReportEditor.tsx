@@ -5,7 +5,7 @@ import {
   ArrowLeft,
   ExternalLink,
   Link2,
-  Plus,
+  Sparkles,
   RefreshCw,
   Trash2,
 } from "lucide-react";
@@ -29,13 +29,13 @@ import {
   type ReportNotes,
 } from "@/custom/reporting/types";
 import {
+  draftClientReportWithAi,
   getClientReport,
+  getReportingAiStatus,
   refreshClientReport,
   saveClientReport,
   setClientReportShared,
 } from "@/serverFunctions/reporting";
-
-const newId = () => `extra:${Math.random().toString(36).slice(2, 10)}`;
 
 function Editor({
   report,
@@ -83,6 +83,38 @@ function Editor({
       setVersion((value) => value + 1);
     },
     onError: () => setError("No se pudo guardar. Prueba de nuevo."),
+  });
+  const aiStatus = useQuery({
+    queryKey: ["client-report-ai", projectId],
+    queryFn: () => getReportingAiStatus({ data: { projectId } }),
+    staleTime: 10 * 60_000,
+  });
+  const draft = useMutation({
+    mutationFn: () =>
+      draftClientReportWithAi({ data: { projectId, reportId: report.id } }),
+    onSuccess: (result) => {
+      if (!result.ok) {
+        setError(
+          result.reason === "no_key"
+            ? "La redacción con IA no está activada (falta la clave de Anthropic)."
+            : "La IA no ha podido redactar ahora. Prueba de nuevo.",
+        );
+        return;
+      }
+      setError(null);
+      setNotes((previous) => ({
+        ...previous,
+        message: result.draft.message || previous.message,
+        sectionNotes: {
+          ...previous.sectionNotes,
+          ...result.draft.sectionNotes,
+        },
+        nextSteps: result.draft.nextSteps || previous.nextSteps,
+      }));
+      setDirty(true);
+    },
+    onError: () =>
+      setError("La IA no ha podido redactar ahora. Prueba de nuevo."),
   });
   const share = useMutation({
     mutationFn: (shared: boolean) =>
@@ -149,6 +181,22 @@ function Editor({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {error ? <p className="text-sm text-destructive">{error}</p> : null}
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={
+              draft.isPending || !aiStatus.data || !aiStatus.data.available
+            }
+            title={
+              aiStatus.data?.available
+                ? `Redacta el mensaje y las notas con IA (${aiStatus.data.model}). Es un borrador: lo revisas antes de guardar.`
+                : "Para activarlo hay que añadir la clave de Anthropic (ANTHROPIC_API_KEY)."
+            }
+            onClick={() => draft.mutate()}
+          >
+            <Sparkles className="size-3.5" aria-hidden />
+            {draft.isPending ? "Redactando…" : "Redactar con IA"}
+          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -219,11 +267,6 @@ function Editor({
                     {copied ? "Copiado" : "Copiar"}
                   </Button>
                 </div>
-              ) : null}
-              {report.tasksTotal > 0 ? (
-                <p className="text-xs text-muted-foreground">
-                  Tareas hechas: {report.tasksDone} de {report.tasksTotal}.
-                </p>
               ) : null}
             </CardContent>
           </Card>
@@ -308,82 +351,6 @@ function Editor({
                   </div>
                 );
               })}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Tareas propias</CardTitle>
-              <p className="text-xs text-muted-foreground">
-                Se añaden al plan de acción, después de las automáticas.
-              </p>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {notes.extraTasks.map((task, index) => (
-                <div
-                  key={task.id}
-                  className="space-y-2 rounded-lg border border-border p-3"
-                >
-                  <div className="flex gap-2">
-                    <Input
-                      value={task.title}
-                      aria-label="Título de la tarea"
-                      onChange={(event) =>
-                        change({
-                          extraTasks: notes.extraTasks.map((item, at) =>
-                            at === index
-                              ? { ...item, title: event.target.value }
-                              : item,
-                          ),
-                        })
-                      }
-                    />
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      aria-label="Quitar tarea"
-                      onClick={() =>
-                        change({
-                          extraTasks: notes.extraTasks.filter(
-                            (_, at) => at !== index,
-                          ),
-                        })
-                      }
-                    >
-                      <Trash2 className="size-4" aria-hidden />
-                    </Button>
-                  </div>
-                  <Textarea
-                    rows={2}
-                    value={task.detail}
-                    placeholder="Qué hay que hacer (opcional)"
-                    onChange={(event) =>
-                      change({
-                        extraTasks: notes.extraTasks.map((item, at) =>
-                          at === index
-                            ? { ...item, detail: event.target.value }
-                            : item,
-                        ),
-                      })
-                    }
-                  />
-                </div>
-              ))}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() =>
-                  change({
-                    extraTasks: [
-                      ...notes.extraTasks,
-                      { id: newId(), title: "Nueva tarea", detail: "" },
-                    ],
-                  })
-                }
-              >
-                <Plus className="size-4" aria-hidden />
-                Añadir tarea
-              </Button>
             </CardContent>
           </Card>
 

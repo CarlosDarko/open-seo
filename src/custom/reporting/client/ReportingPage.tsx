@@ -74,8 +74,6 @@ function ReportRow({
   onDelete: () => void;
 }) {
   const [copied, setCopied] = useState(false);
-  const progress =
-    report.tasksTotal > 0 ? report.tasksDone / report.tasksTotal : 0;
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-3 py-4 first:pt-0 last:pb-0">
       <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
@@ -105,19 +103,6 @@ function ReportRow({
       >
         {report.shared ? "Compartido" : "Privado"}
       </span>
-      {report.tasksTotal > 0 ? (
-        <div className="w-36 space-y-1">
-          <div className="h-2 overflow-hidden rounded-full bg-muted">
-            <div
-              className="h-full rounded-full bg-success"
-              style={{ width: `${progress * 100}%` }}
-            />
-          </div>
-          <p className="text-xs text-muted-foreground tabular-nums">
-            {report.tasksDone} de {report.tasksTotal} tareas hechas
-          </p>
-        </div>
-      ) : null}
       <div className="flex items-center gap-1.5">
         {report.shared ? (
           <Button

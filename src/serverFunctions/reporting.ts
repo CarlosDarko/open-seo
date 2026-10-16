@@ -9,6 +9,7 @@ import {
   replaceSnapshot,
   updateReport,
 } from "@/custom/reporting/server/reportingDb";
+import { aiStatus, draftWithAi } from "@/custom/reporting/server/aiDraft";
 import { buildReportSnapshot } from "@/custom/reporting/server/snapshot";
 import { EMPTY_NOTES } from "@/custom/reporting/types";
 import { requireProjectContext } from "@/serverFunctions/middleware";
@@ -20,15 +21,6 @@ const notesSchema = z.object({
   message: z.string().max(4000),
   sectionNotes: z.record(z.string(), z.string().max(2000)),
   hidden: z.array(z.string().max(40)).max(20),
-  extraTasks: z
-    .array(
-      z.object({
-        id: z.string().min(1).max(60),
-        title: z.string().min(1).max(200),
-        detail: z.string().max(1000),
-      }),
-    )
-    .max(30),
   nextSteps: z.string().max(4000),
 });
 
@@ -118,3 +110,19 @@ export const deleteClientReport = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => ({
     deleted: await deleteReport(context.projectId, data.reportId),
   }));
+
+/** Whether AI drafting is switched on (the key is set) and with which model. */
+export const getReportingAiStatus = createServerFn({ method: "POST" })
+  .middleware(requireProjectContext)
+  .validator(projectInput)
+  .handler(() => aiStatus());
+
+/** Drafts the message, section notes and next steps; nothing is saved. */
+export const draftClientReportWithAi = createServerFn({ method: "POST" })
+  .middleware(requireProjectContext)
+  .validator(reportInput)
+  .handler(async ({ data, context }) => {
+    const report = await getReport(context.projectId, data.reportId);
+    if (!report) return { ok: false as const, reason: "failed" as const };
+    return draftWithAi(report);
+  });
