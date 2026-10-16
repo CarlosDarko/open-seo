@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Line, LineChart, YAxis } from "recharts";
 import {
   ArrowRight,
@@ -51,8 +51,7 @@ import type { BandMove, DailyPoint } from "@/custom/radar/radarAnalysis";
 import type { Verdict } from "@/custom/radar/trackingImpact";
 import {
   getDashboardActivation,
-  getDashboardOverview,
-  refreshDashboardBacklinkSnapshot,
+  getDashboardLinkActivity,
 } from "@/serverFunctions/dashboard";
 import { getRadarPageSignals } from "@/serverFunctions/radar";
 import { listTrackedActions } from "@/serverFunctions/radarTracking";
@@ -87,17 +86,12 @@ function taskHref(projectId: string, id: string): string {
  * everything fits in about one screen.
  */
 export function HomePage({ projectId }: { projectId: string }) {
-  const queryClient = useQueryClient();
   const { filters, update, query, report } = useRadarReport(projectId);
   const [tasksTab, setTasksTab] = useState<"todo" | "done">("todo");
 
   const activation = useQuery({
     queryKey: ["dashboardActivation", projectId],
     queryFn: () => getDashboardActivation({ data: { projectId } }),
-  });
-  const overview = useQuery({
-    queryKey: ["dashboardOverview", projectId],
-    queryFn: () => getDashboardOverview({ data: { projectId } }),
   });
   const topicInput = {
     ...periodInput(filters),
@@ -113,16 +107,6 @@ export function HomePage({ projectId }: { projectId: string }) {
     queryKey: ["radar-tracked-home", projectId],
     queryFn: () => listTrackedActions({ data: { projectId, limit: 4 } }),
     staleTime: 5 * 60_000,
-  });
-
-  // OpenSEO refreshed the backlink summary by itself on every visit, which
-  // costs a little each day. Here it only happens when asked.
-  const refreshBacklinks = useMutation({
-    mutationFn: () => refreshDashboardBacklinkSnapshot({ data: { projectId } }),
-    onSuccess: () =>
-      queryClient.invalidateQueries({
-        queryKey: ["dashboardOverview", projectId],
-      }),
   });
 
   const plan = useMemo(() => (report ? buildActions(report) : null), [report]);
@@ -227,7 +211,7 @@ export function HomePage({ projectId }: { projectId: string }) {
         <AlertsBanner projectId={projectId} />
 
         {!gscConnected ? (
-          <GscCard projectId={projectId} connected={false} />
+          <GscCard projectId={projectId} connected={false} siteUrl={null} />
         ) : query.isError ? (
           <QueryError
             variant="card"
@@ -409,12 +393,8 @@ export function HomePage({ projectId }: { projectId: string }) {
               />
               <HealthCard
                 projectId={projectId}
-                backlinks={overview.data?.backlinks ?? null}
                 showBacklinks={activation.data.domain !== null}
                 ga4Connected={activation.data.ga4.connected}
-                loading={overview.isPending}
-                refreshing={refreshBacklinks.isPending}
-                onRefresh={() => refreshBacklinks.mutate()}
               />
             </div>
           </div>
@@ -977,27 +957,15 @@ function TopicsCard({
   );
 }
 
-type Overview = Awaited<ReturnType<typeof getDashboardOverview>>;
-
 function HealthCard({
   projectId,
-  backlinks,
   showBacklinks,
   ga4Connected,
-  loading,
-  refreshing,
-  onRefresh,
 }: {
   projectId: string;
-  backlinks: Overview["backlinks"];
   showBacklinks: boolean;
   ga4Connected: boolean;
-  loading: boolean;
-  refreshing: boolean;
-  onRefresh: () => void;
 }) {
-  const number = (value: number | null) =>
-    value === null ? "—" : integer.format(value);
   return (
     <Card>
       <CardHeader>
@@ -1007,112 +975,56 @@ function HealthCard({
         </p>
       </CardHeader>
       <CardContent className="space-y-3">
-        {loading ? (
-          <Skeleton className="h-40 w-full" />
-        ) : (
-          <>
-            {showBacklinks ? (
-              <HealthTile
-                icon={Link2}
-                tone="info"
-                title="Backlinks"
-                status={
-                  backlinks
-                    ? {
-                        text: backlinks.stale ? "Desactualizado" : "Al día",
-                        ok: !backlinks.stale,
-                      }
-                    : { text: "Sin datos", ok: false }
-                }
-                action={
-                  <Button
-                    size="xs"
-                    variant="outline"
-                    disabled={refreshing}
-                    onClick={onRefresh}
-                    title="Cuesta unos 0,02 €"
-                  >
-                    <RefreshCw
-                      className={`size-3 ${refreshing ? "animate-spin" : ""}`}
-                      aria-hidden
-                    />
-                    Actualizar
-                  </Button>
-                }
-              >
-                {backlinks ? (
-                  <div className="grid grid-cols-2 gap-2">
-                    <Figure
-                      label="Dominios que te enlazan"
-                      value={number(backlinks.referringDomains)}
-                      gained={backlinks.newReferringDomains}
-                      lost={backlinks.lostReferringDomains}
-                    />
-                    <Figure
-                      label="Enlaces totales"
-                      value={number(backlinks.backlinks)}
-                      gained={backlinks.newBacklinks}
-                      lost={backlinks.lostBacklinks}
-                    />
-                  </div>
-                ) : (
-                  <p className="text-xs text-muted-foreground">
-                    Pulsa «Actualizar» para traer el resumen de enlaces.
-                  </p>
-                )}
-              </HealthTile>
-            ) : null}
+        {showBacklinks ? <BacklinksTile projectId={projectId} /> : null}
 
-            <HealthTile
-              icon={BarChart3}
-              tone="warning"
-              title="Google Analytics"
-              status={
-                ga4Connected
-                  ? { text: "Conectado", ok: true }
-                  : { text: "Sin conectar", ok: false }
-              }
-              action={
-                <Button
-                  size="xs"
-                  variant={ga4Connected ? "outline" : "default"}
-                  render={
-                    <Link to="/p/$projectId/settings" params={{ projectId }} />
-                  }
-                >
-                  {ga4Connected ? "Ajustes" : "Conectar"}
-                </Button>
+        <HealthTile
+          icon={BarChart3}
+          tone="warning"
+          title="Google Analytics"
+          status={
+            ga4Connected
+              ? { text: "Conectado", ok: true }
+              : { text: "Sin conectar", ok: false }
+          }
+          action={
+            <Button
+              size="xs"
+              variant={ga4Connected ? "outline" : "default"}
+              render={
+                <Link to="/p/$projectId/settings" params={{ projectId }} />
               }
             >
-              <p className="text-xs text-muted-foreground">
-                {ga4Connected
-                  ? "Cruzas visitas reales con lo que ves en Search Console."
-                  : "Conéctalo para cruzar las visitas reales con Search Console."}
-              </p>
-            </HealthTile>
+              {ga4Connected ? "Ajustes" : "Conectar"}
+            </Button>
+          }
+        >
+          <p className="text-xs text-muted-foreground">
+            {ga4Connected
+              ? "Cruzas visitas reales con lo que ves en Search Console."
+              : "Conéctalo para cruzar las visitas reales con Search Console."}
+          </p>
+        </HealthTile>
 
-            <HealthTile
-              icon={FileSearch}
-              tone="success"
-              title="Indexación y sitemap"
-              action={
-                <Button
-                  size="xs"
-                  variant="outline"
-                  render={
-                    <Link to="/p/$projectId/indexing" params={{ projectId }} />
-                  }
-                >
-                  Revisar
-                </Button>
+        <HealthTile
+          icon={FileSearch}
+          tone="success"
+          title="Indexación y sitemap"
+          action={
+            <Button
+              size="xs"
+              variant="outline"
+              render={
+                <Link to="/p/$projectId/indexing" params={{ projectId }} />
               }
             >
-              <p className="text-xs text-muted-foreground">
-                Comprueba qué páginas de tu sitemap tiene Google indexadas.
-              </p>
-            </HealthTile>
-          </>
-        )}
+              Revisar
+            </Button>
+          }
+        >
+          <p className="text-xs text-muted-foreground">
+            Comprueba qué páginas de tu sitemap tiene Google indexadas.
+          </p>
+        </HealthTile>
       </CardContent>
     </Card>
   );
@@ -1169,32 +1081,86 @@ function HealthTile({
   );
 }
 
-/** A headline number with what was gained and lost since the last summary. */
-function Figure({
-  label,
-  value,
-  gained,
-  lost,
-}: {
-  label: string;
-  value: string;
-  gained: number | null;
-  lost: number | null;
-}) {
+/** The referring domains that appeared this week. Reading them costs about
+ *  0,02 €, so it only happens when the button is pressed (the original
+ *  dashboard would read them on every visit). */
+function BacklinksTile({ projectId }: { projectId: string }) {
+  const [asked, setAsked] = useState(false);
+  const activity = useQuery({
+    queryKey: ["dashboardLinkActivity", projectId],
+    queryFn: () => getDashboardLinkActivity({ data: { projectId } }),
+    enabled: asked,
+    staleTime: 6 * 60 * 60_000,
+    retry: false,
+  });
+  const data = activity.data;
+  const domains =
+    data?.kind === "domains"
+      ? data.value.map((row) => ({
+          name: row.domain ?? "—",
+          detail: `${integer.format(row.backlinks ?? 0)} enlaces`,
+        }))
+      : (data?.links ?? []).map((link) => ({
+          name: link.domainFrom ?? "—",
+          detail: link.anchor ?? "",
+        }));
+
   return (
-    <div className="rounded-lg bg-card px-3 py-2">
-      <p className="text-[11px] leading-tight text-muted-foreground">{label}</p>
-      <p className="text-xl leading-tight font-bold tabular-nums">{value}</p>
-      {gained !== null || lost !== null ? (
-        <p className="mt-0.5 flex gap-2 text-[11px] font-semibold tabular-nums">
-          {gained !== null ? (
-            <span className="text-success">+{integer.format(gained)}</span>
-          ) : null}
-          {lost !== null ? (
-            <span className="text-destructive">−{integer.format(lost)}</span>
-          ) : null}
+    <HealthTile
+      icon={Link2}
+      tone="info"
+      title="Backlinks nuevos"
+      status={
+        data
+          ? { text: data.stale ? "Desactualizado" : "Al día", ok: !data.stale }
+          : undefined
+      }
+      action={
+        <Button
+          size="xs"
+          variant="outline"
+          disabled={activity.isFetching}
+          onClick={() => (asked ? void activity.refetch() : setAsked(true))}
+          title="Cuesta unos 0,02 €"
+        >
+          <RefreshCw
+            className={`size-3 ${activity.isFetching ? "animate-spin" : ""}`}
+            aria-hidden
+          />
+          {asked ? "Actualizar" : "Ver"}
+        </Button>
+      }
+    >
+      {!asked ? (
+        <p className="text-xs text-muted-foreground">
+          Los dominios que han empezado a enlazarte esta semana. Se leen solo al
+          pulsar «Ver» (unos 0,02 €).
         </p>
-      ) : null}
-    </div>
+      ) : activity.isError ? (
+        <p className="text-xs text-destructive">
+          No se pudieron leer ahora mismo.
+        </p>
+      ) : !data ? (
+        <Skeleton className="h-16 w-full" />
+      ) : domains.length === 0 ? (
+        <p className="text-xs text-muted-foreground">
+          Esta semana no ha aparecido ningún enlace nuevo.
+        </p>
+      ) : (
+        <ul className="space-y-1">
+          {domains.slice(0, 5).map((row) => (
+            <li
+              key={row.name}
+              className="flex items-baseline justify-between gap-2 text-xs"
+            >
+              <span className="min-w-0 truncate font-medium">{row.name}</span>
+              <span className="shrink-0 text-muted-foreground">
+                {row.detail}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </HealthTile>
   );
 }
