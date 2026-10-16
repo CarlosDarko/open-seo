@@ -10,6 +10,7 @@ import { unstable_readConfig } from "wrangler";
 import { z } from "zod";
 import {
   emailAccessGate,
+  publicReportsBypass,
   HOSTED_PROD_STAGE,
   readWorkersSubdomain,
   requireAllowedEmails,
@@ -277,6 +278,14 @@ const resolveSelfHostAccess = (
         emails: allowedEmails,
       });
       policyAud = application.aud;
+      // Client reports (/c/*) are public: see publicReportsBypass.
+      yield* publicReportsBypass({
+        domains: [
+          `${workerName(stage)}.${subdomain}`,
+          ...(customDomain ? [customDomain] : []),
+        ],
+        idSuffix: stage === "selfhost" ? "" : "Staging",
+      });
     }
 
     return { teamDomain, policyAud };

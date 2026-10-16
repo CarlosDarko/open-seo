@@ -88,3 +88,39 @@ export const emailAccessGate = (options: {
       policies: [allow.policyId],
     });
   });
+
+/**
+ * Carlos Ortega fork: lets anyone open the client reports (/c/<token>) without
+ * signing in. A second, more specific Access application with a bypass policy:
+ * Cloudflare applies the application whose path matches best, so the rest of
+ * the site stays behind the email gate. The reports are protected by their own
+ * unguessable link and can be switched off one by one.
+ */
+export const publicReportsBypass = (options: {
+  domains: string[];
+  /** Resource ids must differ per stage. */
+  idSuffix: string;
+}) =>
+  Effect.gen(function* () {
+    const bypass = yield* Cloudflare.Access.Policy(
+      `ClientReportsBypassPolicy${options.idSuffix}`,
+      {
+        name: "Informes de cliente (enlace público)",
+        decision: "bypass",
+        include: [{ everyone: {} }],
+      },
+    );
+    return yield* Cloudflare.Access.Application(
+      `ClientReportsBypass${options.idSuffix}`,
+      {
+        type: "self_hosted",
+        name: "Informes de cliente",
+        domain: `${options.domains[0]}/c/*`,
+        destinations: options.domains.map((host) => ({
+          type: "public" as const,
+          uri: `${host}/c/*`,
+        })),
+        policies: [bypass.policyId],
+      },
+    );
+  });

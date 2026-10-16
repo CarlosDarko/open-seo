@@ -7,6 +7,7 @@ import {
   FileSearch,
   ListChecks,
   Newspaper,
+  Presentation,
   ClipboardCheck,
   FileText,
   Globe,
@@ -117,6 +118,11 @@ const projectNavItems = [
     icon: FileText,
   },
   {
+    to: "/p/$projectId/reporting" as const,
+    label: "Reporting",
+    icon: Presentation,
+  },
+  {
     to: "/p/$projectId/context" as const,
     label: "Context",
     icon: Brain,
@@ -194,6 +200,7 @@ export function getProjectNavGroups(projectId: string) {
     {
       label: "AI Tools",
       items: [
+        byPath("/p/$projectId/reporting"),
         byPath("/p/$projectId/reports"),
         byPath("/p/$projectId/context"),
         aiNavItem,

@@ -109,6 +109,7 @@ import {
 } from "@/server/mcp/tools/site-audit-cleanup-tools";
 import { whoamiTool } from "@/server/mcp/tools/whoami";
 import { explorePromptTool } from "@/server/mcp/tools/explore-prompt";
+import { customMcpTools } from "@/custom/mcp/tools";
 
 type ToolSchema = z.ZodType | z.ZodRawShape;
 
@@ -276,6 +277,8 @@ export function createOpenSeoMcpServer(authProps: McpProps) {
   register(listReportTemplatesTool);
   register(saveReportTemplateTool);
   register(deleteReportTemplateTool);
+  // Fork: Radar, crawl and client-report tools (src/custom/mcp).
+  for (const tool of customMcpTools) register(tool);
 
   return server;
 }

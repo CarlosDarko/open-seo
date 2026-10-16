@@ -32,6 +32,7 @@ import { Route as AuthenticatedYcRouteImport } from './routes/_authenticated.yc'
 import { Route as AcceptInvitationIdRouteImport } from './routes/accept-invitation.$id'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as RReportIdRouteImport } from './routes/r/$reportId'
+import { Route as RvReportIdRouteImport } from './routes/rv/$reportId'
 import { Route as AppBillingFixPaymentRouteImport } from './routes/_app/billing_.fix-payment'
 import { Route as AppHelpDataforseoApiKeyRouteImport } from './routes/_app/help/dataforseo-api-key'
 import { Route as AppHelpOpenrouterApiKeyRouteImport } from './routes/_app/help/openrouter-api-key'
@@ -41,6 +42,8 @@ import { Route as AppSettingsOrganizationRouteImport } from './routes/_app/setti
 import { Route as AuthenticatedOnboardingIndexRouteImport } from './routes/_authenticated.onboarding.index'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ApiAutumnSplatRouteImport } from './routes/api/autumn/$'
+import { Route as CTokenIndexRouteImport } from './routes/c/$token/index'
+import { Route as CTokenCheckRouteImport } from './routes/c/$token/check'
 import { Route as STokenIndexRouteImport } from './routes/s/$token/index'
 import { Route as STokenOgDotpngRouteImport } from './routes/s/$token/og[.]png'
 import { Route as STokenRawRouteImport } from './routes/s/$token/raw'
@@ -70,6 +73,8 @@ import { Route as AppPProjectIdAiVisibilityResearchRouteImport } from './routes/
 import { Route as AppPProjectIdAuditIndexRouteImport } from './routes/_app/p/$projectId/audit/index'
 import { Route as AppPProjectIdRankTrackingIndexRouteImport } from './routes/_app/p/$projectId/rank-tracking/index'
 import { Route as AppPProjectIdRankTrackingConfigIdRouteImport } from './routes/_app/p/$projectId/rank-tracking/$configId'
+import { Route as AppPProjectIdReportingIndexRouteImport } from './routes/_app/p/$projectId/reporting.index'
+import { Route as AppPProjectIdReportingReportIdRouteImport } from './routes/_app/p/$projectId/reporting.$reportId'
 import { Route as AppPProjectIdReportsIndexRouteImport } from './routes/_app/p/$projectId/reports/index'
 import { Route as AppPProjectIdReportsReportIdRouteImport } from './routes/_app/p/$projectId/reports/$reportId'
 import { Route as AppPProjectIdReportsTemplatesRouteImport } from './routes/_app/p/$projectId/reports/templates'
@@ -193,6 +198,11 @@ const RReportIdRoute = RReportIdRouteImport.update({
   path: '/r/$reportId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RvReportIdRoute = RvReportIdRouteImport.update({
+  id: '/rv/$reportId',
+  path: '/rv/$reportId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AppBillingFixPaymentRoute = AppBillingFixPaymentRouteImport.update({
   id: '/billing_/fix-payment',
   path: '/billing/fix-payment',
@@ -237,6 +247,16 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
 const ApiAutumnSplatRoute = ApiAutumnSplatRouteImport.update({
   id: '/api/autumn/$',
   path: '/api/autumn/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CTokenIndexRoute = CTokenIndexRouteImport.update({
+  id: '/c/$token/',
+  path: '/c/$token/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CTokenCheckRoute = CTokenCheckRouteImport.update({
+  id: '/c/$token/check',
+  path: '/c/$token/check',
   getParentRoute: () => rootRouteImport,
 } as any)
 const STokenIndexRoute = STokenIndexRouteImport.update({
@@ -393,6 +413,18 @@ const AppPProjectIdRankTrackingConfigIdRoute =
     path: '/$configId',
     getParentRoute: () => AppPProjectIdRankTrackingRoute,
   } as any)
+const AppPProjectIdReportingIndexRoute =
+  AppPProjectIdReportingIndexRouteImport.update({
+    id: '/reporting/',
+    path: '/reporting/',
+    getParentRoute: () => AppPProjectIdRouteRoute,
+  } as any)
+const AppPProjectIdReportingReportIdRoute =
+  AppPProjectIdReportingReportIdRouteImport.update({
+    id: '/reporting/$reportId',
+    path: '/reporting/$reportId',
+    getParentRoute: () => AppPProjectIdRouteRoute,
+  } as any)
 const AppPProjectIdReportsIndexRoute =
   AppPProjectIdReportsIndexRouteImport.update({
     id: '/reports/',
@@ -463,6 +495,7 @@ export interface FileRoutesByFullPath {
   '/accept-invitation/$id': typeof AcceptInvitationIdRoute
   '/api/health': typeof ApiHealthRoute
   '/r/$reportId': typeof RReportIdRoute
+  '/rv/$reportId': typeof RvReportIdRoute
   '/p/$projectId': typeof AppPProjectIdRouteRouteWithChildren
   '/billing/fix-payment': typeof AppBillingFixPaymentRoute
   '/help/dataforseo-api-key': typeof AppHelpDataforseoApiKeyRoute
@@ -470,10 +503,12 @@ export interface FileRoutesByFullPath {
   '/settings/organization': typeof AppSettingsOrganizationRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/autumn/$': typeof ApiAutumnSplatRoute
+  '/c/$token/check': typeof CTokenCheckRoute
   '/s/$token/og.png': typeof STokenOgDotpngRoute
   '/s/$token/raw': typeof STokenRawRoute
   '/settings/': typeof AppSettingsIndexRoute
   '/onboarding/': typeof AuthenticatedOnboardingIndexRoute
+  '/c/$token/': typeof CTokenIndexRoute
   '/s/$token/': typeof STokenIndexRoute
   '/p/$projectId/action-plan': typeof AppPProjectIdActionPlanRoute
   '/p/$projectId/ai-visibility': typeof AppPProjectIdAiVisibilityRouteWithChildren
@@ -498,6 +533,7 @@ export interface FileRoutesByFullPath {
   '/p/$projectId/': typeof AppPProjectIdIndexRoute
   '/p/$projectId/ai-visibility/research': typeof AppPProjectIdAiVisibilityResearchRoute
   '/p/$projectId/rank-tracking/$configId': typeof AppPProjectIdRankTrackingConfigIdRoute
+  '/p/$projectId/reporting/$reportId': typeof AppPProjectIdReportingReportIdRoute
   '/p/$projectId/reports/$reportId': typeof AppPProjectIdReportsReportIdRoute
   '/p/$projectId/reports/templates': typeof AppPProjectIdReportsTemplatesRoute
   '/p/$projectId/settings/context': typeof AppPProjectIdSettingsContextRoute
@@ -505,6 +541,7 @@ export interface FileRoutesByFullPath {
   '/p/$projectId/ai-visibility/': typeof AppPProjectIdAiVisibilityIndexRoute
   '/p/$projectId/audit/': typeof AppPProjectIdAuditIndexRoute
   '/p/$projectId/rank-tracking/': typeof AppPProjectIdRankTrackingIndexRoute
+  '/p/$projectId/reporting/': typeof AppPProjectIdReportingIndexRoute
   '/p/$projectId/reports/': typeof AppPProjectIdReportsIndexRoute
   '/p/$projectId/settings/': typeof AppPProjectIdSettingsIndexRoute
   '/p/$projectId/ai-visibility/prompts/$promptId': typeof AppPProjectIdAiVisibilityPromptsPromptIdRoute
@@ -530,16 +567,19 @@ export interface FileRoutesByTo {
   '/accept-invitation/$id': typeof AcceptInvitationIdRoute
   '/api/health': typeof ApiHealthRoute
   '/r/$reportId': typeof RReportIdRoute
+  '/rv/$reportId': typeof RvReportIdRoute
   '/billing/fix-payment': typeof AppBillingFixPaymentRoute
   '/help/dataforseo-api-key': typeof AppHelpDataforseoApiKeyRoute
   '/help/openrouter-api-key': typeof AppHelpOpenrouterApiKeyRoute
   '/settings/organization': typeof AppSettingsOrganizationRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/autumn/$': typeof ApiAutumnSplatRoute
+  '/c/$token/check': typeof CTokenCheckRoute
   '/s/$token/og.png': typeof STokenOgDotpngRoute
   '/s/$token/raw': typeof STokenRawRoute
   '/settings': typeof AppSettingsIndexRoute
   '/onboarding': typeof AuthenticatedOnboardingIndexRoute
+  '/c/$token': typeof CTokenIndexRoute
   '/s/$token': typeof STokenIndexRoute
   '/p/$projectId/action-plan': typeof AppPProjectIdActionPlanRoute
   '/p/$projectId/alerts': typeof AppPProjectIdAlertsRoute
@@ -561,6 +601,7 @@ export interface FileRoutesByTo {
   '/p/$projectId': typeof AppPProjectIdIndexRoute
   '/p/$projectId/ai-visibility/research': typeof AppPProjectIdAiVisibilityResearchRoute
   '/p/$projectId/rank-tracking/$configId': typeof AppPProjectIdRankTrackingConfigIdRoute
+  '/p/$projectId/reporting/$reportId': typeof AppPProjectIdReportingReportIdRoute
   '/p/$projectId/reports/$reportId': typeof AppPProjectIdReportsReportIdRoute
   '/p/$projectId/reports/templates': typeof AppPProjectIdReportsTemplatesRoute
   '/p/$projectId/settings/context': typeof AppPProjectIdSettingsContextRoute
@@ -568,6 +609,7 @@ export interface FileRoutesByTo {
   '/p/$projectId/ai-visibility': typeof AppPProjectIdAiVisibilityIndexRoute
   '/p/$projectId/audit': typeof AppPProjectIdAuditIndexRoute
   '/p/$projectId/rank-tracking': typeof AppPProjectIdRankTrackingIndexRoute
+  '/p/$projectId/reporting': typeof AppPProjectIdReportingIndexRoute
   '/p/$projectId/reports': typeof AppPProjectIdReportsIndexRoute
   '/p/$projectId/settings': typeof AppPProjectIdSettingsIndexRoute
   '/p/$projectId/ai-visibility/prompts/$promptId': typeof AppPProjectIdAiVisibilityPromptsPromptIdRoute
@@ -597,6 +639,7 @@ export interface FileRoutesById {
   '/accept-invitation/$id': typeof AcceptInvitationIdRoute
   '/api/health': typeof ApiHealthRoute
   '/r/$reportId': typeof RReportIdRoute
+  '/rv/$reportId': typeof RvReportIdRoute
   '/_app/': typeof AppIndexRoute
   '/_app/p/$projectId': typeof AppPProjectIdRouteRouteWithChildren
   '/_app/billing_/fix-payment': typeof AppBillingFixPaymentRoute
@@ -605,10 +648,12 @@ export interface FileRoutesById {
   '/_app/settings/organization': typeof AppSettingsOrganizationRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/autumn/$': typeof ApiAutumnSplatRoute
+  '/c/$token/check': typeof CTokenCheckRoute
   '/s/$token/og.png': typeof STokenOgDotpngRoute
   '/s/$token/raw': typeof STokenRawRoute
   '/_app/settings/': typeof AppSettingsIndexRoute
   '/_authenticated/onboarding/': typeof AuthenticatedOnboardingIndexRoute
+  '/c/$token/': typeof CTokenIndexRoute
   '/s/$token/': typeof STokenIndexRoute
   '/_app/p/$projectId/action-plan': typeof AppPProjectIdActionPlanRoute
   '/_app/p/$projectId/ai-visibility': typeof AppPProjectIdAiVisibilityRouteWithChildren
@@ -633,6 +678,7 @@ export interface FileRoutesById {
   '/_app/p/$projectId/': typeof AppPProjectIdIndexRoute
   '/_app/p/$projectId/ai-visibility/research': typeof AppPProjectIdAiVisibilityResearchRoute
   '/_app/p/$projectId/rank-tracking/$configId': typeof AppPProjectIdRankTrackingConfigIdRoute
+  '/_app/p/$projectId/reporting/$reportId': typeof AppPProjectIdReportingReportIdRoute
   '/_app/p/$projectId/reports/$reportId': typeof AppPProjectIdReportsReportIdRoute
   '/_app/p/$projectId/reports/templates': typeof AppPProjectIdReportsTemplatesRoute
   '/_app/p/$projectId/settings/context': typeof AppPProjectIdSettingsContextRoute
@@ -640,6 +686,7 @@ export interface FileRoutesById {
   '/_app/p/$projectId/ai-visibility/': typeof AppPProjectIdAiVisibilityIndexRoute
   '/_app/p/$projectId/audit/': typeof AppPProjectIdAuditIndexRoute
   '/_app/p/$projectId/rank-tracking/': typeof AppPProjectIdRankTrackingIndexRoute
+  '/_app/p/$projectId/reporting/': typeof AppPProjectIdReportingIndexRoute
   '/_app/p/$projectId/reports/': typeof AppPProjectIdReportsIndexRoute
   '/_app/p/$projectId/settings/': typeof AppPProjectIdSettingsIndexRoute
   '/_app/p/$projectId/ai-visibility/prompts/$promptId': typeof AppPProjectIdAiVisibilityPromptsPromptIdRoute
@@ -668,6 +715,7 @@ export interface FileRouteTypes {
     | '/accept-invitation/$id'
     | '/api/health'
     | '/r/$reportId'
+    | '/rv/$reportId'
     | '/p/$projectId'
     | '/billing/fix-payment'
     | '/help/dataforseo-api-key'
@@ -675,10 +723,12 @@ export interface FileRouteTypes {
     | '/settings/organization'
     | '/api/auth/$'
     | '/api/autumn/$'
+    | '/c/$token/check'
     | '/s/$token/og.png'
     | '/s/$token/raw'
     | '/settings/'
     | '/onboarding/'
+    | '/c/$token/'
     | '/s/$token/'
     | '/p/$projectId/action-plan'
     | '/p/$projectId/ai-visibility'
@@ -703,6 +753,7 @@ export interface FileRouteTypes {
     | '/p/$projectId/'
     | '/p/$projectId/ai-visibility/research'
     | '/p/$projectId/rank-tracking/$configId'
+    | '/p/$projectId/reporting/$reportId'
     | '/p/$projectId/reports/$reportId'
     | '/p/$projectId/reports/templates'
     | '/p/$projectId/settings/context'
@@ -710,6 +761,7 @@ export interface FileRouteTypes {
     | '/p/$projectId/ai-visibility/'
     | '/p/$projectId/audit/'
     | '/p/$projectId/rank-tracking/'
+    | '/p/$projectId/reporting/'
     | '/p/$projectId/reports/'
     | '/p/$projectId/settings/'
     | '/p/$projectId/ai-visibility/prompts/$promptId'
@@ -735,16 +787,19 @@ export interface FileRouteTypes {
     | '/accept-invitation/$id'
     | '/api/health'
     | '/r/$reportId'
+    | '/rv/$reportId'
     | '/billing/fix-payment'
     | '/help/dataforseo-api-key'
     | '/help/openrouter-api-key'
     | '/settings/organization'
     | '/api/auth/$'
     | '/api/autumn/$'
+    | '/c/$token/check'
     | '/s/$token/og.png'
     | '/s/$token/raw'
     | '/settings'
     | '/onboarding'
+    | '/c/$token'
     | '/s/$token'
     | '/p/$projectId/action-plan'
     | '/p/$projectId/alerts'
@@ -766,6 +821,7 @@ export interface FileRouteTypes {
     | '/p/$projectId'
     | '/p/$projectId/ai-visibility/research'
     | '/p/$projectId/rank-tracking/$configId'
+    | '/p/$projectId/reporting/$reportId'
     | '/p/$projectId/reports/$reportId'
     | '/p/$projectId/reports/templates'
     | '/p/$projectId/settings/context'
@@ -773,6 +829,7 @@ export interface FileRouteTypes {
     | '/p/$projectId/ai-visibility'
     | '/p/$projectId/audit'
     | '/p/$projectId/rank-tracking'
+    | '/p/$projectId/reporting'
     | '/p/$projectId/reports'
     | '/p/$projectId/settings'
     | '/p/$projectId/ai-visibility/prompts/$promptId'
@@ -801,6 +858,7 @@ export interface FileRouteTypes {
     | '/accept-invitation/$id'
     | '/api/health'
     | '/r/$reportId'
+    | '/rv/$reportId'
     | '/_app/'
     | '/_app/p/$projectId'
     | '/_app/billing_/fix-payment'
@@ -809,10 +867,12 @@ export interface FileRouteTypes {
     | '/_app/settings/organization'
     | '/api/auth/$'
     | '/api/autumn/$'
+    | '/c/$token/check'
     | '/s/$token/og.png'
     | '/s/$token/raw'
     | '/_app/settings/'
     | '/_authenticated/onboarding/'
+    | '/c/$token/'
     | '/s/$token/'
     | '/_app/p/$projectId/action-plan'
     | '/_app/p/$projectId/ai-visibility'
@@ -837,6 +897,7 @@ export interface FileRouteTypes {
     | '/_app/p/$projectId/'
     | '/_app/p/$projectId/ai-visibility/research'
     | '/_app/p/$projectId/rank-tracking/$configId'
+    | '/_app/p/$projectId/reporting/$reportId'
     | '/_app/p/$projectId/reports/$reportId'
     | '/_app/p/$projectId/reports/templates'
     | '/_app/p/$projectId/settings/context'
@@ -844,6 +905,7 @@ export interface FileRouteTypes {
     | '/_app/p/$projectId/ai-visibility/'
     | '/_app/p/$projectId/audit/'
     | '/_app/p/$projectId/rank-tracking/'
+    | '/_app/p/$projectId/reporting/'
     | '/_app/p/$projectId/reports/'
     | '/_app/p/$projectId/settings/'
     | '/_app/p/$projectId/ai-visibility/prompts/$promptId'
@@ -862,10 +924,13 @@ export interface RootRouteChildren {
   AcceptInvitationIdRoute: typeof AcceptInvitationIdRoute
   ApiHealthRoute: typeof ApiHealthRoute
   RReportIdRoute: typeof RReportIdRoute
+  RvReportIdRoute: typeof RvReportIdRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiAutumnSplatRoute: typeof ApiAutumnSplatRoute
+  CTokenCheckRoute: typeof CTokenCheckRoute
   STokenOgDotpngRoute: typeof STokenOgDotpngRoute
   STokenRawRoute: typeof STokenRawRoute
+  CTokenIndexRoute: typeof CTokenIndexRoute
   STokenIndexRoute: typeof STokenIndexRoute
   ApiGa4OauthCallbackRoute: typeof ApiGa4OauthCallbackRoute
   ApiGscOauthCallbackRoute: typeof ApiGscOauthCallbackRoute
@@ -1034,6 +1099,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RReportIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/rv/$reportId': {
+      id: '/rv/$reportId'
+      path: '/rv/$reportId'
+      fullPath: '/rv/$reportId'
+      preLoaderRoute: typeof RvReportIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_app/billing_/fix-payment': {
       id: '/_app/billing_/fix-payment'
       path: '/billing/fix-payment'
@@ -1095,6 +1167,20 @@ declare module '@tanstack/react-router' {
       path: '/api/autumn/$'
       fullPath: '/api/autumn/$'
       preLoaderRoute: typeof ApiAutumnSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/c/$token/': {
+      id: '/c/$token/'
+      path: '/c/$token'
+      fullPath: '/c/$token/'
+      preLoaderRoute: typeof CTokenIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/c/$token/check': {
+      id: '/c/$token/check'
+      path: '/c/$token/check'
+      fullPath: '/c/$token/check'
+      preLoaderRoute: typeof CTokenCheckRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/s/$token/': {
@@ -1300,6 +1386,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppPProjectIdRankTrackingConfigIdRouteImport
       parentRoute: typeof AppPProjectIdRankTrackingRoute
     }
+    '/_app/p/$projectId/reporting/': {
+      id: '/_app/p/$projectId/reporting/'
+      path: '/reporting'
+      fullPath: '/p/$projectId/reporting/'
+      preLoaderRoute: typeof AppPProjectIdReportingIndexRouteImport
+      parentRoute: typeof AppPProjectIdRouteRoute
+    }
+    '/_app/p/$projectId/reporting/$reportId': {
+      id: '/_app/p/$projectId/reporting/$reportId'
+      path: '/reporting/$reportId'
+      fullPath: '/p/$projectId/reporting/$reportId'
+      preLoaderRoute: typeof AppPProjectIdReportingReportIdRouteImport
+      parentRoute: typeof AppPProjectIdRouteRoute
+    }
     '/_app/p/$projectId/reports/': {
       id: '/_app/p/$projectId/reports/'
       path: '/reports'
@@ -1448,9 +1548,11 @@ interface AppPProjectIdRouteRouteChildren {
   AppPProjectIdSettingsRoute: typeof AppPProjectIdSettingsRouteWithChildren
   AppPProjectIdTopicsRoute: typeof AppPProjectIdTopicsRoute
   AppPProjectIdIndexRoute: typeof AppPProjectIdIndexRoute
+  AppPProjectIdReportingReportIdRoute: typeof AppPProjectIdReportingReportIdRoute
   AppPProjectIdReportsReportIdRoute: typeof AppPProjectIdReportsReportIdRoute
   AppPProjectIdReportsTemplatesRoute: typeof AppPProjectIdReportsTemplatesRoute
   AppPProjectIdAuditIndexRoute: typeof AppPProjectIdAuditIndexRoute
+  AppPProjectIdReportingIndexRoute: typeof AppPProjectIdReportingIndexRoute
   AppPProjectIdReportsIndexRoute: typeof AppPProjectIdReportsIndexRoute
   AppPProjectIdAuditIssuesResultIdRoute: typeof AppPProjectIdAuditIssuesResultIdRoute
 }
@@ -1475,9 +1577,11 @@ const AppPProjectIdRouteRouteChildren: AppPProjectIdRouteRouteChildren = {
   AppPProjectIdSettingsRoute: AppPProjectIdSettingsRouteWithChildren,
   AppPProjectIdTopicsRoute: AppPProjectIdTopicsRoute,
   AppPProjectIdIndexRoute: AppPProjectIdIndexRoute,
+  AppPProjectIdReportingReportIdRoute: AppPProjectIdReportingReportIdRoute,
   AppPProjectIdReportsReportIdRoute: AppPProjectIdReportsReportIdRoute,
   AppPProjectIdReportsTemplatesRoute: AppPProjectIdReportsTemplatesRoute,
   AppPProjectIdAuditIndexRoute: AppPProjectIdAuditIndexRoute,
+  AppPProjectIdReportingIndexRoute: AppPProjectIdReportingIndexRoute,
   AppPProjectIdReportsIndexRoute: AppPProjectIdReportsIndexRoute,
   AppPProjectIdAuditIssuesResultIdRoute: AppPProjectIdAuditIssuesResultIdRoute,
 }
@@ -1560,10 +1664,13 @@ const rootRouteChildren: RootRouteChildren = {
   AcceptInvitationIdRoute: AcceptInvitationIdRoute,
   ApiHealthRoute: ApiHealthRoute,
   RReportIdRoute: RReportIdRoute,
+  RvReportIdRoute: RvReportIdRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiAutumnSplatRoute: ApiAutumnSplatRoute,
+  CTokenCheckRoute: CTokenCheckRoute,
   STokenOgDotpngRoute: STokenOgDotpngRoute,
   STokenRawRoute: STokenRawRoute,
+  CTokenIndexRoute: CTokenIndexRoute,
   STokenIndexRoute: STokenIndexRoute,
   ApiGa4OauthCallbackRoute: ApiGa4OauthCallbackRoute,
   ApiGscOauthCallbackRoute: ApiGscOauthCallbackRoute,

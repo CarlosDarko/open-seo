@@ -36,6 +36,7 @@ const LAYOUT: { label: string; paths: string[]; collapsible?: boolean }[] = [
       "/p/$projectId/indexing",
     ],
   },
+  { label: "Clientes", paths: ["/p/$projectId/reporting"] },
   {
     label: "Investigación",
     paths: [
