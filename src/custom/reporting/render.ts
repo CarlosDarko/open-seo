@@ -546,6 +546,70 @@ function opportunitiesSection(report: ReportFull): string {
   );
 }
 
+// ------------------------------------------------------------- AI notes
+
+function diagnosisSection(report: ReportFull): string {
+  const items = report.notes.diagnoses.filter((item) => item.text.trim());
+  if (items.length === 0) return "";
+  const cards = items
+    .map((item) => {
+      const row = report.snapshot.pageLosers.find(
+        (loser) => loser.key === item.url,
+      );
+      const pill = row
+        ? `<span class="pill bad">${signedNum(row.clicksDelta)} clics</span><span class="pill flat" style="background:#ececee;color:#3a3a40">${num(row.prevClicks)} → ${num(row.clicks)}</span>`
+        : "";
+      const fixes = item.fixes
+        .filter((fix) => fix.trim())
+        .map((fix) => `<li>${esc(fix)}</li>`)
+        .join("");
+      return `<article class="dgc rv"><div class="u">${esc(pathOf(item.url))}</div><div class="meta">${pill}</div><p>${esc(item.text)}</p>${fixes ? `<h3>Qué haremos</h3><ul class="fix">${fixes}</ul>` : ""}</article>`;
+    })
+    .join("");
+  return section(
+    "diagnostico",
+    "Diagnóstico",
+    "Por qué han bajado estas páginas y cómo recuperarlas",
+    "Hemos revisado cada página y las búsquedas que han caído. Todas tienen arreglo: ya tienen historial en Google, solo hay que reforzarlas.",
+    `<div class="dg">${cards}</div>`,
+    noteOf(report, "diagnostico"),
+  );
+}
+
+function titlesSection(report: ReportFull): string {
+  const items = report.notes.titleIdeas.filter(
+    (item) => item.options.length > 0,
+  );
+  if (items.length === 0) return "";
+  const host = (() => {
+    try {
+      return new URL(report.snapshot.siteUrl).hostname;
+    } catch {
+      return report.snapshot.siteUrl.replace("sc-domain:", "");
+    }
+  })();
+  const cards = items
+    .map((item) => {
+      const path = item.url ? pathOf(item.url) : "";
+      const options = item.options
+        .map(
+          (option) =>
+            `<div class="serp"><div class="su">${esc(host)}${esc(path)}</div><div class="st2">${esc(option.title)}</div><div class="sd">${esc(option.description)}</div></div>`,
+        )
+        .join("");
+      return `<article class="tic rv"><div class="tq2">«${esc(item.query)}»</div>${item.current ? `<div class="cur">Título actual: <s>${esc(item.current)}</s></div>` : ""}${options}</article>`;
+    })
+    .join("");
+  return section(
+    "titulos",
+    "Propuestas de títulos",
+    "Cómo atraer más clics con lo que ya posicionas",
+    "En estas búsquedas ya apareces, pero se clica poco. Estas son propuestas de título y descripción, tal y como se verían en Google.",
+    `<div class="tid">${cards}</div>`,
+    noteOf(report, "titulos"),
+  );
+}
+
 // --------------------------------------------------------------- health
 
 function healthSection(report: ReportFull): string {
@@ -651,6 +715,8 @@ const SHORT: Record<string, string> = {
   reparto: "Audiencia",
   semana: "Ritmo",
   oportunidades: "Oportunidades",
+  titulos: "Títulos",
+  diagnostico: "Diagnóstico",
   tecnico: "Técnico",
   discover: "Discover",
 };
@@ -682,6 +748,8 @@ export function renderReportDocument(
     reparto: () => splitSection(report),
     semana: () => weekSection(report),
     oportunidades: () => opportunitiesSection(report),
+    titulos: () => titlesSection(report),
+    diagnostico: () => diagnosisSection(report),
     tecnico: () => healthSection(report),
     discover: () => discoverSection(report),
   };

@@ -181,6 +181,24 @@ h3{margin:0 0 12px;font-size:12.5px;font-weight:800;letter-spacing:.1em;text-tra
 .obar{grid-column:2/4;height:6px;border-radius:3px;background:var(--soft);overflow:hidden;margin-top:-6px}
 .obar i{display:block;height:100%;background:linear-gradient(90deg,#22a755,#86efac);width:0;transition:width 1s}
 .in .obar i{width:var(--w)}
+/* diagnosis and titles */
+.dg{display:grid;gap:18px}
+.dgc{background:var(--card);border:1px solid var(--line);border-radius:22px;padding:24px;box-shadow:var(--shadow);border-left:6px solid var(--red)}
+.dgc .u{font-weight:800;font-size:18px;word-break:break-all}
+.dgc .meta{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 12px}
+.dgc p{margin:0 0 14px;font-size:15.5px;color:#34343a}
+.fix{display:grid;gap:8px;margin:0;padding:0;list-style:none}
+.fix li{display:flex;gap:10px;align-items:flex-start;background:var(--good-soft);color:#14532d;border-radius:12px;padding:10px 14px;font-size:14.5px;font-weight:600}
+.fix li:before{content:"✓";flex:none;font-weight:800}
+.tid{display:grid;gap:18px}
+.tic{background:var(--card);border:1px solid var(--line);border-radius:22px;padding:24px;box-shadow:var(--shadow)}
+.tic .tq2{font-weight:800;font-size:18px}
+.tic .cur{font-size:13px;color:var(--muted);margin:4px 0 14px}
+.tic .cur s{color:#8a8a93}
+.serp{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-top:10px}
+.serp .su{font-size:12.5px;color:#188038}
+.serp .st2{font-size:19px;line-height:1.3;color:#1a0dab;margin:2px 0}
+.serp .sd{font-size:14px;color:#4d5156}
 /* health */
 .hl{display:grid;grid-template-columns:auto 1fr;gap:34px;align-items:center}
 .ring{position:relative;width:170px;height:170px}

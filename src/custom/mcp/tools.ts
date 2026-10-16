@@ -583,6 +583,7 @@ const reportingUpdate = defineTool({
       else delete sectionNotes[id];
     }
     const notes: ReportNotes = {
+      ...report.notes,
       message: patch.message ?? report.notes.message,
       sectionNotes,
       hidden: patch.hidden ?? report.notes.hidden,

@@ -42,4 +42,47 @@ describe("reports saved by an earlier version", () => {
     } as ReportFull;
     expect(() => renderReportDocument(report, "preview")).not.toThrow();
   });
+
+  it("shows the AI diagnoses and title ideas once the consultant keeps them", () => {
+    const report = {
+      id: "r",
+      projectId: "p",
+      token: "t".repeat(32),
+      title: "Informe",
+      clientName: null,
+      shared: true,
+      createdAt: "",
+      updatedAt: "",
+      createdBy: null,
+      range: { startDate: "2026-09-18", endDate: "2026-10-15" },
+      snapshot: normalizeSnapshot({ siteUrl: "sc-domain:example.com" }),
+      notes: {
+        ...EMPTY_NOTES,
+        diagnoses: [
+          {
+            url: "https://example.com/guia/",
+            text: "El título no menciona la búsqueda que cae.",
+            fixes: ["Añadir la búsqueda al H1"],
+          },
+        ],
+        titleIdeas: [
+          {
+            query: "seo local",
+            url: "https://example.com/guia/",
+            current: "Guía",
+            options: [
+              {
+                title: "SEO local: guía 2026",
+                description: "Todo lo que necesitas.",
+              },
+            ],
+          },
+        ],
+      },
+    } as ReportFull;
+    const html = renderReportDocument(report, "public");
+    expect(html).toContain('id="diagnostico"');
+    expect(html).toContain('class="serp"');
+    expect(html).toContain("El título no menciona");
+  });
 });

@@ -9,7 +9,11 @@ import {
   replaceSnapshot,
   updateReport,
 } from "@/custom/reporting/server/reportingDb";
-import { aiStatus, draftWithAi } from "@/custom/reporting/server/aiDraft";
+import {
+  aiStatus,
+  analyzeWithAi,
+  draftWithAi,
+} from "@/custom/reporting/server/aiDraft";
 import { buildReportSnapshot } from "@/custom/reporting/server/snapshot";
 import { EMPTY_NOTES } from "@/custom/reporting/types";
 import { requireProjectContext } from "@/serverFunctions/middleware";
@@ -22,6 +26,32 @@ const notesSchema = z.object({
   sectionNotes: z.record(z.string(), z.string().max(2000)),
   hidden: z.array(z.string().max(40)).max(20),
   nextSteps: z.string().max(4000),
+  diagnoses: z
+    .array(
+      z.object({
+        url: z.string().max(2000),
+        text: z.string().max(1500),
+        fixes: z.array(z.string().max(400)).max(6),
+      }),
+    )
+    .max(6),
+  titleIdeas: z
+    .array(
+      z.object({
+        query: z.string().max(300),
+        url: z.string().max(2000).nullable(),
+        current: z.string().max(300).nullable(),
+        options: z
+          .array(
+            z.object({
+              title: z.string().max(120),
+              description: z.string().max(250),
+            }),
+          )
+          .max(4),
+      }),
+    )
+    .max(8),
 });
 
 export const listClientReports = createServerFn({ method: "POST" })
@@ -125,4 +155,15 @@ export const draftClientReportWithAi = createServerFn({ method: "POST" })
     const report = await getReport(context.projectId, data.reportId);
     if (!report) return { ok: false as const, reason: "failed" as const };
     return draftWithAi(report);
+  });
+
+/** Reads the pages that fell and the searches seen but not clicked, and
+ *  proposes diagnoses and new titles. A draft: nothing is saved. */
+export const analyzeClientReportWithAi = createServerFn({ method: "POST" })
+  .middleware(requireProjectContext)
+  .validator(reportInput)
+  .handler(async ({ data, context }) => {
+    const report = await getReport(context.projectId, data.reportId);
+    if (!report) return { ok: false as const, reason: "failed" as const };
+    return analyzeWithAi(report, report.snapshot.siteUrl);
   });

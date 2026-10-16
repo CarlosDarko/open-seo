@@ -29,6 +29,7 @@ import {
   type ReportNotes,
 } from "@/custom/reporting/types";
 import {
+  analyzeClientReportWithAi,
   draftClientReportWithAi,
   getClientReport,
   getReportingAiStatus,
@@ -36,6 +37,15 @@ import {
   saveClientReport,
   setClientReportShared,
 } from "@/serverFunctions/reporting";
+
+const NEWLINE = String.fromCharCode(10);
+const pathOnly = (url: string) => {
+  try {
+    return new URL(url).pathname || "/";
+  } catch {
+    return url;
+  }
+};
 
 function Editor({
   report,
@@ -115,6 +125,50 @@ function Editor({
     },
     onError: () =>
       setError("La IA no ha podido redactar ahora. Prueba de nuevo."),
+  });
+  const editOption = (
+    ideaIndex: number,
+    optionIndex: number,
+    patch: { title?: string; description?: string },
+  ) =>
+    change({
+      titleIdeas: notes.titleIdeas.map((entry, at) =>
+        at === ideaIndex
+          ? {
+              ...entry,
+              options: entry.options.map((option, oi) =>
+                oi === optionIndex ? { ...option, ...patch } : option,
+              ),
+            }
+          : entry,
+      ),
+    });
+  const analyze = useMutation({
+    mutationFn: () =>
+      analyzeClientReportWithAi({ data: { projectId, reportId: report.id } }),
+    onSuccess: (result) => {
+      if (!result.ok) {
+        setError(
+          result.reason === "no_key"
+            ? "El análisis con IA no está activado (falta la clave de Anthropic)."
+            : result.reason === "nothing"
+              ? "No hay páginas con caída ni oportunidades de título que analizar."
+              : "La IA no ha podido analizar ahora. Prueba de nuevo.",
+        );
+        return;
+      }
+      setError(null);
+      setNotes((previous) => ({
+        ...previous,
+        diagnoses: result.diagnoses,
+        titleIdeas: result.titleIdeas,
+        hidden: previous.hidden.filter(
+          (id) => id !== "diagnostico" && id !== "titulos",
+        ),
+      }));
+      setDirty(true);
+    },
+    onError: () => setError("La IA no ha podido analizar ahora."),
   });
   const share = useMutation({
     mutationFn: (shared: boolean) =>
@@ -196,6 +250,24 @@ function Editor({
           >
             <Sparkles className="size-3.5" aria-hidden />
             {draft.isPending ? "Redactando…" : "Redactar con IA"}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={
+              analyze.isPending || !aiStatus.data || !aiStatus.data.available
+            }
+            title={
+              aiStatus.data?.available
+                ? `Lee las páginas que bajan y propone diagnósticos y títulos nuevos (${aiStatus.data.deepModel}). Es un borrador.`
+                : "Para activarlo hay que añadir la clave de Anthropic (ANTHROPIC_API_KEY)."
+            }
+            onClick={() => analyze.mutate()}
+          >
+            <Sparkles className="size-3.5" aria-hidden />
+            {analyze.isPending
+              ? "Analizando páginas…"
+              : "Analizar páginas con IA"}
           </Button>
           <Button
             variant="outline"
@@ -352,6 +424,124 @@ function Editor({
               })}
             </CardContent>
           </Card>
+
+          {notes.diagnoses.length > 0 || notes.titleIdeas.length > 0 ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Análisis con IA (borrador)</CardTitle>
+                <p className="text-xs text-muted-foreground">
+                  Revísalo: edita el texto o quita lo que no te convenza. Sale
+                  en el informe al guardar.
+                </p>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {notes.diagnoses.map((item, index) => (
+                  <div
+                    key={item.url}
+                    className="space-y-2 rounded-lg border border-border p-3"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="truncate text-sm font-semibold">
+                        Diagnóstico · {pathOnly(item.url)}
+                      </p>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label="Quitar diagnóstico"
+                        onClick={() =>
+                          change({
+                            diagnoses: notes.diagnoses.filter(
+                              (_, at) => at !== index,
+                            ),
+                          })
+                        }
+                      >
+                        <Trash2 className="size-4" aria-hidden />
+                      </Button>
+                    </div>
+                    <Textarea
+                      rows={4}
+                      value={item.text}
+                      onChange={(event) =>
+                        change({
+                          diagnoses: notes.diagnoses.map((entry, at) =>
+                            at === index
+                              ? { ...entry, text: event.target.value }
+                              : entry,
+                          ),
+                        })
+                      }
+                    />
+                    <Textarea
+                      rows={3}
+                      value={item.fixes.join(NEWLINE)}
+                      aria-label="Qué haremos (uno por línea)"
+                      onChange={(event) =>
+                        change({
+                          diagnoses: notes.diagnoses.map((entry, at) =>
+                            at === index
+                              ? {
+                                  ...entry,
+                                  fixes: event.target.value.split(NEWLINE),
+                                }
+                              : entry,
+                          ),
+                        })
+                      }
+                    />
+                  </div>
+                ))}
+                {notes.titleIdeas.map((item, index) => (
+                  <div
+                    key={`${item.query}-${index}`}
+                    className="space-y-2 rounded-lg border border-border p-3"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="truncate text-sm font-semibold">
+                        Títulos · «{item.query}»
+                      </p>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label="Quitar propuesta"
+                        onClick={() =>
+                          change({
+                            titleIdeas: notes.titleIdeas.filter(
+                              (_, at) => at !== index,
+                            ),
+                          })
+                        }
+                      >
+                        <Trash2 className="size-4" aria-hidden />
+                      </Button>
+                    </div>
+                    {item.options.map((option, optionIndex) => (
+                      <div key={optionIndex} className="space-y-1">
+                        <Input
+                          value={option.title}
+                          aria-label="Título propuesto"
+                          onChange={(event) =>
+                            editOption(index, optionIndex, {
+                              title: event.target.value,
+                            })
+                          }
+                        />
+                        <Input
+                          value={option.description}
+                          aria-label="Descripción propuesta"
+                          onChange={(event) =>
+                            editOption(index, optionIndex, {
+                              description: event.target.value,
+                            })
+                          }
+                        />
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          ) : null}
 
           <Card>
             <CardHeader>

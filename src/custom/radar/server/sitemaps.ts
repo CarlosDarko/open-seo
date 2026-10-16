@@ -163,7 +163,8 @@ export async function collectSitemapUrls(
         continue;
       }
       const parsed = parseSitemap(xml);
-      if (parsed.urls.length > 0) perFile.push({ url, urls: parsed.urls.length });
+      if (parsed.urls.length > 0)
+        perFile.push({ url, urls: parsed.urls.length });
       for (const page of parsed.urls) {
         if (urls.size >= MAX_URLS) {
           truncated = true;

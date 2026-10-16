@@ -149,6 +149,23 @@ export type ReportSnapshot = {
   } | null;
 };
 
+/** A page that lost traffic, explained by the AI after reading it. */
+export type Diagnosis = {
+  url: string;
+  /** What is most likely going on, in plain Spanish. */
+  text: string;
+  /** Concrete things to change. */
+  fixes: string[];
+};
+
+/** New title and description ideas for a search that is seen but not clicked. */
+export type TitleIdea = {
+  query: string;
+  url: string | null;
+  current: string | null;
+  options: { title: string; description: string }[];
+};
+
 /** What the consultant adds on top of the numbers. */
 export type ReportNotes = {
   /** Personal message after the cover, in the consultant's voice. */
@@ -159,6 +176,10 @@ export type ReportNotes = {
   hidden: string[];
   /** Next steps in plain text, one per line. */
   nextSteps: string;
+  /** AI diagnoses of the pages that fell (reviewed by the consultant). */
+  diagnoses: Diagnosis[];
+  /** AI title and description ideas (reviewed by the consultant). */
+  titleIdeas: TitleIdea[];
 };
 
 export const EMPTY_NOTES: ReportNotes = {
@@ -166,6 +187,8 @@ export const EMPTY_NOTES: ReportNotes = {
   sectionNotes: {},
   hidden: [],
   nextSteps: "",
+  diagnoses: [],
+  titleIdeas: [],
 };
 
 /** The sections a report can show, in order. */
@@ -179,6 +202,8 @@ export const REPORT_SECTIONS = [
   { id: "reparto", label: "Quién te trae el tráfico" },
   { id: "semana", label: "Patrón semanal" },
   { id: "oportunidades", label: "Oportunidades" },
+  { id: "titulos", label: "Propuestas de títulos (IA)" },
+  { id: "diagnostico", label: "Diagnóstico de páginas (IA)" },
   { id: "tecnico", label: "Salud técnica (sitemap e indexación)" },
   { id: "discover", label: "Google Discover" },
   { id: "proximos", label: "Próximos pasos" },
