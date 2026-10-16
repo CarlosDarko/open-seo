@@ -25,6 +25,8 @@ type Row = {
   snapshot_json: string;
   notes_json: string;
   checks_json: string;
+  ai_cost_eur: number | null;
+  ai_calls: number | null;
 };
 
 function parseJson<T>(text: string, fallback: T): T {
@@ -47,6 +49,8 @@ function summaryOf(row: Row, snapshot: ReportSnapshot): ReportSummary {
     updatedAt: row.updated_at,
     createdBy: row.created_by,
     range: snapshot.range,
+    aiCostEur: row.ai_cost_eur ?? 0,
+    aiCalls: row.ai_calls ?? 0,
   };
 }
 
@@ -274,4 +278,16 @@ export async function deleteReport(
     .bind(projectId, id)
     .run();
   return (result.meta.changes ?? 0) > 0;
+}
+
+/** Adds what an AI call cost to the report's running total. */
+export async function addAiCost(
+  reportId: string,
+  costEur: number,
+): Promise<void> {
+  await env.DB.prepare(
+    `UPDATE client_reports SET ai_cost_eur = ai_cost_eur + ?, ai_calls = ai_calls + 1 WHERE id = ?`,
+  )
+    .bind(costEur, reportId)
+    .run();
 }

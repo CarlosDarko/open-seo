@@ -1,31 +1,19 @@
 // What the numbers of a report mean once they are put side by side: instead of
 // listing figures, it crosses them (clicks with impressions and position, the
 // Google updates with the daily trend, segments with the total change, pages
-// with the queries behind them) and says it in plain Spanish. Pure, so it can
-// be tested and handed to an AI that rewrites it.
+// with the queries behind them) and says it in plain, professional Spanish,
+// never addressing the reader as "tú": the subject is the website. Pure, so
+// it can be tested and handed to an AI that rewrites it.
 import { integer } from "@/custom/radar/format";
 import type { GoogleUpdate } from "@/custom/radar/googleUpdates";
 import type { DailyPoint } from "@/custom/radar/radarAnalysis";
 import type { ChangeLine, ReportSnapshot } from "@/custom/reporting/types";
 
-export type IconName =
-  | "up"
-  | "down"
-  | "alert"
-  | "target"
-  | "calendar"
-  | "phone"
-  | "bolt"
-  | "layers"
-  | "star"
-  | "search"
-  | "shield"
-  | "link";
-
 export type Insight = {
   id: string;
   tone: "good" | "warn" | "bad" | "info";
-  icon: IconName;
+  /** The small label above the headline ("Tráfico", "Google"...). */
+  topic: string;
   title: string;
   body: string;
   stats: { label: string; value: string }[];
@@ -69,7 +57,7 @@ const change = (now: number, before: number): number | null =>
 const CAUSE: Record<string, string> = {
   posicion: "ha perdido posición",
   demanda: "se busca menos ese tema",
-  ctr: "su título atrae menos clics",
+  ctr: "el título atrae menos clics",
   mixto: "hay varias causas a la vez",
   nueva: "es una página nueva",
   perdida: "ya no recibe clics",
@@ -130,29 +118,29 @@ export function updateImpacts(snapshot: ReportSnapshot): UpdateImpact[] {
         : null;
 
     let verdict =
-      "No hay suficientes días antes del cambio para medir su efecto.";
+      "No hay suficientes días anteriores al cambio para medir su efecto.";
     if (before !== null && during !== null) {
       const delta = change(during, before);
       if (delta === null || Math.abs(delta) < 0.07) {
         verdict =
-          "Durante el despliegue tus clics no se movieron de forma clara.";
+          "Durante el despliegue los clics diarios no variaron de forma clara.";
       } else if (delta < 0) {
-        verdict = `Durante el despliegue tus clics diarios bajaron un ${pct(delta)} (${num(before)} → ${num(during)} al día).`;
+        verdict = `Durante el despliegue los clics diarios bajaron un ${pct(delta)} (${num(before)} → ${num(during)} al día).`;
       } else {
-        verdict = `Durante el despliegue tus clics diarios subieron un ${pct(delta)} (${num(before)} → ${num(during)} al día).`;
+        verdict = `Durante el despliegue los clics diarios subieron un ${pct(delta)} (${num(before)} → ${num(during)} al día).`;
       }
       if (after !== null) {
         const back = change(after, before);
         if (back !== null && delta !== null && delta < -0.07) {
           verdict +=
             back >= -0.05
-              ? " Después te has recuperado hasta el nivel anterior."
-              : ` Después sigues un ${pct(back)} por debajo del nivel anterior.`;
+              ? " Después se ha recuperado el nivel anterior."
+              : ` Después los clics siguen un ${pct(back)} por debajo del nivel anterior.`;
         } else if (back !== null && delta !== null && delta > 0.07) {
           verdict +=
             back >= 0.03
-              ? " Y la mejora se ha mantenido."
-              : " Pero la mejora no se ha mantenido.";
+              ? " La mejora se ha mantenido."
+              : " La mejora no se ha mantenido después.";
         }
       }
     }
@@ -160,7 +148,15 @@ export function updateImpacts(snapshot: ReportSnapshot): UpdateImpact[] {
   });
 }
 
-const WEEKDAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
+const WEEKDAYS = [
+  "Lunes",
+  "Martes",
+  "Miércoles",
+  "Jueves",
+  "Viernes",
+  "Sábado",
+  "Domingo",
+];
 
 /** Average clicks per day of the week, Monday first. */
 export function weekdayStats(daily: DailyPoint[]): WeekdayStat[] {
@@ -201,7 +197,7 @@ export function contributions(snapshot: ReportSnapshot): Contribution[] {
   add("Por tipo de página", snapshot.segments.pageType);
   add("Por dispositivo", snapshot.segments.device);
   if (snapshot.brand.hasBrand) {
-    add("Marca y no marca", [
+    add("Marca y resto de búsquedas", [
       {
         label: "Búsquedas de marca",
         clicks: snapshot.brand.clicks,
@@ -231,14 +227,14 @@ function trafficInsight(snapshot: ReportSnapshot): Insight | null {
       value: `${one.format(prevTotals.position)} → ${one.format(totals.position)}`,
     },
   ];
-  const base = { id: "traffic", icon: "up" as IconName, stats };
+  const base = { id: "traffic", topic: "Tráfico", stats };
   if (clicks >= 0.05 && impressions >= 0.05) {
     return {
       ...base,
       tone: "good",
       weight: 90,
-      title: "Crecimiento sano: Google te enseña más y te clican más",
-      body: `Las impresiones suben un ${pct(impressions)} y los clics un ${pct(clicks)}. ${positionDiff >= 0.3 ? "Además tu posición media mejora, así que el avance viene de posicionar mejor, no solo de que se busque más." : "La posición se mantiene, así que el empuje viene sobre todo de más demanda o de más búsquedas en las que apareces."}`,
+      title: "Crecimiento sólido: más visibilidad y más clics",
+      body: `Las impresiones suben un ${pct(impressions)} y los clics un ${pct(clicks)}. ${positionDiff >= 0.3 ? "La posición media también mejora, de modo que el avance procede de posicionar mejor y no solo de una mayor demanda." : "La posición media se mantiene, por lo que el impulso procede sobre todo de una mayor demanda o de aparecer en más búsquedas."}`,
     };
   }
   if (clicks >= 0.05) {
@@ -246,38 +242,35 @@ function trafficInsight(snapshot: ReportSnapshot): Insight | null {
       ...base,
       tone: "good",
       weight: 85,
-      title: "Más clics sin necesitar más visibilidad",
-      body: `Los clics suben un ${pct(clicks)} con impresiones casi iguales: la gente que ya te veía ahora te elige más. Señal de que tus títulos y descripciones funcionan mejor o de que subes posiciones en búsquedas clave.`,
+      title: "Más clics sin necesidad de más visibilidad",
+      body: `Los clics suben un ${pct(clicks)} con unas impresiones prácticamente iguales: los usuarios que ya veían la web la eligen más. Indica que los títulos y las descripciones funcionan mejor o que sube la posición en búsquedas clave.`,
     };
   }
   if (clicks <= -0.05 && impressions >= 0.03) {
     return {
       ...base,
-      icon: "alert",
       tone: "warn",
       weight: 95,
-      title: "Te ven igual o más, pero te clican menos",
-      body: `Las impresiones ${impressions > 0 ? `suben un ${pct(impressions)}` : "se mantienen"} y los clics bajan un ${pct(clicks)}. Suele indicar un problema de atractivo del resultado (título, descripción) o que Google muestra por encima respuestas de IA, vídeos o recuadros que se llevan el clic.`,
+      title: "La web se muestra igual o más, pero se clica menos",
+      body: `Las impresiones ${impressions > 0 ? `suben un ${pct(impressions)}` : "se mantienen"} y los clics bajan un ${pct(clicks)}. Suele indicar un problema de atractivo del resultado (título, descripción) o que Google muestra por encima respuestas de IA, vídeos u otros recuadros que se llevan el clic.`,
     };
   }
   if (clicks <= -0.05 && positionDiff <= -0.3) {
     return {
       ...base,
-      icon: "down",
       tone: "bad",
       weight: 100,
-      title: "Pierdes tráfico porque pierdes posiciones",
-      body: `Los clics bajan un ${pct(clicks)} y las impresiones un ${pct(impressions)}, con la posición media empeorando de ${one.format(prevTotals.position)} a ${one.format(totals.position)}. Hay competidores pasándote o contenido que ha perdido relevancia: conviene revisar las páginas que más caen.`,
+      title: "El tráfico baja por pérdida de posiciones",
+      body: `Los clics bajan un ${pct(clicks)} y las impresiones un ${pct(impressions)}, con la posición media pasando de ${one.format(prevTotals.position)} a ${one.format(totals.position)}. Hay competidores por delante o contenido que ha perdido relevancia: conviene revisar las páginas que más caen.`,
     };
   }
   if (clicks <= -0.05) {
     return {
       ...base,
-      icon: "down",
       tone: Math.abs(clicks) >= 0.2 ? "bad" : "warn",
       weight: 92,
-      title: "Menos búsquedas, no peor posicionamiento",
-      body: `Los clics bajan un ${pct(clicks)} y las impresiones un ${pct(impressions)}, pero tu posición media apenas cambia. Lo más probable es una caída de la demanda (estacionalidad o interés del tema), no un problema técnico.`,
+      title: "Menos búsquedas, sin deterioro del posicionamiento",
+      body: `Los clics bajan un ${pct(clicks)} y las impresiones un ${pct(impressions)}, pero la posición media apenas cambia. Lo más probable es una caída de la demanda (estacionalidad o interés por el tema) y no un problema técnico.`,
     };
   }
   return {
@@ -285,7 +278,7 @@ function trafficInsight(snapshot: ReportSnapshot): Insight | null {
     tone: "info",
     weight: 50,
     title: "Periodo estable",
-    body: `Clics e impresiones casi no varían (${signedPct(clicks)} y ${signedPct(impressions)}). No hay señales de alarma ni de despegue: es buen momento para invertir en las oportunidades que se detallan más abajo.`,
+    body: `Clics e impresiones casi no varían (${signedPct(clicks)} y ${signedPct(impressions)}). No hay señales de alarma ni de despegue: es buen momento para invertir en las oportunidades que se detallan más adelante.`,
   };
 }
 
@@ -306,13 +299,13 @@ function sourceInsight(snapshot: ReportSnapshot): Insight | null {
   const up = net > 0;
   return {
     id: "source",
-    icon: "layers",
+    topic: "Origen del cambio",
     tone: up ? "good" : "warn",
     weight: 70,
     title: up
-      ? `El crecimiento viene sobre todo de «${top.label}»`
+      ? `El crecimiento procede sobre todo de «${top.label}»`
       : `La caída se concentra en «${top.label}»`,
-    body: `${pct(share)} de ${up ? "lo que has ganado" : "lo que has perdido"} sale de ese tipo de página (${signed(top.delta)} clics). ${up ? "Es donde mejor está funcionando tu estrategia: merece la pena replicarla en el resto." : "Arreglar esa zona recupera la mayor parte de la caída."}`,
+    body: `El ${pct(share)} de lo ${up ? "ganado" : "perdido"} sale de ese tipo de página (${signed(top.delta)} clics). ${up ? "Es la zona donde mejor funciona la estrategia actual y merece la pena replicarla en el resto del sitio." : "Corregir esa zona permitiría recuperar la mayor parte de la caída."}`,
     stats: pageType.rows.slice(0, 3).map((row) => ({
       label: row.label,
       value: `${signed(row.delta)} clics`,
@@ -332,13 +325,13 @@ function pageInsight(
   const cause = row.cause ? CAUSE[row.cause] : undefined;
   return {
     id: kind,
-    icon: up ? "star" : "alert",
+    topic: up ? "Página que más crece" : "Página que más pierde",
     tone: up ? "good" : "bad",
     weight: up ? 66 : 88,
     title: up
-      ? `${pathOf(row.key)} es tu mayor avance (${signed(row.clicksDelta)} clics)`
-      : `${pathOf(row.key)} es tu mayor caída (${signed(row.clicksDelta)} clics)`,
-    body: `${up ? "Pasa" : "Pasa"} de ${num(row.prevClicks)} a ${num(row.clicks)} clics.${queries.length ? ` Lo explican ${queries.join(" y ")}.` : ""}${!up && cause ? ` Causa probable: ${cause}.` : ""}${up ? " Mira qué tiene esa página (formato, enlaces, actualización) y repítelo en páginas parecidas." : " Es la primera página que revisaría."}`,
+      ? `${pathOf(row.key)} es el mayor avance (${signed(row.clicksDelta)} clics)`
+      : `${pathOf(row.key)} es la mayor caída (${signed(row.clicksDelta)} clics)`,
+    body: `Pasa de ${num(row.prevClicks)} a ${num(row.clicks)} clics.${queries.length ? ` Lo explican ${queries.join(" y ")}.` : ""}${!up && cause ? ` Causa probable: ${cause}.` : ""}${up ? " Conviene analizar qué tiene esa página (formato, enlaces, actualización) y replicarlo en páginas similares." : " Es la primera página que conviene revisar."}`,
     stats: [
       {
         label: "Posición",
@@ -366,13 +359,13 @@ function updateInsight(snapshot: ReportSnapshot): Insight | null {
   const relevant = Math.abs(delta) >= 0.07;
   return {
     id: "update",
-    icon: "bolt",
+    topic: "Actualizaciones de Google",
     tone: !relevant ? "info" : delta < 0 ? "warn" : "good",
     weight: relevant ? 94 : 45,
     title: relevant
-      ? `El ${biggest.update.label} coincide con un cambio en tus clics`
-      : `El ${biggest.update.label} no ha alterado tu tráfico`,
-    body: `${biggest.verdict} Que coincidan en fechas no prueba que sea la causa, pero sí es una pista para interpretar el resto de movimientos.`,
+      ? `El ${biggest.update.label} coincide con un cambio en los clics`
+      : `El ${biggest.update.label} no ha alterado el tráfico`,
+    body: `${biggest.verdict} Que coincidan en fechas no prueba que sea la causa, pero es una pista útil para interpretar el resto de movimientos.`,
     stats: [
       { label: "Antes", value: `${num(biggest.before ?? 0)} clics/día` },
       { label: "Durante", value: `${num(biggest.during ?? 0)} clics/día` },
@@ -391,21 +384,21 @@ function concentrationInsight(snapshot: ReportSnapshot): Insight | null {
   if (share < 0.4) {
     return {
       id: "concentration",
-      icon: "shield",
+      topic: "Dependencia de páginas",
       tone: "good",
       weight: 40,
-      title: "Tu tráfico está bien repartido",
-      body: `Tus 3 páginas principales suman el ${pct(share)} de los clics: no dependes de una sola página.`,
+      title: "El tráfico está bien repartido entre páginas",
+      body: `Las 3 páginas principales suman el ${pct(share)} de los clics: el sitio no depende de una sola página.`,
       stats: [{ label: "Top 3 páginas", value: pct(share) }],
     };
   }
   return {
     id: "concentration",
-    icon: "shield",
+    topic: "Dependencia de páginas",
     tone: share >= 0.6 ? "warn" : "info",
     weight: share >= 0.6 ? 74 : 48,
-    title: `${pct(share)} de tus clics dependen de 3 páginas`,
-    body: `${pathOf(topPages[0].url)} por sí sola aporta el ${pct(topPages[0].clicks / pageClicksTotal)}. ${share >= 0.6 ? "Es mucha dependencia: una caída en una de ellas se nota en todo el sitio. Conviene proteger esas páginas y trabajar otras para repartir el riesgo." : "Hay cierta dependencia; vigila que esas páginas no pierdan posiciones."}`,
+    title: `El ${pct(share)} de los clics depende de 3 páginas`,
+    body: `${pathOf(topPages[0].url)} aporta por sí sola el ${pct(topPages[0].clicks / pageClicksTotal)}. ${share >= 0.6 ? "Es una dependencia elevada: una caída en una de ellas se nota en todo el sitio. Conviene protegerlas y trabajar otras páginas para repartir el riesgo." : "Hay cierta dependencia; conviene vigilar que esas páginas no pierdan posiciones."}`,
     stats: topPages.slice(0, 3).map((page) => ({
       label: pathOf(page.url).slice(0, 28),
       value: `${num(page.clicks)} clics`,
@@ -421,17 +414,17 @@ function brandInsight(snapshot: ReportSnapshot): Insight | null {
   const otherChange = change(brand.otherClicks, brand.prevOtherClicks);
   return {
     id: "brand",
-    icon: "search",
+    topic: "Marca",
     tone: share >= 0.5 ? "warn" : "info",
     weight: share >= 0.5 ? 68 : 42,
     title:
       share >= 0.5
-        ? `${pct(share)} de tus clics son de gente que ya te conoce`
-        : `${pct(1 - share)} de tus clics vienen de búsquedas sin marca`,
+        ? `El ${pct(share)} de los clics procede de usuarios que ya conocen la marca`
+        : `El ${pct(1 - share)} de los clics procede de búsquedas sin marca`,
     body:
       share >= 0.5
-        ? `Más de la mitad llega buscando tu nombre. Es tráfico valioso, pero no demuestra que Google te descubra: el SEO que capta clientes nuevos está en el resto de búsquedas${otherChange !== null ? `, que este periodo ${otherChange >= 0 ? "crecen" : "caen"} un ${pct(otherChange)}` : ""}.`
-        : `La mayor parte del tráfico llega de gente que no te buscaba por nombre, que es justo el tráfico que capta clientes nuevos${otherChange !== null ? ` (${signedPct(otherChange)} frente al periodo anterior)` : ""}.`,
+        ? `Más de la mitad llega buscando el nombre de la marca. Es tráfico valioso, pero no demuestra que Google descubra el sitio: el SEO que capta clientes nuevos está en el resto de búsquedas${otherChange !== null ? `, que en este periodo ${otherChange >= 0 ? "crecen" : "caen"} un ${pct(otherChange)}` : ""}.`
+        : `La mayor parte del tráfico llega de usuarios que no buscaban la marca por su nombre, que es justo el tráfico que capta clientes nuevos${otherChange !== null ? ` (${signedPct(otherChange)} frente al periodo anterior)` : ""}.`,
     stats: [
       { label: "Marca", value: `${num(brand.clicks)} clics` },
       { label: "Sin marca", value: `${num(brand.otherClicks)} clics` },
@@ -452,11 +445,11 @@ function opportunityInsight(snapshot: ReportSnapshot): Insight | null {
     snapshot.totals.clicks > 0 ? potential / snapshot.totals.clicks : 0;
   return {
     id: "opportunities",
-    icon: "target",
+    topic: "Oportunidades",
     tone: "good",
     weight: 72,
     title: `Hay unas ${num(potential)} visitas más al alcance${share >= 0.03 ? ` (+${pct(share)})` : ""}`,
-    body: `Se consiguen subiendo a ${snapshot.opportunities.some((item) => item.kind === "push") ? "las primeras posiciones" : "su CTR habitual"} las búsquedas que ya te muestran. La más rentable es «${best.query}»: ${num(best.impressions)} impresiones y solo ${num(best.clicks)} clics, con posible ganancia de +${num(best.potentialClicks)}.`,
+    body: `Se consiguen subiendo a las primeras posiciones, o mejorando el título, las búsquedas en las que la web ya aparece. La más rentable es «${best.query}»: ${num(best.impressions)} impresiones y solo ${num(best.clicks)} clics, con una ganancia posible de +${num(best.potentialClicks)}.`,
     stats: [
       { label: "Visitas posibles", value: `+${num(potential)}` },
       { label: "Búsquedas", value: `${snapshot.opportunities.length}` },
@@ -475,7 +468,7 @@ function topThreeInsight(snapshot: ReportSnapshot): Insight | null {
     .join(" y ");
   return {
     id: "top3",
-    icon: "link",
+    topic: "Posicionamiento",
     tone: diff >= 0 ? "good" : "warn",
     weight: diff >= 3 ? 64 : 46,
     title:
@@ -484,7 +477,7 @@ function topThreeInsight(snapshot: ReportSnapshot): Insight | null {
         : diff < 0
           ? `${Math.abs(diff)} ${Math.abs(diff) === 1 ? "búsqueda sale" : "búsquedas salen"} del top 3`
           : "El top 3 se mantiene",
-    body: `Ahora tienes ${num(band.queries)} búsquedas en las 3 primeras posiciones (antes ${num(band.prevQueries)}), que traen ${num(band.clicks)} clics.${names && diff > 0 ? ` Entran, por ejemplo, ${names}.` : ""} El top 3 es donde está la mayor parte de los clics.`,
+    body: `Ahora hay ${num(band.queries)} búsquedas entre las 3 primeras posiciones (antes ${num(band.prevQueries)}), que aportan ${num(band.clicks)} clics.${names && diff > 0 ? ` Entran, por ejemplo, ${names}.` : ""} El top 3 concentra la mayor parte de los clics.`,
     stats: [
       { label: "Ahora", value: `${num(band.queries)}` },
       { label: "Antes", value: `${num(band.prevQueries)}` },
@@ -502,14 +495,17 @@ function weekdayInsight(snapshot: ReportSnapshot): Insight | null {
   if (worst.average <= 0 || best.average / worst.average < 1.25) return null;
   return {
     id: "weekday",
-    icon: "calendar",
+    topic: "Ritmo semanal",
     tone: "info",
     weight: 38,
-    title: `Tu mejor día es ${best.label === "Sáb" ? "el sábado" : best.label === "Dom" ? "el domingo" : `el ${best.label.toLowerCase()}`}`,
-    body: `Recibes de media ${num(best.average)} clics ese día frente a ${num(worst.average)} los ${worst.label === "Sáb" ? "sábados" : worst.label === "Dom" ? "domingos" : `${worst.label.toLowerCase()}`}: ${one.format(best.average / worst.average)} veces más. Publica y actualiza contenido antes de tus días fuertes.`,
+    title: `El día de más tráfico es el ${best.label.toLowerCase()}`,
+    body: `Ese día se registran de media ${num(best.average)} clics, frente a ${num(worst.average)} del ${worst.label.toLowerCase()}: ${one.format(best.average / worst.average)} veces más. Conviene publicar y actualizar contenido antes de los días fuertes.`,
     stats: [
       { label: "Mejor día", value: `${best.label} · ${num(best.average)}` },
-      { label: "Peor día", value: `${worst.label} · ${num(worst.average)}` },
+      {
+        label: "Día más flojo",
+        value: `${worst.label} · ${num(worst.average)}`,
+      },
     ],
   };
 }
@@ -522,11 +518,11 @@ function deviceInsight(snapshot: ReportSnapshot): Insight | null {
   const delta = change(mobile.clicks, mobile.prevClicks);
   return {
     id: "mobile",
-    icon: "phone",
+    topic: "Dispositivos",
     tone: "info",
     weight: 36,
-    title: `${pct(mobile.share)} de tus clics llegan desde el móvil`,
-    body: `La experiencia móvil es la que decide tu resultado${delta !== null ? ` (clics en móvil: ${signedPct(delta)})` : ""}. Cualquier problema de velocidad o de diseño en pantallas pequeñas te cuesta tráfico directamente.`,
+    title: `El ${pct(mobile.share)} de los clics llega desde el móvil`,
+    body: `La experiencia móvil es la que decide el resultado${delta !== null ? ` (clics en móvil: ${signedPct(delta)})` : ""}. Cualquier problema de velocidad o de diseño en pantallas pequeñas reduce el tráfico de forma directa.`,
     stats: [{ label: "Móvil", value: pct(mobile.share) }],
   };
 }
@@ -535,11 +531,11 @@ function queriesInsight(snapshot: ReportSnapshot): Insight | null {
   if (!snapshot.period.comparable || snapshot.newQueries < 5) return null;
   return {
     id: "queries",
-    icon: "search",
+    topic: "Búsquedas",
     tone: snapshot.newQueries >= snapshot.lostQueries ? "good" : "info",
     weight: 44,
-    title: `${num(snapshot.newQueries)} búsquedas nuevas te muestran por primera vez`,
-    body: `Han aparecido ${num(snapshot.newQueries)} búsquedas con impresiones que antes no tenías y se han perdido ${num(snapshot.lostQueries)}. Es una buena señal de que Google amplía los temas en los que te considera relevante.`,
+    title: `${num(snapshot.newQueries)} búsquedas nuevas muestran la web por primera vez`,
+    body: `Han aparecido ${num(snapshot.newQueries)} búsquedas con impresiones que antes no existían y se han perdido ${num(snapshot.lostQueries)}. Es una buena señal de que Google amplía los temas en los que considera relevante al sitio.`,
     stats: [
       { label: "Nuevas", value: `${num(snapshot.newQueries)}` },
       { label: "Perdidas", value: `${num(snapshot.lostQueries)}` },
@@ -558,13 +554,13 @@ function topicInsight(snapshot: ReportSnapshot): Insight | null {
   const star = snapshot.period.comparable && growing.delta > 5 ? growing : null;
   return {
     id: "topics",
-    icon: "layers",
+    topic: "Temas",
     tone: star ? "good" : "info",
     weight: star ? 69 : 47,
     title: star
-      ? `«${star.topic.label}» es tu tema en alza (${signed(star.delta)} clics)`
-      : `«${biggest.label}» es el tema que más tráfico te da`,
-    body: `${star ? `Es el tema que más crece: de ${num(star.topic.prevClicks)} a ${num(star.topic.clicks)} clics. ` : ""}Tu mayor tema por tráfico es «${biggest.label}» (${num(biggest.clicks)} clics en ${num(biggest.queries)} búsquedas)${reach && reach.label !== biggest.label && reach.nearTopShare >= 0.4 ? `; y «${reach.label}» tiene el ${pct(reach.nearTopShare)} de sus impresiones en posiciones 4 a 20, justo al alcance de subir` : ""}.`,
+      ? `«${star.topic.label}» es el tema en alza (${signed(star.delta)} clics)`
+      : `«${biggest.label}» es el tema con más tráfico`,
+    body: `${star ? `Es el tema que más crece: de ${num(star.topic.prevClicks)} a ${num(star.topic.clicks)} clics. ` : ""}El mayor tema por tráfico es «${biggest.label}» (${num(biggest.clicks)} clics en ${num(biggest.queries)} búsquedas)${reach && reach.label !== biggest.label && reach.nearTopShare >= 0.4 ? `; y «${reach.label}» tiene el ${pct(reach.nearTopShare)} de sus impresiones en posiciones 4 a 20, a un paso de subir` : ""}.`,
     stats: topics.slice(0, 3).map((topic) => ({
       label: topic.label,
       value: `${num(topic.clicks)} clics`,
@@ -578,14 +574,14 @@ function healthInsight(snapshot: ReportSnapshot): Insight | null {
   const covered = 1 - health.unseen / health.inSitemap;
   return {
     id: "health",
-    icon: "shield",
+    topic: "Estado técnico",
     tone: covered >= 0.85 ? "good" : covered >= 0.6 ? "info" : "warn",
     weight: covered >= 0.85 ? 43 : 60,
     title:
       covered >= 0.85
-        ? `El ${pct(covered)} de tu sitemap ya aparece en Google`
-        : `${num(health.unseen)} páginas de tu sitemap aún no tienen visibilidad`,
-    body: `Tu sitemap declara ${num(health.inSitemap)} páginas y Google ha mostrado ${num(health.inSitemap - health.unseen)} de ellas en los últimos 3 meses.${health.notInSitemap > 0 ? ` Además, ${num(health.notInSitemap)} páginas que ya reciben impresiones no están en el sitemap.` : ""}${health.sitemapErrors > 0 ? ` Search Console informa de ${num(health.sitemapErrors)} errores en los sitemaps.` : ""}`,
+        ? `El ${pct(covered)} del sitemap ya aparece en Google`
+        : `${num(health.unseen)} páginas del sitemap aún no tienen visibilidad`,
+    body: `El sitemap declara ${num(health.inSitemap)} páginas y Google ha mostrado ${num(health.inSitemap - health.unseen)} de ellas en los últimos 3 meses.${health.notInSitemap > 0 ? ` Además, ${num(health.notInSitemap)} páginas que ya reciben impresiones no figuran en el sitemap.` : ""}${health.sitemapErrors > 0 ? ` Search Console informa de ${num(health.sitemapErrors)} errores en los sitemaps.` : ""}`,
     stats: [
       { label: "En el sitemap", value: num(health.inSitemap) },
       { label: "Sin impresiones", value: num(health.unseen) },
@@ -599,11 +595,11 @@ function discoverInsight(snapshot: ReportSnapshot): Insight | null {
   const delta = change(discover.clicks, discover.prevClicks);
   return {
     id: "discover",
-    icon: "star",
+    topic: "Google Discover",
     tone: delta !== null && delta < -0.15 ? "info" : "good",
     weight: 52,
-    title: `Google Discover te trae ${num(discover.clicks)} clics`,
-    body: `Discover recomienda tu contenido a gente que no lo estaba buscando${delta !== null ? ` (${signedPct(delta)} frente al periodo anterior)` : ""}. Es tráfico extra sobre el de las búsquedas.`,
+    title: `Google Discover aporta ${num(discover.clicks)} clics`,
+    body: `Discover recomienda el contenido a usuarios que no lo estaban buscando${delta !== null ? ` (${signedPct(delta)} frente al periodo anterior)` : ""}. Es tráfico adicional al de las búsquedas.`,
     stats: [{ label: "Impresiones", value: num(discover.impressions) }],
   };
 }
@@ -611,45 +607,46 @@ function discoverInsight(snapshot: ReportSnapshot): Insight | null {
 const UPSIDE: Record<string, (tone: Insight["tone"]) => string> = {
   traffic: (tone) =>
     tone === "good"
-      ? "Lo importante ahora es no tocar lo que funciona y apoyarlo con más contenido del mismo estilo."
-      : "Lo bueno: tu sitio sigue siendo visible, y recuperar clics en páginas que ya conoce Google es más rápido que ganar visibilidad nueva.",
+      ? "Lo prioritario ahora es preservar lo que funciona y reforzarlo con más contenido del mismo tipo."
+      : "En positivo: el sitio sigue siendo visible, y recuperar clics en páginas que Google ya conoce es más rápido que ganar visibilidad nueva.",
   update: (tone) =>
     tone === "warn"
-      ? "Los cambios de Google son temporales y suelen corregirse reforzando la calidad del contenido; ya sabemos dónde mirar."
-      : "Tu sitio ha resistido o aprovechado el cambio: buena señal de calidad a ojos de Google.",
+      ? "Los cambios de Google son temporales y suelen corregirse reforzando la calidad del contenido; ya se sabe dónde actuar."
+      : "El sitio ha resistido o aprovechado el cambio: buena señal de calidad a ojos de Google.",
   source: (tone) =>
     tone === "good"
-      ? "Tienes una fórmula que funciona: replicarla en otras secciones es el camino más corto para seguir creciendo."
-      : "Al estar concentrado, el arreglo también está concentrado: poco trabajo bien dirigido puede recuperar casi todo.",
+      ? "Existe una fórmula que funciona: replicarla en otras secciones es el camino más corto para seguir creciendo."
+      : "Al estar concentrado el problema, también lo está la solución: un trabajo bien dirigido puede recuperar casi todo.",
   winner: () =>
-    "Replica lo que hace bien esta página en las parecidas y el efecto se multiplica.",
+    "Replicar lo que hace bien esta página en las similares multiplica el efecto.",
   loser: () =>
     "Es recuperable: la página ya tiene historial y autoridad en Google, y basta con reforzarla para volver a subir.",
   concentration: (tone) =>
     tone === "good"
-      ? "Un tráfico repartido es un tráfico seguro."
-      : "Lo positivo: tienes páginas fuertes que sirven de plataforma para empujar a las demás con enlaces internos.",
+      ? "Un tráfico repartido es un tráfico más seguro."
+      : "En positivo: las páginas fuertes sirven de plataforma para impulsar a las demás mediante enlaces internos.",
   brand: () =>
-    "Una marca que se busca es un activo: cada persona que te busca por nombre ya confía en ti.",
+    "Una marca que se busca es un activo: cada usuario que la busca por nombre ya confía en ella.",
   opportunities: () =>
-    "Son victorias rápidas: no hace falta crear contenido nuevo, solo mejorar lo que ya existe.",
+    "Son mejoras rápidas: no hace falta crear contenido nuevo, solo optimizar lo que ya existe.",
   top3: (tone) =>
     tone === "good"
-      ? "Cada búsqueda que entra al top 3 multiplica sus clics."
+      ? "Cada búsqueda que entra en el top 3 multiplica sus clics."
       : "Con ajustes puntuales de contenido y enlaces, esas búsquedas pueden volver al top 3.",
   weekday: () =>
-    "Úsalo a tu favor: programa lo importante para tus días fuertes.",
-  mobile: () => "Una buena experiencia móvil es ventaja competitiva inmediata.",
+    "Programar las novedades para los días fuertes aprovecha mejor la audiencia.",
+  mobile: () =>
+    "Una buena experiencia móvil es una ventaja competitiva inmediata.",
   queries: () =>
-    "Cada búsqueda nueva es una puerta de entrada más para clientes potenciales.",
+    "Cada búsqueda nueva es una puerta de entrada adicional para clientes potenciales.",
   topics: () =>
-    "Saber qué temas te funcionan permite apostar por ellos con seguridad.",
+    "Conocer qué temas funcionan permite apostar por ellos con seguridad.",
   health: (tone) =>
     tone === "good"
-      ? "Tu base técnica es sólida: Google encuentra y valora tus páginas."
-      : "Activar esas páginas es trabajo técnico sencillo con mucho potencial de tráfico.",
+      ? "La base técnica es sólida: Google encuentra y valora las páginas."
+      : "Activar esas páginas es un trabajo técnico sencillo con mucho potencial de tráfico.",
   discover: () =>
-    "Discover es un canal extra que no depende de que te busquen.",
+    "Discover es un canal adicional que no depende de que el usuario busque.",
 };
 
 /** The most encouraging fact of the period, always: even a hard period has
@@ -661,20 +658,20 @@ export function silverLining(snapshot: ReportSnapshot): string {
     ? (change(totals.clicks, prevTotals.clicks) ?? 0)
     : 0;
   if (clicks >= 0.05) {
-    return `Tu tráfico crece: ${signed(totals.clicks - prevTotals.clicks)} clics más que en el periodo anterior.`;
+    return `El tráfico crece: ${signed(totals.clicks - prevTotals.clicks)} clics más que en el periodo anterior.`;
   }
   const band = snapshot.bands[0];
   if (comparable && band && band.queries > band.prevQueries) {
-    return `Tienes ${band.queries - band.prevQueries} búsquedas más en el top 3 que antes.`;
+    return `Hay ${band.queries - band.prevQueries} búsquedas más en el top 3 que antes.`;
   }
   const winner = [...snapshot.pageWinners].sort(
     (a, b) => b.clicksDelta - a.clicksDelta,
   )[0];
   if (winner && winner.clicksDelta >= 10) {
-    return `${pathOf(winner.key)} ha crecido ${signed(winner.clicksDelta)} clics: tu mejor página del periodo.`;
+    return `${pathOf(winner.key)} ha crecido ${signed(winner.clicksDelta)} clics: la mejor página del periodo.`;
   }
   if (snapshot.newQueries >= 5) {
-    return `Has ganado ${num(snapshot.newQueries)} búsquedas nuevas en las que antes no aparecías.`;
+    return `La web ha ganado ${num(snapshot.newQueries)} búsquedas nuevas en las que antes no aparecía.`;
   }
   const potential = snapshot.opportunities.reduce(
     (sum, item) => sum + item.potentialClicks,
@@ -683,7 +680,7 @@ export function silverLining(snapshot: ReportSnapshot): string {
   if (potential >= 10) {
     return `Hay unas ${num(potential)} visitas más al alcance con mejoras muy concretas.`;
   }
-  return `Tu web recibió ${num(totals.clicks)} clics de Google: la base sobre la que seguir creciendo.`;
+  return `La web recibió ${num(totals.clicks)} clics de Google: la base sobre la que seguir creciendo.`;
 }
 
 /** Up to three good facts to show on the cover. */
@@ -709,7 +706,7 @@ export function highlights(snapshot: ReportSnapshot): string[] {
     out.push(`${num(snapshot.newQueries)} búsquedas nuevas`);
   }
   if (out.length === 0) {
-    out.push(`${num(totals.impressions)} veces visible en Google`);
+    out.push(`${num(totals.impressions)} impresiones en Google`);
   }
   return out.slice(0, 3);
 }

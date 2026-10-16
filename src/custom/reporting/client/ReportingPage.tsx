@@ -54,6 +54,13 @@ const dateFormat = new Intl.DateTimeFormat("es-ES", {
   timeZone: "Europe/Madrid",
 });
 
+const euroFormat = new Intl.NumberFormat("es-ES", {
+  style: "currency",
+  currency: "EUR",
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 3,
+});
+
 const shortDate = (iso: string) => dateFormat.format(new Date(iso));
 
 export const publicUrl = (token: string) =>
@@ -92,6 +99,9 @@ function ReportRow({
           {shortDate(report.range.startDate)} –{" "}
           {shortDate(report.range.endDate)} · creado el{" "}
           {shortDate(report.createdAt)}
+          {report.aiCalls > 0
+            ? ` · IA: ${euroFormat.format(report.aiCostEur)}`
+            : ""}
         </p>
       </div>
       <span
@@ -129,7 +139,7 @@ function ReportRow({
           }
         >
           <ExternalLink className="size-3" aria-hidden />
-          Ver
+          Vista previa
         </Button>
         <Button
           size="xs"

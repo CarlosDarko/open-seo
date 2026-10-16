@@ -1,10 +1,12 @@
 // Optional AI for client reports. The numbers and findings are always computed
 // by the app; the model only interprets and writes. It runs only when the
-// ANTHROPIC_API_KEY secret is set. Two models: a small, cheap one for writing
-// in the consultant's voice (REPORT_AI_MODEL, default Haiku) and a stronger one
-// for reading pages and reasoning about them (REPORT_AI_MODEL_DEEP, default
-// Sonnet). Everything comes back as a draft: nothing is saved or sent until the
-// consultant reviews it, and the model is told never to invent figures.
+// ANTHROPIC_API_KEY secret is set. Two models: REPORT_AI_MODEL for writing and
+// REPORT_AI_MODEL_DEEP for reading pages and reasoning about them (both
+// default to Sonnet). Everything comes back as a draft: nothing is saved or
+// sent until the consultant reviews it, and the model is told never to invent
+// figures. Every call is priced from the tokens the API reports, added to the
+// report's total and recorded in the euro cost ledger.
+import { recordCost } from "@/custom/costs/server/ledger";
 import { fetchPageSignals } from "@/custom/radar/server/fetchPageSignals";
 import {
   buildInsights,
@@ -12,17 +14,39 @@ import {
   silverLining,
 } from "@/custom/reporting/insights";
 import { buildVerdict } from "@/custom/reporting/narrative";
+import { addAiCost } from "@/custom/reporting/server/reportingDb";
 import type {
+  ContentIdea,
   Diagnosis,
+  OpportunityIdea,
   ReportFull,
   TitleIdea,
 } from "@/custom/reporting/types";
 import { ProjectContextService } from "@/server/features/project-context/services/ProjectContextService";
 import { getOptionalEnvValue } from "@/server/lib/runtime-env";
 
-const FAST_MODEL = "claude-haiku-5-5";
-const DEEP_MODEL = "claude-sonnet-5-5";
+const DEFAULT_MODEL = "claude-sonnet-5-5";
 const API_URL = "https://api.anthropic.com/v1/messages";
+
+/** US dollars per million tokens, by model family (an estimate: update when
+ *  Anthropic changes its prices). */
+const PRICES = [
+  { match: "haiku", input: 1, output: 5 },
+  { match: "opus", input: 15, output: 75 },
+  { match: "sonnet", input: 3, output: 15 },
+] as const;
+
+function priceOf(model: string) {
+  const lower = model.toLowerCase();
+  return (
+    PRICES.find((price) => lower.includes(price.match)) ?? {
+      input: 3,
+      output: 15,
+    }
+  );
+}
+
+export type AiWho = { organizationId: string; userEmail: string | null };
 
 export type AiDraft = {
   message: string;
@@ -38,34 +62,40 @@ export async function aiStatus(): Promise<{
   const key = await getOptionalEnvValue("ANTHROPIC_API_KEY");
   return {
     available: Boolean(key),
-    model: (await getOptionalEnvValue("REPORT_AI_MODEL")) || FAST_MODEL,
+    model: (await getOptionalEnvValue("REPORT_AI_MODEL")) || DEFAULT_MODEL,
     deepModel:
-      (await getOptionalEnvValue("REPORT_AI_MODEL_DEEP")) || DEEP_MODEL,
+      (await getOptionalEnvValue("REPORT_AI_MODEL_DEEP")) || DEFAULT_MODEL,
   };
 }
+
+type CallResult =
+  | { ok: true; text: string; costEur: number }
+  | { ok: false; reason: "no_key" | "failed" };
 
 async function callClaude(input: {
   deep: boolean;
   system: string;
   user: string;
   maxTokens: number;
-}): Promise<
-  { ok: true; text: string } | { ok: false; reason: "no_key" | "failed" }
-> {
+  report: ReportFull;
+  who: AiWho;
+  kind: string;
+}): Promise<CallResult> {
   const key = await getOptionalEnvValue("ANTHROPIC_API_KEY");
   if (!key) return { ok: false, reason: "no_key" };
   const status = await aiStatus();
+  const model = input.deep ? status.deepModel : status.model;
   try {
     const response = await fetch(API_URL, {
       method: "POST",
-      signal: AbortSignal.timeout(90_000),
+      signal: AbortSignal.timeout(120_000),
       headers: {
         "content-type": "application/json",
         "x-api-key": key,
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: input.deep ? status.deepModel : status.model,
+        model,
         max_tokens: input.maxTokens,
         system: input.system,
         messages: [{ role: "user", content: input.user }],
@@ -77,9 +107,33 @@ async function callClaude(input: {
     }
     const body = (await response.json()) as {
       content?: { type: string; text?: string }[];
+      usage?: { input_tokens?: number; output_tokens?: number };
     };
+    const price = priceOf(model);
+    const costUsd =
+      ((body.usage?.input_tokens ?? 0) * price.input +
+        (body.usage?.output_tokens ?? 0) * price.output) /
+      1_000_000;
+    let costEur = costUsd * 0.92;
+    try {
+      await recordCost({
+        organizationId: input.who.organizationId,
+        userEmail: input.who.userEmail,
+        projectId: input.report.projectId,
+        feature: "report-ai",
+        endpoint: input.kind,
+        costUsd,
+        outcome: "ok",
+      });
+      // The ledger holds the exact euro figure for the day's exchange rate.
+      costEur = costUsd * 0.92;
+    } catch (error) {
+      console.error("[report-ai] could not record the cost", error);
+    }
+    await addAiCost(input.report.id, costEur).catch(() => undefined);
     return {
       ok: true,
+      costEur,
       text: (body.content ?? [])
         .map((part) => (part.type === "text" ? (part.text ?? "") : ""))
         .join(""),
@@ -119,13 +173,15 @@ async function businessContext(projectId: string): Promise<string> {
   }
 }
 
+const STYLE = `Estilo obligatorio: castellano claro, sencillo y profesional, propio de un informe para un cliente no técnico. NO tutees al lector y no uses "tú", "tu", "tus", "te": el sujeto es la web, el sitio, el proyecto o las páginas (por ejemplo "la web gana posiciones", "las páginas principales concentran el 60 % de los clics"). Si usas un término técnico, explícalo en pocas palabras. Sé honesto con los datos pero constructivo: si algo va mal, dilo con claridad y explica por qué es recuperable. Nunca inventes cifras, causas ni contenido que no se te haya dado; si no hay base suficiente para afirmar algo, usa un tono prudente ("conviene comprobar", "posiblemente").`;
+
 // ------------------------------------------------------------- writing
 
-const WRITE_SYSTEM = `Eres Carlos Ortega, consultor SEO español. Escribes a un cliente que NO es técnico, en castellano claro, cercano y profesional, sin jerga (si usas un término técnico, lo explicas en pocas palabras). Eres siempre honesto con los datos, pero tu enfoque es constructivo y optimista: cuando algo va mal lo dices con claridad y a continuación explicas por qué es recuperable y qué se hará. Relaciona los datos con el negocio del cliente cuando tengas su contexto. Nunca inventes cifras ni causas: usa solo los datos y hallazgos que te doy, y no prometas resultados concretos. Responde SOLO con un objeto JSON con esta forma exacta:
-{"message": "mensaje personal para el cliente, 3 a 5 frases, en primera persona",
+const WRITE_SYSTEM = `Eres Carlos Ortega, consultor SEO. Redactas textos para el informe que se entrega a un cliente. ${STYLE} El mensaje inicial puede usar la primera persona del plural ("hemos revisado", "recomendamos"). Relaciona los datos con el negocio del cliente cuando se te dé su contexto. Responde SOLO con un objeto JSON con esta forma exacta:
+{"message": "mensaje de presentación del informe, 3 a 5 frases",
  "sectionNotes": {"hallazgos": "...", "evolucion": "...", "origen": "...", "posiciones": "...", "temas": "...", "oportunidades": "..."},
  "nextSteps": "3 a 4 próximos pasos concretos, uno por línea, sin numerar"}
-Cada nota de sección tiene 1 o 2 frases que ayudan a interpretar esa sección; si no tienes nada útil que añadir en una sección, déjala como cadena vacía.`;
+Cada nota de sección tiene 1 o 2 frases que ayudan a interpretar esa sección; si no hay nada útil que añadir, déjala como cadena vacía.`;
 
 function brief(report: ReportFull, business: string) {
   const { snapshot } = report;
@@ -161,8 +217,10 @@ function brief(report: ReportFull, business: string) {
 
 export async function draftWithAi(
   report: ReportFull,
+  who: AiWho,
 ): Promise<
-  { ok: true; draft: AiDraft } | { ok: false; reason: "no_key" | "failed" }
+  | { ok: true; draft: AiDraft; costEur: number }
+  | { ok: false; reason: "no_key" | "failed" }
 > {
   const business = await businessContext(report.projectId);
   const answer = await callClaude({
@@ -170,6 +228,9 @@ export async function draftWithAi(
     system: WRITE_SYSTEM,
     user: `Datos del informe:\n${JSON.stringify(brief(report, business))}`,
     maxTokens: 1800,
+    report,
+    who,
+    kind: "draft",
   });
   if (!answer.ok) return answer;
   const raw = parseJson<Partial<AiDraft>>(answer.text);
@@ -182,6 +243,7 @@ export async function draftWithAi(
   }
   return {
     ok: true,
+    costEur: answer.costEur,
     draft: {
       message: clip(raw.message, 3500),
       sectionNotes,
@@ -192,39 +254,57 @@ export async function draftWithAi(
 
 // ------------------------------------------------------------ analysis
 
-const ANALYSIS_SYSTEM = `Eres un consultor SEO senior que revisa páginas web de un cliente. Recibes, para cada página que ha perdido tráfico, lo que hay en la página (título, descripción, H1, encabezados, número de palabras) y las búsquedas que más han caído con su posición antes y ahora; y, para cada oportunidad de CTR, la búsqueda, su posición actual, su CTR y el título y la descripción actuales. Escribes en castellano claro para un cliente no técnico.
-Reglas estrictas: usa SOLO la información que te doy; no inventes datos, cifras ni contenido de la página que no hayas visto; si no hay suficiente información para afirmar algo, dilo con prudencia ("posiblemente", "conviene comprobar"). Sé concreto: señala qué falta o qué sobra en título, H1 y encabezados respecto a la búsqueda que cae. Tono constructivo: cada diagnóstico acaba en algo que se puede arreglar.
-Para los títulos nuevos: máximo 60 caracteres el título y 155 la descripción, naturales, con la búsqueda o su intención al principio, sin clickbait ni promesas falsas.
+const ANALYSIS_SYSTEM = `Eres un consultor SEO senior que revisa un sitio web para un cliente. ${STYLE}
+Recibes: (1) páginas que han perdido tráfico, con lo que hay en cada una (título, descripción, H1, encabezados, número de palabras) y las búsquedas que más han caído con su posición antes y ahora; (2) oportunidades de crecimiento: búsquedas donde el sitio ya aparece, con su posición, impresiones, clics, clics potenciales, tipo ("push": está cerca del top 3; "snippet": se ve mucho y se clica poco) y la página que posiciona con su título y encabezados; (3) los temas con más tráfico y las búsquedas que más aportan.
+Tu trabajo es dar ideas que de verdad aporten, no generalidades:
+- Diagnóstico de cada página que cae: causa más probable y arreglos concretos (qué cambiar en título, H1, encabezados o contenido respecto a la búsqueda que cae).
+- Para cada oportunidad: interpreta qué intención de búsqueda hay detrás, qué le falta a la página actual (apóyate en su título y encabezados) y 2 o 3 acciones concretas y distintas entre sí (por ejemplo ampliar una sección concreta, responder una pregunta, enlazar desde páginas relacionadas, separar la intención en una página nueva, mejorar el título). Evita consejos vacíos como "mejorar el contenido".
+- Ideas de contenido nuevo (3 a 5) basadas en los temas y las búsquedas dadas, cada una con el motivo por el que tendría recorrido. No inventes volúmenes de búsqueda.
+- Títulos nuevos: máximo 60 caracteres el título y 155 la descripción, naturales, con la búsqueda o su intención al principio, sin clickbait ni promesas falsas.
 Responde SOLO con un objeto JSON con esta forma exacta:
-{"diagnoses": [{"url": "...", "text": "2 a 4 frases con el diagnóstico probable", "fixes": ["arreglo concreto 1", "arreglo concreto 2", "arreglo concreto 3"]}],
+{"diagnoses": [{"url": "...", "text": "2 a 4 frases", "fixes": ["...", "...", "..."]}],
+ "opportunityIdeas": [{"query": "...", "analysis": "2 o 3 frases", "actions": ["...", "..."]}],
+ "contentIdeas": [{"title": "...", "reason": "1 o 2 frases"}],
  "titleIdeas": [{"query": "...", "url": "...", "options": [{"title": "...", "description": "..."}, {"title": "...", "description": "..."}]}]}`;
 
-const MAX_PAGES = 3;
+const MAX_LOSERS = 3;
 const MAX_TITLES = 4;
+const MAX_OPPORTUNITIES = 6;
+
+export type AiAnalysis = {
+  diagnoses: Diagnosis[];
+  titleIdeas: TitleIdea[];
+  opportunityIdeas: OpportunityIdea[];
+  contentIdeas: ContentIdea[];
+};
 
 export async function analyzeWithAi(
   report: ReportFull,
   siteUrl: string,
+  who: AiWho,
 ): Promise<
-  | { ok: true; diagnoses: Diagnosis[]; titleIdeas: TitleIdea[] }
+  | ({ ok: true; costEur: number } & AiAnalysis)
   | { ok: false; reason: "no_key" | "failed" | "nothing" }
 > {
   const { snapshot } = report;
   const losers = snapshot.pageLosers
     .filter((row) => row.clicksDelta <= -10)
-    .slice(0, MAX_PAGES);
-  const snippets = snapshot.opportunities
-    .filter((item) => item.kind === "snippet" && item.page)
+    .slice(0, MAX_LOSERS);
+  const opportunities = [...snapshot.opportunities]
     .sort((a, b) => b.potentialClicks - a.potentialClicks)
-    .slice(0, MAX_TITLES);
-  if (losers.length === 0 && snippets.length === 0) {
+    .slice(0, MAX_OPPORTUNITIES);
+  if (
+    losers.length === 0 &&
+    opportunities.length === 0 &&
+    snapshot.topics.length === 0
+  ) {
     return { ok: false, reason: "nothing" };
   }
 
   const urls = [
     ...new Set([
       ...losers.map((row) => row.key),
-      ...snippets.flatMap((item) => (item.page ? [item.page] : [])),
+      ...opportunities.flatMap((item) => (item.page ? [item.page] : [])),
     ]),
   ];
   const signals = new Map(
@@ -261,13 +341,27 @@ export async function analyzeWithAi(
       busquedas_que_mas_caen: row.queries,
       pagina: pageInfo(row.key),
     })),
-    oportunidades_de_ctr: snippets.map((item) => ({
+    oportunidades: opportunities.map((item) => ({
       busqueda: item.query,
+      tipo: item.kind,
       url: item.page,
       posicion: item.position,
       impresiones: item.impressions,
       clics: item.clicks,
+      clics_potenciales: item.potentialClicks,
       pagina: item.page ? pageInfo(item.page) : undefined,
+    })),
+    temas: snapshot.topics.slice(0, 8).map((topic) => ({
+      tema: topic.label,
+      clics: topic.clicks,
+      clics_antes: topic.prevClicks,
+      posicion_media: topic.position,
+      busquedas_principales: topic.topQueries.map((item) => item.query),
+    })),
+    busquedas_que_mas_aportan: snapshot.topQueries.slice(0, 10).map((item) => ({
+      busqueda: item.query,
+      clics: item.clicks,
+      posicion: item.position,
     })),
   };
 
@@ -275,11 +369,16 @@ export async function analyzeWithAi(
     deep: true,
     system: ANALYSIS_SYSTEM,
     user: `Datos:\n${JSON.stringify(payload)}`,
-    maxTokens: 3500,
+    maxTokens: 6000,
+    report,
+    who,
+    kind: "analyze",
   });
   if (!answer.ok) return answer;
   const raw = parseJson<{
     diagnoses?: Partial<Diagnosis>[];
+    opportunityIdeas?: Partial<OpportunityIdea>[];
+    contentIdeas?: Partial<ContentIdea>[];
     titleIdeas?: {
       query?: string;
       url?: string | null;
@@ -289,13 +388,29 @@ export async function analyzeWithAi(
   if (!raw) return { ok: false, reason: "failed" };
 
   const knownUrls = new Set(urls);
+  const knownQueries = new Set(opportunities.map((item) => item.query));
   const diagnoses: Diagnosis[] = (raw.diagnoses ?? [])
     .filter((item) => item.url && knownUrls.has(item.url))
-    .slice(0, MAX_PAGES)
+    .slice(0, MAX_LOSERS)
     .map((item) => ({
       url: String(item.url),
       text: clip(item.text, 900),
       fixes: (item.fixes ?? []).slice(0, 4).map((fix) => clip(fix, 300)),
+    }));
+  const opportunityIdeas: OpportunityIdea[] = (raw.opportunityIdeas ?? [])
+    .filter((item) => item.query && knownQueries.has(item.query))
+    .slice(0, MAX_OPPORTUNITIES)
+    .map((item) => ({
+      query: clip(item.query, 200),
+      analysis: clip(item.analysis, 900),
+      actions: (item.actions ?? []).slice(0, 4).map((a) => clip(a, 300)),
+    }));
+  const contentIdeas: ContentIdea[] = (raw.contentIdeas ?? [])
+    .filter((item) => item.title)
+    .slice(0, 5)
+    .map((item) => ({
+      title: clip(item.title, 160),
+      reason: clip(item.reason, 400),
     }));
   const titleIdeas: TitleIdea[] = (raw.titleIdeas ?? [])
     .filter((item) => item.query)
@@ -309,5 +424,12 @@ export async function analyzeWithAi(
         description: clip(option.description, 200),
       })),
     }));
-  return { ok: true, diagnoses, titleIdeas };
+  return {
+    ok: true,
+    costEur: answer.costEur,
+    diagnoses,
+    titleIdeas,
+    opportunityIdeas,
+    contentIdeas,
+  };
 }

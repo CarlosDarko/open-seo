@@ -118,9 +118,12 @@ export const REPORT_SCRIPT = `
 
   /* ---------- top bar and menu ---------- */
   var bar=document.getElementById("top");
+  var totop=document.getElementById("totop");
+  if(totop)totop.addEventListener("click",function(){window.scrollTo({top:0,behavior:reduce?"auto":"smooth"});});
   var links=document.querySelectorAll(".nav a");
   function onScroll(){
     if(bar)bar.className=window.scrollY>40?"top solid":"top";
+    if(totop)totop.className=window.scrollY>700?"totop show":"totop";
     var cur=null;each(links,function(a){var s=document.getElementById(a.getAttribute("href").slice(1));if(s&&s.getBoundingClientRect().top<160)cur=a;});
     each(links,function(a){a.className=a===cur?"on":"";});
   }

@@ -166,6 +166,16 @@ export type TitleIdea = {
   options: { title: string; description: string }[];
 };
 
+/** The AI's reading of one opportunity: what is going on and what to do. */
+export type OpportunityIdea = {
+  query: string;
+  analysis: string;
+  actions: string[];
+};
+
+/** A piece of content worth creating, with the reason. */
+export type ContentIdea = { title: string; reason: string };
+
 /** What the consultant adds on top of the numbers. */
 export type ReportNotes = {
   /** Personal message after the cover, in the consultant's voice. */
@@ -180,6 +190,10 @@ export type ReportNotes = {
   diagnoses: Diagnosis[];
   /** AI title and description ideas (reviewed by the consultant). */
   titleIdeas: TitleIdea[];
+  /** AI reading of the opportunities (reviewed by the consultant). */
+  opportunityIdeas: OpportunityIdea[];
+  /** AI ideas for new content (reviewed by the consultant). */
+  contentIdeas: ContentIdea[];
 };
 
 export const EMPTY_NOTES: ReportNotes = {
@@ -189,22 +203,24 @@ export const EMPTY_NOTES: ReportNotes = {
   nextSteps: "",
   diagnoses: [],
   titleIdeas: [],
+  opportunityIdeas: [],
+  contentIdeas: [],
 };
 
 /** The sections a report can show, in order. */
 export const REPORT_SECTIONS = [
-  { id: "hallazgos", label: "Lo esencial (hallazgos)" },
-  { id: "evolucion", label: "Evolución y cambios de Google" },
-  { id: "origen", label: "De dónde viene el cambio" },
+  { id: "hallazgos", label: "Resumen ejecutivo (conclusiones)" },
+  { id: "evolucion", label: "Evolución y actualizaciones de Google" },
+  { id: "origen", label: "Origen del cambio" },
   { id: "posiciones", label: "Posicionamiento" },
   { id: "temas", label: "Temas" },
-  { id: "consultas", label: "Búsquedas estrella" },
-  { id: "reparto", label: "Quién te trae el tráfico" },
-  { id: "semana", label: "Patrón semanal" },
-  { id: "oportunidades", label: "Oportunidades" },
+  { id: "consultas", label: "Búsquedas que más aportan" },
+  { id: "reparto", label: "Perfil del tráfico" },
+  { id: "semana", label: "Distribución semanal" },
+  { id: "oportunidades", label: "Oportunidades de crecimiento" },
   { id: "titulos", label: "Propuestas de títulos (IA)" },
   { id: "diagnostico", label: "Diagnóstico de páginas (IA)" },
-  { id: "tecnico", label: "Salud técnica (sitemap e indexación)" },
+  { id: "tecnico", label: "Estado técnico (sitemap e indexación)" },
   { id: "discover", label: "Google Discover" },
   { id: "proximos", label: "Próximos pasos" },
 ] as const;
@@ -222,6 +238,9 @@ export type ReportSummary = {
   updatedAt: string;
   createdBy: string | null;
   range: { startDate: string; endDate: string };
+  /** What the AI has cost for this report, in euros, and how many calls. */
+  aiCostEur: number;
+  aiCalls: number;
 };
 
 export type ReportFull = ReportSummary & {

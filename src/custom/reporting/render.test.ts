@@ -153,6 +153,8 @@ const report: ReportFull = {
   createdAt: "2026-10-16T10:00:00.000Z",
   updatedAt: "2026-10-16T10:00:00.000Z",
   createdBy: null,
+  aiCostEur: 0,
+  aiCalls: 0,
   range: snapshot.range,
   snapshot,
   notes: { ...EMPTY_NOTES, message: "Hola </script><b>x</b>" },
@@ -187,7 +189,7 @@ describe("renderReportDocument", () => {
   });
 
   it("always shows an encouraging reading under each finding", () => {
-    expect(html).toContain('class="up"');
+    expect(html).toContain('class="up2"');
   });
 
   it("leaves out the sections the consultant hides", () => {

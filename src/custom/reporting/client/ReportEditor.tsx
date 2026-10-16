@@ -39,6 +39,13 @@ import {
 } from "@/serverFunctions/reporting";
 
 const NEWLINE = String.fromCharCode(10);
+const euroFormat = new Intl.NumberFormat("es-ES", {
+  style: "currency",
+  currency: "EUR",
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 3,
+});
+const euro = (value: number) => euroFormat.format(value);
 const pathOnly = (url: string) => {
   try {
     return new URL(url).pathname || "/";
@@ -62,6 +69,7 @@ function Editor({
   const [version, setVersion] = useState(0);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
 
   const change = (patch: Partial<ReportNotes>) => {
     setNotes((previous) => ({ ...previous, ...patch }));
@@ -112,6 +120,10 @@ function Editor({
         return;
       }
       setError(null);
+      setInfo(
+        `Texto redactado. Coste de esta llamada: ${euro(result.costEur)}.`,
+      );
+      void refetch();
       setNotes((previous) => ({
         ...previous,
         message: result.draft.message || previous.message,
@@ -158,10 +170,16 @@ function Editor({
         return;
       }
       setError(null);
+      setInfo(
+        `Análisis hecho. Coste de esta llamada: ${euro(result.costEur)}.`,
+      );
+      void refetch();
       setNotes((previous) => ({
         ...previous,
         diagnoses: result.diagnoses,
         titleIdeas: result.titleIdeas,
+        opportunityIdeas: result.opportunityIdeas,
+        contentIdeas: result.contentIdeas,
         hidden: previous.hidden.filter(
           (id) => id !== "diagnostico" && id !== "titulos",
         ),
@@ -235,6 +253,9 @@ function Editor({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {error ? <p className="text-sm text-destructive">{error}</p> : null}
+          {!error && info ? (
+            <p className="text-sm text-muted-foreground">{info}</p>
+          ) : null}
           <Button
             variant="outline"
             size="sm"
@@ -337,8 +358,30 @@ function Editor({
                     <Link2 className="size-4" aria-hidden />
                     {copied ? "Copiado" : "Copiar"}
                   </Button>
+                  <Button
+                    variant="outline"
+                    render={
+                      <a
+                        href={publicUrl(report.token)}
+                        target="_blank"
+                        rel="noreferrer"
+                      />
+                    }
+                  >
+                    <ExternalLink className="size-4" aria-hidden />
+                    Abrir
+                  </Button>
                 </div>
               ) : null}
+              <p className="text-xs text-muted-foreground">
+                Coste de la IA en este informe:{" "}
+                <strong className="text-foreground">
+                  {euro(report.aiCostEur)}
+                </strong>{" "}
+                ({report.aiCalls}{" "}
+                {report.aiCalls === 1 ? "llamada" : "llamadas"}
+                ).
+              </p>
             </CardContent>
           </Card>
 
@@ -425,7 +468,10 @@ function Editor({
             </CardContent>
           </Card>
 
-          {notes.diagnoses.length > 0 || notes.titleIdeas.length > 0 ? (
+          {notes.diagnoses.length > 0 ||
+          notes.titleIdeas.length > 0 ||
+          notes.opportunityIdeas.length > 0 ||
+          notes.contentIdeas.length > 0 ? (
             <Card>
               <CardHeader>
                 <CardTitle>Análisis con IA (borrador)</CardTitle>
@@ -539,6 +585,115 @@ function Editor({
                     ))}
                   </div>
                 ))}
+                {notes.opportunityIdeas.map((item, index) => (
+                  <div
+                    key={`${item.query}-opp-${index}`}
+                    className="space-y-2 rounded-lg border border-border p-3"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="truncate text-sm font-semibold">
+                        Oportunidad · «{item.query}»
+                      </p>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label="Quitar análisis de oportunidad"
+                        onClick={() =>
+                          change({
+                            opportunityIdeas: notes.opportunityIdeas.filter(
+                              (_, at) => at !== index,
+                            ),
+                          })
+                        }
+                      >
+                        <Trash2 className="size-4" aria-hidden />
+                      </Button>
+                    </div>
+                    <Textarea
+                      rows={3}
+                      value={item.analysis}
+                      aria-label="Análisis"
+                      onChange={(event) =>
+                        change({
+                          opportunityIdeas: notes.opportunityIdeas.map(
+                            (entry, at) =>
+                              at === index
+                                ? { ...entry, analysis: event.target.value }
+                                : entry,
+                          ),
+                        })
+                      }
+                    />
+                    <Textarea
+                      rows={3}
+                      value={item.actions.join(NEWLINE)}
+                      aria-label="Acciones (una por línea)"
+                      onChange={(event) =>
+                        change({
+                          opportunityIdeas: notes.opportunityIdeas.map(
+                            (entry, at) =>
+                              at === index
+                                ? {
+                                    ...entry,
+                                    actions: event.target.value.split(NEWLINE),
+                                  }
+                                : entry,
+                          ),
+                        })
+                      }
+                    />
+                  </div>
+                ))}
+                {notes.contentIdeas.map((item, index) => (
+                  <div
+                    key={`${item.title}-content-${index}`}
+                    className="space-y-2 rounded-lg border border-border p-3"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Input
+                        value={item.title}
+                        aria-label="Idea de contenido"
+                        onChange={(event) =>
+                          change({
+                            contentIdeas: notes.contentIdeas.map((entry, at) =>
+                              at === index
+                                ? { ...entry, title: event.target.value }
+                                : entry,
+                            ),
+                          })
+                        }
+                      />
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label="Quitar idea de contenido"
+                        onClick={() =>
+                          change({
+                            contentIdeas: notes.contentIdeas.filter(
+                              (_, at) => at !== index,
+                            ),
+                          })
+                        }
+                      >
+                        <Trash2 className="size-4" aria-hidden />
+                      </Button>
+                    </div>
+                    <Textarea
+                      rows={2}
+                      value={item.reason}
+                      aria-label="Motivo"
+                      onChange={(event) =>
+                        change({
+                          contentIdeas: notes.contentIdeas.map((entry, at) =>
+                            at === index
+                              ? { ...entry, reason: event.target.value }
+                              : entry,
+                          ),
+                        })
+                      }
+                    />
+                  </div>
+                ))}
               </CardContent>
             </Card>
           ) : null}
@@ -571,7 +726,7 @@ function Editor({
               }
             >
               <ExternalLink className="size-3" aria-hidden />
-              Abrir aparte
+              Abrir vista previa (con sesión)
             </Button>
           </div>
           <iframe

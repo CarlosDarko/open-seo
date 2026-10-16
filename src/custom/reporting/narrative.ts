@@ -40,7 +40,7 @@ export function buildVerdict(snapshot: ReportSnapshot): Verdict {
   const lining = silverLining(snapshot);
 
   let tone: Verdict["tone"] = "flat";
-  let headline = `En estos ${period.days} días tu web recibió ${num(totals.clicks)} clics desde Google y se mostró ${num(totals.impressions)} veces.`;
+  let headline = `Durante estos ${period.days} días la web recibió ${num(totals.clicks)} clics desde Google y se mostró ${num(totals.impressions)} veces.`;
   if (clicks !== null) {
     const when =
       period.compare === "year"

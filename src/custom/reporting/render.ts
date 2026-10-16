@@ -3,6 +3,7 @@
 // charts and a closing call. Everything that comes from data is escaped here.
 // Numbers and lists are written on the server (the page reads without
 // scripts and prints well); a small script adds the reveals and the chart.
+// The text never addresses the reader as "tú": the subject is the website.
 import { integer } from "@/custom/radar/format";
 import {
   KIND_COLOR,
@@ -20,14 +21,9 @@ import {
   pathOf,
   updateImpacts,
   weekdayStats,
-  type IconName,
   type Insight,
 } from "@/custom/reporting/insights";
-import {
-  buildVerdict,
-  percentChange,
-  signedPercent,
-} from "@/custom/reporting/narrative";
+import { buildVerdict, percentChange } from "@/custom/reporting/narrative";
 import { REPORT_SCRIPT } from "@/custom/reporting/renderScript";
 import { REPORT_CSS } from "@/custom/reporting/renderStyles";
 import {
@@ -82,29 +78,15 @@ function jsonForScript(value: unknown): string {
   return JSON.stringify(value).replaceAll("<", `${BACKSLASH}u003c`);
 }
 
-const ICONS: Record<IconName, string> = {
-  up: "M3 17l6-6 4 4 8-8M15 7h6v6",
-  down: "M3 7l6 6 4-4 8 8M15 17h6v-6",
-  alert:
-    "M12 9v4M12 17h.01M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z",
-  target:
-    "M12 21a9 9 0 100-18 9 9 0 000 18zM12 17a5 5 0 100-10 5 5 0 000 10zM12 13a1 1 0 100-2 1 1 0 000 2z",
-  calendar:
-    "M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2z",
-  phone:
-    "M7 2h10a2 2 0 012 2v16a2 2 0 01-2 2H7a2 2 0 01-2-2V4a2 2 0 012-2zM12 18h.01",
-  bolt: "M13 2L3 14h8l-1 8 10-12h-8l1-8z",
-  layers: "M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5",
-  star: "M12 2l3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1L12 2z",
-  search: "M11 19a8 8 0 100-16 8 8 0 000 16zM21 21l-4.3-4.3",
-  shield: "M12 2l8 3v6c0 5-3.5 9-8 11-4.5-2-8-6-8-11V5l8-3zM9 12l2 2 4-4",
-  link: "M10 13a5 5 0 007.5.5l3-3a5 5 0 00-7-7l-1.7 1.7M14 11a5 5 0 00-7.5-.5l-3 3a5 5 0 007 7l1.7-1.7",
+/** The brand mark as a favicon (an inline SVG, so no extra request). */
+const FAVICON = `data:image/svg+xml,${encodeURIComponent(LOGO_MARK_LIGHT)}`;
+
+const TONE_LABEL: Record<Insight["tone"], string> = {
+  good: "A favor",
+  warn: "A vigilar",
+  bad: "Atención",
+  info: "Informativo",
 };
-
-const icon = (name: IconName) =>
-  `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${ICONS[name]}"/></svg>`;
-
-const SPARK_ICON = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3zM19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8L19 16z"/></svg>`;
 
 function noteOf(report: ReportFull, id: SectionId): string {
   const text = report.notes.sectionNotes[id]?.trim();
@@ -127,12 +109,20 @@ ${body}${note}
 </section>`;
 }
 
-function deltaPill(now: number, before: number, invert = false): string {
+/** A change shown as an arrow and coloured text: "▲ 16,4 %". */
+function pctDelta(now: number, before: number): string {
   const change = percentChange(now, before);
   if (change === null) return "";
-  if (Math.abs(change) < 0.005) return `<span class="pill flat">= igual</span>`;
-  const better = invert ? change < 0 : change > 0;
-  return `<span class="pill ${better ? "good" : "bad"}">${signedPercent(change)}</span>`;
+  if (Math.abs(change) < 0.005) return `<span class="dl flat">= igual</span>`;
+  const up = change > 0;
+  return `<span class="dl ${up ? "up" : "down"}">${up ? "▲" : "▼"} ${one.format(Math.abs(change) * 100)} %</span>`;
+}
+
+/** A change in whole units: "▲ +113". */
+function countDelta(now: number, before: number): string {
+  const diff = now - before;
+  if (diff === 0) return `<span class="dl flat">= igual</span>`;
+  return `<span class="dl ${diff > 0 ? "up" : "down"}">${diff > 0 ? "▲" : "▼"} ${signedNum(diff)}</span>`;
 }
 
 // ------------------------------------------------------------------ hero
@@ -159,17 +149,17 @@ function hero(report: ReportFull, host: string): string {
     value: number,
     kind: "int" | "dec" | "pct",
     shown: string,
-    pill: string,
+    delta: string,
   ) =>
-    `<div class="kpi"><div class="l">${label}</div><div class="v" data-count="${value}" data-kind="${kind}">${shown}</div>${pill}</div>`;
-  const positionPill = (() => {
+    `<div class="kpi"><div class="l">${label}</div><div class="v" data-count="${value}" data-kind="${kind}">${shown}</div>${delta}</div>`;
+  const positionDelta = (() => {
     const diff = prevTotals.position - totals.position;
     if (!comparable || prevTotals.position <= 0) return "";
-    if (Math.abs(diff) < 0.05) return `<span class="pill flat">= igual</span>`;
-    return `<span class="pill ${diff > 0 ? "good" : "bad"}">${diff > 0 ? "▲" : "▼"} ${one.format(Math.abs(diff))} posiciones</span>`;
+    if (Math.abs(diff) < 0.05) return `<span class="dl flat">= igual</span>`;
+    return `<span class="dl ${diff > 0 ? "up" : "down"}">${diff > 0 ? "▲" : "▼"} ${one.format(Math.abs(diff))} posiciones</span>`;
   })();
-  const chips = highlights(snapshot)
-    .map((text) => `<span class="chip">${esc(text)}</span>`)
+  const facts = highlights(snapshot)
+    .map((text) => `<span>${esc(text)}</span>`)
     .join("");
   const name = report.clientName?.trim() || host;
   const heading = report.title.replace(/ — .*$/, "").trim() || "Informe SEO";
@@ -180,12 +170,12 @@ ${areaPath(snapshot.daily.map((point) => point.clicks))}
 <span class="eyebrow rv">Informe de rendimiento SEO · ${dayShort(snapshot.range.startDate)} – ${dayShort(snapshot.range.endDate)}</span>
 <h1 class="rv d1">${esc(heading)} de <em>${esc(name)}</em></h1>
 <p class="sub rv d2">${esc(verdict.headline)} ${esc(verdict.lining)}</p>
-<div class="chips rv d3">${chips}</div>
+<div class="hl rv d3">${facts}</div>
 <div class="kpis rv d3">
-${kpi("Clics", totals.clicks, "int", num(totals.clicks), comparable ? deltaPill(totals.clicks, prevTotals.clicks) : "")}
-${kpi("Impresiones", totals.impressions, "int", num(totals.impressions), comparable ? deltaPill(totals.impressions, prevTotals.impressions) : "")}
-${kpi("CTR", totals.ctr * 100, "pct", `${one.format(totals.ctr * 100)} %`, comparable ? deltaPill(totals.ctr, prevTotals.ctr) : "")}
-${kpi("Posición media", totals.position, "dec", one.format(totals.position), positionPill)}
+${kpi("Clics", totals.clicks, "int", num(totals.clicks), comparable ? pctDelta(totals.clicks, prevTotals.clicks) : "")}
+${kpi("Impresiones", totals.impressions, "int", num(totals.impressions), comparable ? pctDelta(totals.impressions, prevTotals.impressions) : "")}
+${kpi("CTR", totals.ctr * 100, "pct", `${one.format(totals.ctr * 100)} %`, comparable ? pctDelta(totals.ctr, prevTotals.ctr) : "")}
+${kpi("Posición media", totals.position, "dec", one.format(totals.position), positionDelta)}
 </div>
 </div>
 </header>`;
@@ -201,12 +191,12 @@ function messageSection(report: ReportFull): string {
 
 function insightCard(item: Insight, index: number): string {
   const stats = item.stats
-    .map((stat) => `<span>${esc(stat.label)} <b>${esc(stat.value)}</b></span>`)
+    .map((stat) => `<span>${esc(stat.label)}<b>${esc(stat.value)}</b></span>`)
     .join("");
   const upside = item.upside
-    ? `<div class="up">${SPARK_ICON}<span>${esc(item.upside)}</span></div>`
+    ? `<div class="up2"><b>En positivo</b>${esc(item.upside)}</div>`
     : "";
-  return `<article class="in-card ${item.tone}${index === 0 ? " big" : ""} rv d${(index % 3) + 1}"><div class="ic">${icon(item.icon)}</div><div class="t">${esc(item.title)}</div><p class="b">${esc(item.body)}</p><div class="st">${stats}</div>${upside}</article>`;
+  return `<article class="fd${index === 0 ? " big" : ""} rv d${(index % 2) + 1}"><div class="top2"><span>${esc(item.topic)}</span><span class="tone ${item.tone}">${TONE_LABEL[item.tone]}</span></div><div class="t">${esc(item.title)}</div><p class="b">${esc(item.body)}</p><div class="st">${stats}</div>${upside}</article>`;
 }
 
 function insightsSection(report: ReportFull): string {
@@ -214,9 +204,9 @@ function insightsSection(report: ReportFull): string {
   if (items.length === 0) return "";
   return section(
     "hallazgos",
-    "Lo esencial",
-    "Qué ha pasado y qué significa",
-    "Cruzamos todas las fuentes de Search Console para contarte, en claro, lo que de verdad importa este periodo y qué hacer con ello.",
+    "Resumen ejecutivo",
+    "Conclusiones del periodo",
+    "Lectura conjunta de las distintas fuentes de Search Console: qué ha ocurrido, por qué y qué implica para el proyecto.",
     `<div class="ins">${items.map(insightCard).join("")}</div>`,
     noteOf(report, "hallazgos"),
   );
@@ -238,10 +228,10 @@ function trendSection(report: ReportFull): string {
       const color = KIND_COLOR[item.update.kind];
       const cell = (label: string, value: number | null) =>
         `<div><small>${label}</small><b>${value === null ? "—" : num(value)}</b></div>`;
-      return `<div class="ucard rv" style="--uc:${color}"><div class="un">${esc(item.update.label)} <span class="pill red" style="background:${color}22;color:${color}">${esc(KIND_NAME[item.update.kind])}</span></div><div class="ud">${dayShort(item.update.begin)} → ${item.update.end ? dayShort(item.update.end) : "en curso"} · clics por día</div><div class="trio">${cell("Antes", item.before)}${cell("Durante", item.during)}${cell("Después", item.after)}</div><p>${esc(item.verdict)}</p></div>`;
+      return `<div class="ucard rv" style="--uc:${color}"><div class="un"><i></i>${esc(item.update.label)}</div><div class="ud">${esc(KIND_NAME[item.update.kind])} · ${dayShort(item.update.begin)} → ${item.update.end ? dayShort(item.update.end) : "en curso"} · clics por día</div><div class="trio">${cell("Antes", item.before)}${cell("Durante", item.during)}${cell("Después", item.after)}</div><p>${esc(item.verdict)}</p></div>`;
     })
     .join("");
-  const body = `<div class="card rv">
+  const body = `<div class="sheet rv">
 <div class="tabs"><button class="on" data-metric="clicks">Clics</button><button data-metric="impressions">Impresiones</button><button data-metric="position">Posición</button></div>
 <div class="chartbox"><svg id="chart" role="img" aria-label="Evolución diaria"></svg><div class="tip" id="tip"></div></div>
 <div class="legend"><span><i></i>Este periodo</span>${snapshot.period.comparable ? `<span><i class="prev"></i>Periodo anterior</span>` : ""}${legend}</div>
@@ -250,10 +240,10 @@ ${cards ? `<div class="uimp">${cards}</div>` : ""}
   return section(
     "evolucion",
     "Evolución",
-    "Día a día, con Google de fondo",
+    "Evolución del tráfico y actualizaciones de Google",
     snapshot.updates.length > 0
-      ? "Las franjas de color son los cambios de algoritmo de Google que coincidieron con el periodo, con su efecto medido sobre tus clics."
-      : "Cómo se han movido tus resultados cada día frente al periodo anterior. Pasa el ratón o el dedo por la gráfica.",
+      ? "Las franjas de color marcan los cambios de algoritmo de Google que coincidieron con el periodo, con su efecto medido sobre los clics diarios."
+      : "Evolución diaria de los resultados frente al periodo anterior. Pasar el cursor, o el dedo, por la gráfica muestra el detalle de cada día.",
     body,
     noteOf(report, "evolucion"),
   );
@@ -263,7 +253,7 @@ ${cards ? `<div class="uimp">${cards}</div>` : ""}
 
 function changeBars(rows: ChangeLine[], up: boolean, withWhy: boolean): string {
   if (rows.length === 0) {
-    return `<p class="empty">Nada destacable en este sentido.</p>`;
+    return `<p class="empty">Sin variaciones destacables en este sentido.</p>`;
   }
   const max = Math.max(...rows.map((row) => Math.abs(row.clicksDelta)), 1);
   return rows
@@ -276,7 +266,7 @@ function changeBars(rows: ChangeLine[], up: boolean, withWhy: boolean): string {
               .slice(0, 2)
               .map(
                 (item) =>
-                  `<em>${esc(item.query)} ${signedNum(item.clicksDelta)}</em>`,
+                  `<span>${esc(item.query)} (${signedNum(item.clicksDelta)})</span>`,
               )
               .join("")}</div>`
           : "";
@@ -315,22 +305,22 @@ function originSection(report: ReportFull): string {
   const net = snapshot.totals.clicks - snapshot.prevTotals.clicks;
   const body = `${
     groups.length > 0
-      ? `<div class="card rv"><div class="grid g3">${groups.map((group) => divergeBlock(group.title, group.rows)).join("")}</div></div>`
+      ? `<div class="sheet rv"><div class="grid g3">${groups.map((group) => divergeBlock(group.title, group.rows)).join("")}</div></div>`
       : ""
   }
 <div class="grid g2" style="margin-top:18px">
-<div class="card rv"><h3>Páginas que suben</h3>${changeBars(snapshot.pageWinners, true, true)}</div>
-<div class="card rv d1"><h3>Páginas que bajan</h3>${changeBars(snapshot.pageLosers, false, true)}</div>
-<div class="card rv"><h3>Búsquedas que suben</h3>${changeBars(snapshot.queryWinners, true, false)}</div>
-<div class="card rv d1"><h3>Búsquedas que bajan</h3>${changeBars(snapshot.queryLosers, false, false)}</div>
+<div class="sheet rv"><h3>Páginas que suben</h3>${changeBars(snapshot.pageWinners, true, true)}</div>
+<div class="sheet rv d1"><h3>Páginas que bajan</h3>${changeBars(snapshot.pageLosers, false, true)}</div>
+<div class="sheet rv"><h3>Búsquedas que suben</h3>${changeBars(snapshot.queryWinners, true, false)}</div>
+<div class="sheet rv d1"><h3>Búsquedas que bajan</h3>${changeBars(snapshot.queryLosers, false, false)}</div>
 </div>`;
   return section(
     "origen",
-    "De dónde viene el cambio",
+    "Origen del cambio",
     net >= 0
-      ? `Los ${signedNum(net)} clics, desglosados`
-      : "Dónde se concentra el cambio",
-    "Quién suma y quién resta dentro del total: por tipo de página, por dispositivo y por marca, y las páginas y búsquedas concretas que explican el movimiento.",
+      ? `Origen de los ${signedNum(net)} clics: qué páginas y búsquedas lo explican`
+      : "Origen de la variación: qué páginas y búsquedas la explican",
+    "Cuánto suma o resta cada tipo de página, dispositivo y tipo de búsqueda al total, y las páginas y búsquedas concretas que más se mueven.",
     body,
     noteOf(report, "origen"),
   );
@@ -338,36 +328,54 @@ function originSection(report: ReportFull): string {
 
 // ------------------------------------------------------------ positions
 
+const BAND_COLORS = ["#f11c41", "#1a1a1a", "#7a7a84", "#c4c4cb"];
+
 function bandsSection(report: ReportFull): string {
   const { snapshot } = report;
   if (snapshot.bands.length === 0) return "";
+  const comparable = snapshot.period.comparable;
+  const totalClicks = snapshot.bands.reduce(
+    (sum, band) => sum + band.clicks,
+    0,
+  );
   const maxQueries = Math.max(
     ...snapshot.bands.map((band) => Math.max(band.queries, band.prevQueries)),
     1,
   );
-  const rows = snapshot.bands
-    .map((band) => {
-      const now = (band.queries / maxQueries) * 100;
-      const before = (band.prevQueries / maxQueries) * 100;
-      const diff = band.queries - band.prevQueries;
-      return `<div class="band"><span class="bl">${esc(band.label)}</span><span><span class="tr"><i style="--w:${now.toFixed(0)}%"></i></span>${snapshot.period.comparable ? `<span class="tr old"><i style="--w:${before.toFixed(0)}%"></i></span>` : ""}</span><span class="bn"><b>${num(band.queries)}</b> búsquedas${snapshot.period.comparable ? `<small>${diff === 0 ? "igual que antes" : `${signedNum(diff)} que antes`}</small>` : ""}<small>${num(band.clicks)} clics</small></span></div>`;
+  const stacked = snapshot.bands
+    .filter((band) => band.clicks > 0)
+    .map((band, index) => {
+      const share = totalClicks > 0 ? (band.clicks / totalClicks) * 100 : 0;
+      return `<div style="width:${share.toFixed(2)}%;background:${BAND_COLORS[index % BAND_COLORS.length]}" title="${esc(band.label)}: ${num(band.clicks)} clics">${share >= 12 ? `${Math.round(share)} %` : ""}</div>`;
+    })
+    .join("");
+  const legend = snapshot.bands
+    .map(
+      (band, index) =>
+        `<span><i style="background:${BAND_COLORS[index % BAND_COLORS.length]}"></i>${esc(band.label)} · ${num(band.clicks)} clics</span>`,
+    )
+    .join("");
+  const cards = snapshot.bands
+    .map((band, index) => {
+      const share = totalClicks > 0 ? (band.clicks / totalClicks) * 100 : 0;
+      return `<div class="bcard rv d${(index % 3) + 1}"><div class="bk">${esc(band.label)}</div><div class="bn">${num(band.queries)}</div><div class="bs">búsquedas</div>${comparable ? `<div class="bd">${countDelta(band.queries, band.prevQueries)} frente al periodo anterior</div>` : ""}<div class="pair"><div class="now"><i style="--w:${((band.queries / maxQueries) * 100).toFixed(0)}%"></i></div>${comparable ? `<div class="old"><i style="--w:${((band.prevQueries / maxQueries) * 100).toFixed(0)}%"></i></div>` : ""}</div><div class="bm"><b>${num(band.clicks)}</b> clics · <b>${Math.round(share)} %</b> del total</div></div>`;
     })
     .join("");
   const entered = snapshot.bands[0]?.entered ?? [];
   const movers = entered.length
-    ? `<h3 style="margin-top:22px">Han entrado al top 3</h3><div class="movers">${entered
+    ? `<div class="sheet rv" style="margin-top:22px"><h3>Búsquedas que entran en el top 3</h3><table class="mvt"><tbody>${entered
         .map(
           (move) =>
-            `<span class="mv">${esc(move.query)} <b>${move.prevPosition !== null ? `${one.format(move.prevPosition)} → ` : ""}${move.position !== null ? one.format(move.position) : ""}</b></span>`,
+            `<tr><td>${esc(move.query)}</td><td>${move.prevPosition !== null ? `${one.format(move.prevPosition)} → ` : "Nueva · "}<span class="dl up">${move.position !== null ? one.format(move.position) : ""}</span></td></tr>`,
         )
-        .join("")}</div>`
+        .join("")}</tbody></table></div>`
     : "";
   return section(
     "posiciones",
     "Posicionamiento",
-    "Cuántas búsquedas, y en qué posición",
-    `Barra roja: ahora${snapshot.period.comparable ? "; barra gris: antes" : ""}. Cada paso hacia arriba multiplica los clics: el top 3 se lleva la mayoría.`,
-    `<div class="card rv">${rows}${movers}</div>`,
+    "Distribución de las búsquedas por posición en Google",
+    `Cuántas búsquedas tiene la web en cada tramo de posiciones y cuántos clics aporta cada uno. En las tarjetas, la barra roja indica el periodo actual${comparable ? " y la gris el anterior" : ""}.`,
+    `<div class="sheet rv"><h3>Reparto de los clics por tramo de posición</h3><div class="stk">${stacked}</div><div class="stl">${legend}</div></div><div class="bands">${cards}</div>${movers}`,
     noteOf(report, "posiciones"),
   );
 }
@@ -380,19 +388,20 @@ function topicsSection(report: ReportFull): string {
   const cards = snapshot.topics
     .map((topic, index) => {
       const delta = snapshot.period.comparable
-        ? deltaPill(topic.clicks, topic.prevClicks)
+        ? pctDelta(topic.clicks, topic.prevClicks)
         : "";
       const queries = topic.topQueries
-        .map((item) => `<span>${esc(item.query)}</span>`)
+        .map((item) => `<li>${esc(item.query)}</li>`)
         .join("");
-      return `<div class="topic rv d${(index % 3) + 1}"><div class="tn">${esc(topic.label)}</div><div class="tk"><b>${num(topic.clicks)}</b><span>clics</span>${delta}</div><small>${num(topic.queries)} búsquedas · ${num(topic.impressions)} impresiones · posición ${one.format(topic.position)}</small><div class="tq">${queries}</div><div><small>Al alcance de subir: ${Math.round(topic.nearTopShare * 100)} %</small><div class="meter"><i style="--w:${Math.round(topic.nearTopShare * 100)}%"></i></div></div></div>`;
+      const reach = Math.round(topic.nearTopShare * 100);
+      return `<div class="topic rv d${(index % 3) + 1}"><div class="tn">${esc(topic.label)}</div><div class="tk"><b>${num(topic.clicks)}</b><span>clics</span>${delta}</div><small>${num(topic.queries)} búsquedas · ${num(topic.impressions)} impresiones · posición media ${one.format(topic.position)}</small><ul class="tq">${queries}</ul><div><small>Impresiones en posiciones 4 a 20: ${reach} %</small><div class="meter"><i style="--w:${reach}%"></i></div></div></div>`;
     })
     .join("");
   return section(
     "temas",
     "Temas",
-    "De qué te buscan",
-    "Agrupamos tus búsquedas por temas para ver dónde está tu autoridad. La barra indica qué parte del tema está en posiciones 4 a 20: la más fácil de subir.",
+    "Temas con más tráfico orgánico",
+    "Las búsquedas se agrupan por tema para identificar dónde está la autoridad del sitio. La barra indica qué parte del tema está en posiciones 4 a 20, la más fácil de subir.",
     `<div class="topics">${cards}</div>`,
     noteOf(report, "temas"),
   );
@@ -411,52 +420,33 @@ function queriesSection(report: ReportFull): string {
     .join("");
   return section(
     "consultas",
-    "Búsquedas estrella",
-    "Las búsquedas que más te traen",
-    "Sin contar las de tu marca: las que atraen a gente que no te conocía.",
-    `<div class="card rv"><table><thead><tr><th>Búsqueda</th><th class="r">Clics</th><th class="r">Impresiones</th><th class="r">Posición</th></tr></thead><tbody>${rows}</tbody></table></div>`,
+    "Búsquedas",
+    "Búsquedas que más tráfico aportan",
+    "Se excluyen las búsquedas de marca, para mostrar las que atraen a usuarios que todavía no conocían el proyecto.",
+    `<div class="sheet rv"><table class="qt"><thead><tr><th>Búsqueda</th><th class="r">Clics</th><th class="r">Impresiones</th><th class="r">Posición</th></tr></thead><tbody>${rows}</tbody></table></div>`,
     noteOf(report, "consultas"),
   );
 }
 
-// -------------------------------------------------------------- donuts
+// ------------------------------------------------------------- audience
 
-const PALETTE = [
-  "#f11c41",
-  "#1a1a1a",
-  "#f59e0b",
-  "#2563eb",
-  "#22a755",
-  "#8b5cf6",
-  "#0891b2",
-  "#9ca3af",
-];
-
-function donut(
+function audienceCard(
   title: string,
   lines: SegmentLine[],
   comparable: boolean,
 ): string {
   if (lines.length === 0) return "";
-  let offset = 0;
-  const circles = lines
+  const top = lines.slice(0, 6);
+  const rows = top
     .map((line, index) => {
-      const part = line.share * 100;
-      const circle = `<circle cx="21" cy="21" r="15.9155" stroke="${PALETTE[index % PALETTE.length]}" stroke-dasharray="${part.toFixed(2)} ${(100 - part).toFixed(2)}" stroke-dashoffset="${(-offset).toFixed(2)}"/>`;
-      offset += part;
-      return circle;
+      const delta = comparable ? pctDelta(line.clicks, line.prevClicks) : "";
+      return `<div class="arow${index === 0 ? " first" : ""}"><span class="an" title="${esc(line.label)}">${esc(line.label)}</span><span class="ap">${one.format(line.share * 100)} %</span><span class="dl-slot">${delta || ""}</span><div class="ab"><i style="--w:${Math.max(2, line.share * 100).toFixed(1)}%"></i></div></div>`;
     })
     .join("");
-  const legend = lines
-    .map((line, index) => {
-      const delta = comparable ? deltaPill(line.clicks, line.prevClicks) : "";
-      return `<span><i class="dot" style="background:${PALETTE[index % PALETTE.length]}"></i>${esc(line.label)} <b>${one.format(line.share * 100)} %</b> ${delta}</span>`;
-    })
-    .join("");
-  return `<div class="card rv"><h3>${esc(title)}</h3><div class="dn"><svg viewBox="0 0 42 42" aria-hidden="true"><circle cx="21" cy="21" r="15.9155" stroke="#ececee"/>${circles}</svg><div class="lg">${legend}</div></div></div>`;
+  return `<div class="sheet rv"><h3>${esc(title)}</h3>${rows}</div>`;
 }
 
-function splitSection(report: ReportFull): string {
+function audienceSection(report: ReportFull): string {
   const { snapshot } = report;
   const comparable = snapshot.period.comparable;
   const total = snapshot.brand.clicks + snapshot.brand.otherClicks;
@@ -480,18 +470,18 @@ function splitSection(report: ReportFull): string {
         ]
       : [];
   const blocks = [
-    donut("Dispositivo", snapshot.segments.device, comparable),
-    donut("Tipo de página", snapshot.segments.pageType, comparable),
-    donut("Marca y no marca", brandLines, comparable),
-    donut("Intención de búsqueda", snapshot.segments.intent, comparable),
+    audienceCard("Dispositivo", snapshot.segments.device, comparable),
+    audienceCard("Tipo de página", snapshot.segments.pageType, comparable),
+    audienceCard("Marca y resto de búsquedas", brandLines, comparable),
+    audienceCard("Intención de búsqueda", snapshot.segments.intent, comparable),
   ].join("");
   if (!blocks) return "";
   return section(
     "reparto",
     "Audiencia",
-    "Quién te trae el tráfico",
-    "Cómo se reparten los clics y cuánto ha crecido cada parte.",
-    `<div class="donuts">${blocks}</div>`,
+    "Perfil del tráfico orgánico",
+    `Porcentaje de los clics que corresponde a cada grupo${comparable ? " y su variación frente al periodo anterior" : ""}.`,
+    `<div class="aud">${blocks}</div>`,
     noteOf(report, "reparto"),
   );
 }
@@ -504,18 +494,18 @@ function weekSection(report: ReportFull): string {
   const stats = weekdayStats(daily);
   const max = Math.max(...stats.map((item) => item.average), 1);
   const best = stats.reduce((a, b) => (b.average > a.average ? b : a));
-  const cols = stats
+  const rows = stats
     .map(
       (item) =>
-        `<div class="wd${item === best ? " best" : ""}"><b>${num(item.average)}</b><div class="col" style="--h:${Math.max(4, (item.average / max) * 100).toFixed(0)}%"></div><span>${item.label}</span></div>`,
+        `<div class="wkr${item === best ? " best" : ""}"><span class="wl">${item.label}</span><div class="wb"><i style="--w:${Math.max(3, (item.average / max) * 100).toFixed(0)}%"></i></div><b>${num(item.average)}</b></div>`,
     )
     .join("");
   return section(
     "semana",
-    "Ritmo",
-    "Cuándo te visitan más",
-    "Clics medios por día de la semana en este periodo. Sirve para decidir cuándo publicar y cuándo actualizar.",
-    `<div class="card rv"><div class="week">${cols}</div></div>`,
+    "Ritmo semanal",
+    "Distribución semanal del tráfico",
+    "Clics medios por día de la semana durante el periodo. Permite decidir cuándo publicar y cuándo actualizar contenido.",
+    `<div class="sheet rv"><div class="wk">${rows}</div></div>`,
     noteOf(report, "semana"),
   );
 }
@@ -527,21 +517,44 @@ function opportunitiesSection(report: ReportFull): string {
     (a, b) => b.potentialClicks - a.potentialClicks,
   );
   if (rows.length === 0) return "";
-  const max = Math.max(...rows.map((row) => row.potentialClicks), 1);
+  const ideas = new Map(
+    report.notes.opportunityIdeas.map((item) => [item.query, item] as const),
+  );
   const list = rows
     .slice(0, 8)
-    .map(
-      (row, index) =>
-        `<div class="opp"><div class="rk">${index + 1}</div><div><div class="q">${esc(row.query)}</div><div class="m"><em>${row.kind === "push" ? "A un paso del top 3" : "Se ve mucho, se clica poco"}</em><em>posición ${one.format(row.position)}</em><em>${num(row.impressions)} impresiones</em>${row.page ? `<em>${esc(pathOf(row.page))}</em>` : ""}</div></div><div class="g">+${num(row.potentialClicks)}<small>clics posibles</small></div><div class="obar"><i style="--w:${((row.potentialClicks / max) * 100).toFixed(0)}%"></i></div></div>`,
-    )
+    .map((row, index) => {
+      const idea = ideas.get(row.query);
+      const ai = idea
+        ? `<div class="oai"><b>Análisis y acciones</b><p>${esc(idea.analysis)}</p>${
+            idea.actions.filter((a) => a.trim()).length
+              ? `<ul>${idea.actions
+                  .filter((action) => action.trim())
+                  .map((action) => `<li>${esc(action)}</li>`)
+                  .join("")}</ul>`
+              : ""
+          }</div>`
+        : "";
+      return `<div class="opp"><div class="oh"><div class="rk">${index + 1}</div><div><div class="q">${esc(row.query)}</div><div class="m">${row.kind === "push" ? "A un paso del top 3" : "Se muestra mucho y se clica poco"} · posición ${one.format(row.position)} · ${num(row.impressions)} impresiones${row.page ? ` · ${esc(pathOf(row.page))}` : ""}</div></div><div class="g">+${num(row.potentialClicks)}<small>clics posibles</small></div></div>${ai}</div>`;
+    })
     .join("");
+  const contentIdeas = report.notes.contentIdeas.filter((item) =>
+    item.title.trim(),
+  );
+  const content = contentIdeas.length
+    ? `<div class="ideas">${contentIdeas
+        .map(
+          (item) =>
+            `<div class="idea"><b>${esc(item.title)}</b><p>${esc(item.reason)}</p></div>`,
+        )
+        .join("")}</div>`
+    : "";
   const total = rows.reduce((sum, row) => sum + row.potentialClicks, 0);
   return section(
     "oportunidades",
     "Oportunidades",
-    `Unas ${num(total)} visitas más al alcance`,
-    "Búsquedas donde ya apareces y un pequeño empujón (mejor título, más enlaces, contenido más completo) se traduce en clics. Ordenadas por lo que ganarías.",
-    `<div class="card rv">${list}</div>`,
+    `Oportunidades de crecimiento: unas ${num(total)} visitas más al alcance`,
+    "Búsquedas en las que la web ya aparece y que, con una mejora concreta de título, contenido o enlaces, pueden traducirse en más clics. Ordenadas por la ganancia estimada.",
+    `<div class="sheet rv">${list}${content}</div>`,
     noteOf(report, "oportunidades"),
   );
 }
@@ -556,21 +569,21 @@ function diagnosisSection(report: ReportFull): string {
       const row = report.snapshot.pageLosers.find(
         (loser) => loser.key === item.url,
       );
-      const pill = row
-        ? `<span class="pill bad">${signedNum(row.clicksDelta)} clics</span><span class="pill flat" style="background:#ececee;color:#3a3a40">${num(row.prevClicks)} → ${num(row.clicks)}</span>`
+      const meta = row
+        ? `<div class="meta">${signedNum(row.clicksDelta)} clics (${num(row.prevClicks)} → ${num(row.clicks)})</div>`
         : "";
       const fixes = item.fixes
         .filter((fix) => fix.trim())
         .map((fix) => `<li>${esc(fix)}</li>`)
         .join("");
-      return `<article class="dgc rv"><div class="u">${esc(pathOf(item.url))}</div><div class="meta">${pill}</div><p>${esc(item.text)}</p>${fixes ? `<h3>Qué haremos</h3><ul class="fix">${fixes}</ul>` : ""}</article>`;
+      return `<article class="dgc rv"><div class="u">${esc(pathOf(item.url))}</div>${meta}<p>${esc(item.text)}</p>${fixes ? `<h3>Actuaciones previstas</h3><ul class="fix">${fixes}</ul>` : ""}</article>`;
     })
     .join("");
   return section(
     "diagnostico",
     "Diagnóstico",
-    "Por qué han bajado estas páginas y cómo recuperarlas",
-    "Hemos revisado cada página y las búsquedas que han caído. Todas tienen arreglo: ya tienen historial en Google, solo hay que reforzarlas.",
+    "Diagnóstico de las páginas que pierden tráfico",
+    "Se ha revisado cada página y las búsquedas que más han caído. Todas tienen recuperación posible: cuentan ya con historial en Google y solo requieren refuerzo.",
     `<div class="dg">${cards}</div>`,
     noteOf(report, "diagnostico"),
   );
@@ -597,14 +610,14 @@ function titlesSection(report: ReportFull): string {
             `<div class="serp"><div class="su">${esc(host)}${esc(path)}</div><div class="st2">${esc(option.title)}</div><div class="sd">${esc(option.description)}</div></div>`,
         )
         .join("");
-      return `<article class="tic rv"><div class="tq2">«${esc(item.query)}»</div>${item.current ? `<div class="cur">Título actual: <s>${esc(item.current)}</s></div>` : ""}${options}</article>`;
+      return `<article class="tic rv"><div class="tq2">«${esc(item.query)}»</div>${item.current ? `<div class="cur">Título actual: ${esc(item.current)}</div>` : ""}${options}</article>`;
     })
     .join("");
   return section(
     "titulos",
-    "Propuestas de títulos",
-    "Cómo atraer más clics con lo que ya posicionas",
-    "En estas búsquedas ya apareces, pero se clica poco. Estas son propuestas de título y descripción, tal y como se verían en Google.",
+    "Títulos",
+    "Propuestas de títulos y descripciones",
+    "En estas búsquedas la web ya aparece, pero recibe pocos clics. Se proponen títulos y descripciones alternativos, tal como se verían en los resultados de Google.",
     `<div class="tid">${cards}</div>`,
     noteOf(report, "titulos"),
   );
@@ -616,18 +629,14 @@ function healthSection(report: ReportFull): string {
   const health = report.snapshot.health;
   if (!health || health.inSitemap < 5) return "";
   const covered = Math.max(0, 1 - health.unseen / health.inSitemap);
-  const color =
-    covered >= 0.85 ? "#22a755" : covered >= 0.6 ? "#f59e0b" : "#f11c41";
   const tile = (value: number, label: string) =>
     `<div><b>${num(value)}</b><small>${label}</small></div>`;
   return section(
     "tecnico",
-    "Salud técnica",
-    covered >= 0.85
-      ? "Google ya conoce casi todo tu sitio"
-      : "Páginas por activar en Google",
-    "Cruzamos tu sitemap con lo que Google ha mostrado en los últimos 3 meses.",
-    `<div class="card rv"><div class="hl"><div class="ring"><svg viewBox="0 0 42 42" aria-hidden="true"><circle cx="21" cy="21" r="15.9155" stroke="#ececee"/><circle cx="21" cy="21" r="15.9155" stroke="${color}" stroke-linecap="round" stroke-dasharray="${(covered * 100).toFixed(1)} ${(100 - covered * 100).toFixed(1)}"/></svg><div class="ct"><b>${Math.round(covered * 100)} %</b><small>con visibilidad</small></div></div><div class="hs">${tile(health.inSitemap, "páginas en el sitemap")}${tile(health.pagesWithImpressions, "páginas con impresiones")}${tile(health.unseen, "sin impresiones aún")}${tile(health.notInSitemap, "con impresiones fuera del sitemap")}${tile(health.sitemapErrors, "errores de sitemap")}</div></div></div>`,
+    "Estado técnico",
+    "Estado técnico: cobertura del sitemap en Google",
+    "Se compara el sitemap con las páginas que Google ha mostrado en los últimos 3 meses.",
+    `<div class="sheet rv"><div class="hlt"><div class="ring"><svg viewBox="0 0 42 42" aria-hidden="true"><circle cx="21" cy="21" r="15.9155" stroke="#ececee"/><circle cx="21" cy="21" r="15.9155" stroke="#1a1a1a" stroke-linecap="round" stroke-dasharray="${(covered * 100).toFixed(1)} ${(100 - covered * 100).toFixed(1)}"/></svg><div class="ct"><b>${Math.round(covered * 100)} %</b><small>con visibilidad</small></div></div><div class="hs">${tile(health.inSitemap, "páginas en el sitemap")}${tile(health.pagesWithImpressions, "páginas con impresiones")}${tile(health.unseen, "sin impresiones todavía")}${tile(health.notInSitemap, "con impresiones fuera del sitemap")}${tile(health.sitemapErrors, "errores de sitemap")}</div></div></div>`,
     noteOf(report, "tecnico"),
   );
 }
@@ -647,9 +656,9 @@ function discoverSection(report: ReportFull): string {
   return section(
     "discover",
     "Google Discover",
-    `${num(discover.clicks)} clics sin que te busquen`,
-    "Discover recomienda tu contenido a personas con intereses afines, aunque no hayan buscado nada. Es tráfico extra.",
-    `<div class="card rv"><div class="grid g2"><div><h3>Resumen</h3><div class="kpi" style="background:#1a1a1a;color:#f6f6f6;border-radius:16px"><div class="l">Clics desde Discover</div><div class="v" data-count="${discover.clicks}" data-kind="int">${num(discover.clicks)}</div>${report.snapshot.period.comparable ? deltaPill(discover.clicks, discover.prevClicks) : ""}</div></div><div><h3>Contenido recomendado</h3>${pages}</div></div></div>`,
+    "Tráfico procedente de Google Discover",
+    "Discover recomienda contenido a usuarios con intereses afines aunque no hayan buscado nada: es tráfico adicional al de las búsquedas.",
+    `<div class="sheet rv"><div class="grid g2"><div><h3>Clics desde Discover</h3><div class="topic" style="border:0;box-shadow:none;padding:0"><div class="tk"><b data-count="${discover.clicks}" data-kind="int">${num(discover.clicks)}</b>${report.snapshot.period.comparable ? pctDelta(discover.clicks, discover.prevClicks) : ""}</div><small>${num(discover.impressions)} impresiones</small></div></div><div><h3>Contenido más recomendado</h3>${pages}</div></div></div>`,
     noteOf(report, "discover"),
   );
 }
@@ -662,7 +671,7 @@ function suggestedSteps(report: ReportFull): string[] {
   const loser = snapshot.pageLosers[0];
   if (loser && loser.clicksDelta <= -10) {
     steps.push(
-      `Revisar y reforzar ${pathOf(loser.key)}: es la página con más margen de recuperación.`,
+      `Revisar y reforzar ${pathOf(loser.key)}, la página con más margen de recuperación.`,
     );
   }
   const best = [...snapshot.opportunities].sort(
@@ -676,12 +685,12 @@ function suggestedSteps(report: ReportFull): string[] {
   const topic = snapshot.topics[0];
   if (topic) {
     steps.push(
-      `Publicar más contenido sobre «${topic.label}», tu tema con más tirón.`,
+      `Publicar más contenido sobre «${topic.label}», el tema con más tirón.`,
     );
   }
   if (steps.length === 0) {
     steps.push(
-      "Mantener el ritmo de publicación y vigilar la evolución del próximo periodo.",
+      "Mantener el ritmo de publicación y revisar la evolución en el próximo periodo.",
     );
   }
   return steps.slice(0, 4);
@@ -695,10 +704,10 @@ function closing(report: ReportFull): string {
   const steps = typed.length > 0 ? typed : suggestedSteps(report);
   const note = report.notes.sectionNotes.proximos?.trim();
   return `<footer class="end" id="proximos"><div class="wrap">
-<div class="kick rv">Próximos pasos</div><h2 class="rv">Y ahora, a por lo siguiente</h2>
+<div class="kick rv">Próximos pasos</div><h2 class="rv">Hoja de ruta para el próximo periodo</h2>
 <ol class="steps rv">${steps.map((step) => `<li>${esc(step)}</li>`).join("")}</ol>
-${note ? `<div class="note rv" style="background:rgba(255,255,255,.08);color:#f6f6f6"><b style="color:#ffb3c0">Nota de Carlos</b>${esc(note)}</div>` : ""}
-<a class="big-cta rv" href="https://carlosortega.page" target="_blank" rel="noopener">Hablemos del siguiente paso</a>
+${note ? `<div class="note rv" style="background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.16);color:#f6f6f6"><b style="color:#ffb3c0">Nota de Carlos</b>${esc(note)}</div>` : ""}
+<a class="big-cta rv" href="https://carlosortega.page" target="_blank" rel="noopener">Contactar con Carlos Ortega</a>
 <div class="foot"><span class="fm">${LOGO_MARK_LIGHT}</span><span>Informe generado el ${day(report.snapshot.generatedAt.slice(0, 10))} con datos de Google Search Console · carlosortega.page</span></div>
 </div></footer>`;
 }
@@ -706,14 +715,14 @@ ${note ? `<div class="note rv" style="background:rgba(255,255,255,.08);color:#f6
 // ----------------------------------------------------------------- page
 
 const SHORT: Record<string, string> = {
-  hallazgos: "Hallazgos",
+  hallazgos: "Conclusiones",
   evolucion: "Evolución",
   origen: "Origen",
   posiciones: "Posiciones",
   temas: "Temas",
   consultas: "Búsquedas",
   reparto: "Audiencia",
-  semana: "Ritmo",
+  semana: "Semana",
   oportunidades: "Oportunidades",
   titulos: "Títulos",
   diagnostico: "Diagnóstico",
@@ -745,7 +754,7 @@ export function renderReportDocument(
     posiciones: () => bandsSection(report),
     temas: () => topicsSection(report),
     consultas: () => queriesSection(report),
-    reparto: () => splitSection(report),
+    reparto: () => audienceSection(report),
     semana: () => weekSection(report),
     oportunidades: () => opportunitiesSection(report),
     titulos: () => titlesSection(report),
@@ -782,6 +791,7 @@ export function renderReportDocument(
 <meta name="robots" content="noindex,nofollow">
 <meta name="theme-color" content="#1a1a1a">
 <title>${esc(title)}</title>
+<link rel="icon" type="image/svg+xml" href="${FAVICON}">
 <script>document.documentElement.className="js";</script>
 <style>${REPORT_CSS}</style></head>
 <body>
@@ -790,6 +800,7 @@ ${hero(report, host)}
 ${messageSection(report)}
 ${built.map((item) => item.html).join("\n")}
 ${hidden.has("proximos") ? "" : closing(report)}
+<button class="totop" id="totop" type="button" aria-label="Volver arriba"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
 <script type="application/json" id="report-data">${jsonForScript(data)}</script>
 <script>${REPORT_SCRIPT}</script>
 </body></html>`;

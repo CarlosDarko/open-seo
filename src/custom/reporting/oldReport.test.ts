@@ -36,6 +36,8 @@ describe("reports saved by an earlier version", () => {
       createdAt: "",
       updatedAt: "",
       createdBy: null,
+      aiCostEur: 0,
+      aiCalls: 0,
       range: snapshot.range,
       snapshot,
       notes: EMPTY_NOTES,
@@ -54,6 +56,8 @@ describe("reports saved by an earlier version", () => {
       createdAt: "",
       updatedAt: "",
       createdBy: null,
+      aiCostEur: 0,
+      aiCalls: 0,
       range: { startDate: "2026-09-18", endDate: "2026-10-15" },
       snapshot: normalizeSnapshot({ siteUrl: "sc-domain:example.com" }),
       notes: {

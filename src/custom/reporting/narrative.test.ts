@@ -28,7 +28,7 @@ describe("buildVerdict", () => {
     const verdict = buildVerdict(base);
     expect(verdict.tone).toBe("good");
     expect(verdict.headline).toContain("20,0 % más");
-    expect(verdict.lining).toContain("Tu tráfico crece");
+    expect(verdict.lining).toContain("El tráfico crece");
   });
 
   it("tells a fall straight but always leaves something encouraging", () => {

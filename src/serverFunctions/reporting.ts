@@ -52,6 +52,20 @@ const notesSchema = z.object({
       }),
     )
     .max(8),
+  opportunityIdeas: z
+    .array(
+      z.object({
+        query: z.string().max(300),
+        analysis: z.string().max(1500),
+        actions: z.array(z.string().max(400)).max(6),
+      }),
+    )
+    .max(8),
+  contentIdeas: z
+    .array(
+      z.object({ title: z.string().max(200), reason: z.string().max(600) }),
+    )
+    .max(8),
 });
 
 export const listClientReports = createServerFn({ method: "POST" })
@@ -154,7 +168,10 @@ export const draftClientReportWithAi = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const report = await getReport(context.projectId, data.reportId);
     if (!report) return { ok: false as const, reason: "failed" as const };
-    return draftWithAi(report);
+    return draftWithAi(report, {
+      organizationId: context.organizationId,
+      userEmail: context.userEmail,
+    });
   });
 
 /** Reads the pages that fell and the searches seen but not clicked, and
@@ -165,5 +182,8 @@ export const analyzeClientReportWithAi = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const report = await getReport(context.projectId, data.reportId);
     if (!report) return { ok: false as const, reason: "failed" as const };
-    return analyzeWithAi(report, report.snapshot.siteUrl);
+    return analyzeWithAi(report, report.snapshot.siteUrl, {
+      organizationId: context.organizationId,
+      userEmail: context.userEmail,
+    });
   });
