@@ -20,6 +20,7 @@ import type {
   ChangeLine,
   PageLine,
   QueryMove,
+  QueryRow,
   ReportSnapshot,
   SegmentLine,
 } from "@/custom/reporting/types";
@@ -80,12 +81,14 @@ const moves = (
     query: string;
     position: number | null;
     prevPosition: number | null;
+    impressions: number;
   }[],
 ): BandMove[] =>
-  rows.slice(0, 4).map((row) => ({
+  rows.slice(0, 40).map((row) => ({
     query: row.query,
     position: row.position,
     prevPosition: row.prevPosition,
+    impressions: row.impressions,
   }));
 
 export async function buildReportSnapshot(
@@ -109,7 +112,7 @@ export async function buildReportSnapshot(
       startDate: report.range.startDate,
       endDate: report.range.endDate,
       dimensions: ["query"],
-      rowLimit: 200,
+      rowLimit: 1000,
     }),
     GscService.getPerformance({
       projectId,
@@ -129,22 +132,41 @@ export async function buildReportSnapshot(
       : Promise.resolve(null),
   ]);
 
-  const topQueries = queries.rows
-    .flatMap((row) => {
-      const query = row.keys?.[0];
-      return query && !isBrandQuery(query, tokens)
-        ? [
-            {
-              query,
-              clicks: row.clicks,
-              impressions: row.impressions,
-              position: row.position,
-            },
-          ]
-        : [];
-    })
-    .sort((a, b) => b.clicks - a.clicks || b.impressions - a.impressions)
-    .slice(0, 12);
+  const ownQueries = queries.rows.flatMap((row) => {
+    const query = row.keys?.[0];
+    return query && !isBrandQuery(query, tokens)
+      ? [
+          {
+            query,
+            clicks: row.clicks,
+            impressions: row.impressions,
+            position: row.position,
+          },
+        ]
+      : [];
+  });
+  const bySize = (
+    a: { clicks: number; impressions: number },
+    b: { clicks: number; impressions: number },
+  ) => b.clicks - a.clicks || b.impressions - a.impressions;
+  const topQueries = [...ownQueries].sort(bySize).slice(0, 30);
+  // The same position bands as the Radar: up to 3, 10, 20 and beyond.
+  const bandOf = (position: number) =>
+    position <= 3.5 ? 0 : position <= 10.5 ? 1 : position <= 20.5 ? 2 : 3;
+  const queriesByBand: QueryRow[][] = [[], [], [], []];
+  for (const item of [...ownQueries].sort(bySize)) {
+    const list = queriesByBand[bandOf(item.position)];
+    if (list.length < 25) {
+      list.push({
+        query: item.query,
+        clicks: item.clicks,
+        impressions: item.impressions,
+        position: item.position,
+        prevClicks: 0,
+        prevPosition: null,
+      });
+    }
+  }
 
   const pageRows = mergePageVariants(pages.rows, 0);
   const prevByKey = new Map(
@@ -157,7 +179,7 @@ export async function buildReportSnapshot(
   const pageClicksTotal = pageRows.reduce((sum, row) => sum + row.clicks, 0);
   const topPages: PageLine[] = [...pageRows]
     .sort((a, b) => b.clicks - a.clicks)
-    .slice(0, 8)
+    .slice(0, 12)
     .flatMap((row) =>
       row.keys?.[0]
         ? [
@@ -194,7 +216,7 @@ export async function buildReportSnapshot(
   return {
     ok: true,
     snapshot: {
-      version: 3,
+      version: 4,
       generatedAt: new Date().toISOString(),
       siteUrl: report.siteUrl,
       range: report.range,
@@ -219,18 +241,37 @@ export async function buildReportSnapshot(
       topQueries,
       topPages,
       pageClicksTotal,
-      pageWinners: report.pageChanges.winners.slice(0, 6).map(changeLine),
-      pageLosers: report.pageChanges.losers.slice(0, 6).map(changeLine),
-      queryWinners: report.queryChanges.winners.slice(0, 6).map(changeLine),
-      queryLosers: report.queryChanges.losers.slice(0, 6).map(changeLine),
-      newQueries: report.newQueries.length,
-      lostQueries: report.lostQueries.length,
+      pageWinners: report.pageChanges.winners.slice(0, 10).map(changeLine),
+      pageLosers: report.pageChanges.losers.slice(0, 10).map(changeLine),
+      queryWinners: report.queryChanges.winners.slice(0, 10).map(changeLine),
+      queryLosers: report.queryChanges.losers.slice(0, 10).map(changeLine),
+      newQueries: report.newAndLostFull.newCount,
+      lostQueries: report.newAndLostFull.lostCount,
+      newQueriesList: report.newAndLostFull.newQueries.map((row) => ({
+        query: row.key,
+        clicks: row.clicks,
+        impressions: row.impressions,
+        position: row.position,
+        prevClicks: 0,
+        prevPosition: null,
+      })),
+      lostQueriesList: report.newAndLostFull.lostQueries.map((row) => ({
+        query: row.key,
+        clicks: 0,
+        impressions: row.prevImpressions,
+        position: null,
+        prevClicks: row.prevClicks,
+        prevPosition: row.prevPosition,
+      })),
+      queriesByBand,
       bands: report.bands.map((band) => ({
         label: band.label,
         queries: band.queries,
         prevQueries: band.prevQueries,
         clicks: band.clicks,
         prevClicks: band.prevClicks,
+        enteredCount: band.enteredCount,
+        leftCount: band.leftCount,
         entered: moves(band.entered),
         left: moves(band.left),
       })),

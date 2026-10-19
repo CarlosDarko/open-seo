@@ -68,6 +68,32 @@ const snapshot = {
   queryLosers: [],
   newQueries: 12,
   lostQueries: 3,
+  newQueriesList: [
+    {
+      query: "seo para dentistas",
+      clicks: 4,
+      impressions: 300,
+      position: 8,
+      prevClicks: 0,
+      prevPosition: null,
+    },
+  ],
+  lostQueriesList: [],
+  queriesByBand: [
+    [
+      {
+        query: "seo local",
+        clicks: 40,
+        impressions: 900,
+        position: 2.1,
+        prevClicks: 0,
+        prevPosition: null,
+      },
+    ],
+    [],
+    [],
+    [],
+  ],
   bands: [
     {
       label: "Posiciones 1-3",
@@ -181,11 +207,26 @@ describe("renderReportDocument", () => {
   });
 
   it("builds the findings, topics and technical sections and the brand", () => {
-    for (const id of ["hallazgos", "evolucion", "temas", "tecnico"]) {
-      expect(html).toContain(`id="${id}"`);
+    for (const id of [
+      "trafico",
+      "posiciones",
+      "busquedas",
+      "temas",
+      "tecnico",
+    ]) {
+      expect(html).toContain(`data-panel="${id}"`);
     }
+    expect(html).toContain("Resumen ejecutivo");
     expect(html).toContain("<svg");
     expect(html).toContain("carlosortega.page");
+  });
+
+  it("opens every page link in a new tab and lists the searches behind a figure", () => {
+    expect(html).toContain(
+      'href="https://example.com/a/" target="_blank" rel="noopener noreferrer"',
+    );
+    expect(html).toContain("seo para dentistas");
+    expect(html).toContain("google.com/search?q=seo%20para%20dentistas");
   });
 
   it("always shows an encouraging reading under each finding", () => {
@@ -194,11 +235,11 @@ describe("renderReportDocument", () => {
 
   it("leaves out the sections the consultant hides", () => {
     const hidden = renderReportDocument(
-      { ...report, notes: { ...report.notes, hidden: ["temas"] } },
+      { ...report, notes: { ...report.notes, hidden: ["temas", "reparto"] } },
       "public",
     );
-    expect(hidden).not.toContain('id="temas"');
-    expect(html).toContain('id="temas"');
+    expect(hidden).not.toContain('data-panel="temas"');
+    expect(html).toContain('data-panel="temas"');
   });
 
   it("ships a browser script that is valid JavaScript", () => {

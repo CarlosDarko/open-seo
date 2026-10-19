@@ -272,6 +272,8 @@ export async function buildRadarReport(projectId: string, data: RadarInput) {
       },
       queryChanges: winnersAndLosers(queryChanges),
       ...newAndLostQueries(queryChanges),
+      // The client reports list more of them than the Radar page does.
+      newAndLostFull: newAndLostQueries(queryChanges, 40),
       ctrOpportunities: allCtr.slice(0, 20),
       nearTop: nearTopOpportunities(queryPageRows, curve, minImpressions, 60)
         .filter((item) => !ctrQueries.has(item.query))

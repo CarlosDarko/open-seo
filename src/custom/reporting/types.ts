@@ -44,6 +44,17 @@ export type BandMove = {
   query: string;
   position: number | null;
   prevPosition: number | null;
+  impressions: number;
+};
+
+/** One search with its figures, to list it in a table. */
+export type QueryRow = {
+  query: string;
+  clicks: number;
+  impressions: number;
+  position: number | null;
+  prevClicks: number;
+  prevPosition: number | null;
 };
 
 export type BandLine = {
@@ -52,6 +63,9 @@ export type BandLine = {
   prevQueries: number;
   clicks: number;
   prevClicks: number;
+  /** How many searches entered / left the band, and the biggest of each. */
+  enteredCount: number;
+  leftCount: number;
   entered: BandMove[];
   left: BandMove[];
 };
@@ -85,7 +99,7 @@ export type TopicLine = {
 };
 
 export type ReportSnapshot = {
-  version: 3;
+  version: 4;
   generatedAt: string;
   siteUrl: string;
   range: { startDate: string; endDate: string };
@@ -121,8 +135,13 @@ export type ReportSnapshot = {
   pageLosers: ChangeLine[];
   queryWinners: ChangeLine[];
   queryLosers: ChangeLine[];
+  /** How many searches appeared / disappeared, and the biggest of each. */
   newQueries: number;
   lostQueries: number;
+  newQueriesList: QueryRow[];
+  lostQueriesList: QueryRow[];
+  /** The main searches of each position band, in the order of `bands`. */
+  queriesByBand: QueryRow[][];
   bands: BandLine[];
   segments: {
     device: SegmentLine[];

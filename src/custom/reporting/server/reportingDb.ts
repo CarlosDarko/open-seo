@@ -61,7 +61,7 @@ export function normalizeSnapshot(
 ): ReportSnapshot {
   const empty = { clicks: 0, impressions: 0, ctr: 0, position: 0 };
   return {
-    version: 3,
+    version: 4,
     generatedAt: raw.generatedAt ?? new Date().toISOString(),
     siteUrl: raw.siteUrl ?? "",
     range: raw.range ?? { startDate: "2000-01-01", endDate: "2000-01-01" },
@@ -95,10 +95,21 @@ export function normalizeSnapshot(
     queryLosers: raw.queryLosers ?? [],
     newQueries: raw.newQueries ?? 0,
     lostQueries: raw.lostQueries ?? 0,
+    newQueriesList: raw.newQueriesList ?? [],
+    lostQueriesList: raw.lostQueriesList ?? [],
+    queriesByBand: raw.queriesByBand ?? [[], [], [], []],
     bands: (raw.bands ?? []).map((band) => ({
       ...band,
-      entered: band.entered ?? [],
-      left: band.left ?? [],
+      enteredCount: band.enteredCount ?? (band.entered ?? []).length,
+      leftCount: band.leftCount ?? (band.left ?? []).length,
+      entered: (band.entered ?? []).map((move) => ({
+        ...move,
+        impressions: move.impressions ?? 0,
+      })),
+      left: (band.left ?? []).map((move) => ({
+        ...move,
+        impressions: move.impressions ?? 0,
+      })),
     })),
     segments: {
       device: raw.segments?.device ?? [],

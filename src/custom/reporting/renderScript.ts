@@ -116,16 +116,35 @@ export const REPORT_SCRIPT = `
     window.addEventListener("resize",draw);draw();
   }
 
+  /* ---------- tabs, sub-tabs and links between them ---------- */
+  var tabBtns=document.querySelectorAll("[data-tab]");
+  var tabPanels=document.querySelectorAll("[data-panel]");
+  function openTab(id,scroll){
+    each(tabBtns,function(b){b.className=b.getAttribute("data-tab")===id?"on":"";});
+    each(tabPanels,function(p){p.className="panel"+(p.getAttribute("data-panel")===id?" on":"");});
+    if(id==="trafico")draw();
+    try{history.replaceState(null,"","#"+id);}catch(e){}
+    if(scroll){var bar=document.getElementById("tabs");if(bar)window.scrollTo({top:bar.getBoundingClientRect().top+window.scrollY-56,behavior:reduce?"auto":"smooth"});}
+  }
+  each(tabBtns,function(b){b.addEventListener("click",function(){openTab(b.getAttribute("data-tab"),true);});});
+  each(document.querySelectorAll("[data-go]"),function(a){a.addEventListener("click",function(ev){ev.preventDefault();openTab(a.getAttribute("data-go"),true);});});
+  document.addEventListener("click",function(ev){
+    var b=ev.target.closest?ev.target.closest("[data-sub]"):null;if(!b)return;
+    var group=b.closest(".stg");if(!group)return;
+    var id=b.getAttribute("data-sub");
+    each(group.querySelectorAll("[data-sub]"),function(o){o.className=o===b?"on":"";});
+    each(group.querySelectorAll("[data-sp]"),function(p){p.className="sp"+(p.getAttribute("data-sp")===id?" on":"");});
+  });
+  var first=window.location.hash.slice(1);
+  if(first){var exists=false;each(tabBtns,function(b){if(b.getAttribute("data-tab")===first)exists=true;});if(exists)openTab(first,false);}
+
   /* ---------- top bar and menu ---------- */
   var bar=document.getElementById("top");
   var totop=document.getElementById("totop");
   if(totop)totop.addEventListener("click",function(){window.scrollTo({top:0,behavior:reduce?"auto":"smooth"});});
-  var links=document.querySelectorAll(".nav a");
   function onScroll(){
     if(bar)bar.className=window.scrollY>40?"top solid":"top";
     if(totop)totop.className=window.scrollY>700?"totop show":"totop";
-    var cur=null;each(links,function(a){var s=document.getElementById(a.getAttribute("href").slice(1));if(s&&s.getBoundingClientRect().top<160)cur=a;});
-    each(links,function(a){a.className=a===cur?"on":"";});
   }
   window.addEventListener("scroll",onScroll,{passive:true});onScroll();
   window.addEventListener("beforeprint",function(){each(document.querySelectorAll(".rv"),function(n){n.classList.add("in");});draw();});

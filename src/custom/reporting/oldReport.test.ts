@@ -85,7 +85,7 @@ describe("reports saved by an earlier version", () => {
       },
     } as ReportFull;
     const html = renderReportDocument(report, "public");
-    expect(html).toContain('id="diagnostico"');
+    expect(html).toContain("Diagnóstico de las páginas");
     expect(html).toContain('class="serp"');
     expect(html).toContain("El título no menciona");
   });

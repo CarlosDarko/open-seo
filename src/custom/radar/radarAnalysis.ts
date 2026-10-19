@@ -417,18 +417,21 @@ export function winnersAndLosers<T extends ChangeRow>(rows: T[], limit = 10) {
 
 /** Queries that appear (or vanish) between periods, by visibility. */
 export function newAndLostQueries(rows: ChangeRow[], limit = 15) {
+  const fresh = rows
+    .filter((row) => row.status === "new" && row.impressions >= 10)
+    .sort((a, b) => b.impressions - a.impressions);
+  const gone = rows
+    .filter((row) => row.status === "lost" && row.prevImpressions >= 10)
+    .sort(
+      (a, b) =>
+        b.prevClicks - a.prevClicks || b.prevImpressions - a.prevImpressions,
+    );
   return {
-    newQueries: rows
-      .filter((row) => row.status === "new" && row.impressions >= 10)
-      .sort((a, b) => b.impressions - a.impressions)
-      .slice(0, limit),
-    lostQueries: rows
-      .filter((row) => row.status === "lost" && row.prevImpressions >= 10)
-      .sort(
-        (a, b) =>
-          b.prevClicks - a.prevClicks || b.prevImpressions - a.prevImpressions,
-      )
-      .slice(0, limit),
+    newQueries: fresh.slice(0, limit),
+    lostQueries: gone.slice(0, limit),
+    /** How many there are in all, beyond the `limit` listed. */
+    newCount: fresh.length,
+    lostCount: gone.length,
   };
 }
 
