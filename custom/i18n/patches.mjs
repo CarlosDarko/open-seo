@@ -26,6 +26,14 @@ export const SOURCE_PATCHES = [
     from: "const { payload } = event;",
     to: "const { payload } = event;\n    if (\"researchPhase\" in payload) return runResearchPhase(payload);",
   },
+  {
+    // Prompt Research in the project's own language and market
+    // (src/custom/ai/promptResearch.ts): OpenSEO's reads DataForSEO data that
+    // only exists for US English.
+    file: "src/server/features/ai-visibility/services/AiVisibilityService.ts",
+    from: 'import { listAiResearchKeywords, researchAiPrompts } from "./aiPromptResearch";',
+    to: 'import { listAiResearchKeywords } from "./aiPromptResearch";\nimport { researchAiPromptsLocal as researchAiPrompts } from "@/custom/ai/promptResearch";',
+  },
   // The brand research of "AI visibility" runs as ONE Workflow step, and the
   // free Workers plan allows 50 subrequests per invocation: reading five
   // competitor sites (each one discovers and fetches several pages) plus the
