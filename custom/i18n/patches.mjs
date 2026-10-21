@@ -6,6 +6,42 @@
 //
 // file: path ending of the file; from: RegExp or string; to: replacement.
 export const SOURCE_PATCHES = [
+  // The brand research of "AI visibility" runs as ONE Workflow step, and the
+  // free Workers plan allows 50 subrequests per invocation: reading five
+  // competitor sites (each one discovers and fetches several pages) plus the
+  // model steps went over and the step failed ("Too many subrequests"). These
+  // limits keep one run within it: fewer model steps, three competitor sites,
+  // one page each, two pages of the own site.
+  {
+    file: "src/server/features/projects/services/websiteResearch.ts",
+    from: "stopWhen: stepCountIs(7),",
+    to: "stopWhen: stepCountIs(5),",
+  },
+  {
+    file: "src/server/features/projects/services/websiteResearch.ts",
+    from: "if (sitesRead > 5)",
+    to: "if (sitesRead > 3)",
+  },
+  {
+    file: "src/server/features/projects/services/websiteResearch.ts",
+    from: "Read at most five businesses in total.",
+    to: "Read at most three businesses in total.",
+  },
+  {
+    file: "src/server/features/projects/services/websiteResearch.ts",
+    from: "domains: z.array(z.string().min(1).max(255)).min(1).max(5),",
+    to: "domains: z.array(z.string().min(1).max(255)).min(1).max(3),",
+  },
+  {
+    file: "src/server/features/projects/services/websiteResearch.ts",
+    from: "const pages = (await readSite(candidate, 2)).pages;",
+    to: "const pages = (await readSite(candidate, 1)).pages;",
+  },
+  {
+    file: "src/server/features/projects/services/websiteResearch.ts",
+    from: "? await readSite(project.domain ? `https://${domain}` : website, 3)",
+    to: "? await readSite(project.domain ? `https://${domain}` : website, 2)",
+  },
   {
     // The project home is our own page (src/custom/dashboard/HomePage.tsx),
     // which reuses OpenSEO's onboarding and cards.
