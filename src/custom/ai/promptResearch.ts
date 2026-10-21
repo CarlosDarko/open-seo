@@ -186,10 +186,29 @@ export async function researchAiPromptsLocal(
   if (cachedRaw.success) {
     research = cachedRaw.data;
   } else {
-    const google = await readGoogle(
-      city ? `${keyword} ${city}` : keyword,
-      market,
-    );
+    // DataForSEO's live Google search fails now and then ("Internal SE Server
+    // Error"): retry, and if it keeps failing write the prompts without it.
+    let google: Awaited<ReturnType<typeof readGoogle>> = {
+      questions: [],
+      related: [],
+      results: [],
+    };
+    let googleError: unknown = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        google = await readGoogle(
+          city ? `${keyword} ${city}` : keyword,
+          market,
+        );
+        googleError = null;
+        break;
+      } catch (error) {
+        googleError = error;
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+      }
+    }
+    if (googleError)
+      console.error("[prompt-research] Google failed", googleError);
     let written: string[] = [];
     try {
       written = await generate(keyword, market, project, google, city);
@@ -216,7 +235,8 @@ export async function researchAiPromptsLocal(
     for (const item of google.questions.slice(0, 10))
       add(item.question, "google", item.source ? [item.source] : []);
     research = { prompts: prompts.slice(0, MAX_PROMPTS) };
-    await setCached(cacheKey, research, TTL_SECONDS);
+    // Without Google's data it is not worth keeping for a day.
+    if (!googleError) await setCached(cacheKey, research, TTL_SECONDS);
   }
 
   const state = await getTracker({ projectId: input.projectId });
