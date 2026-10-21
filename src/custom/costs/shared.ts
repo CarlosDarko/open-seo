@@ -35,6 +35,8 @@ const FEATURE_LABELS_ES: Record<string, string> = {
   ai_prompt_responses: "Explorador de prompts (IA)",
   local_seo: "SEO local",
   agent: "Agente SAM",
+  openrouter: "IA de OpenRouter (investigación de marca y asistente)",
+  "report-ai": "IA de los informes (Anthropic)",
 };
 
 export function costFeatureLabel(feature: string): string {

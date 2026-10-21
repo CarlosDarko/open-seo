@@ -12,6 +12,7 @@ import {
   type CostSettings,
 } from "@/custom/costs/shared";
 import { getProviderBalance } from "@/custom/costs/server/balance";
+import { syncOpenRouterUsage } from "@/custom/costs/server/openrouter";
 import { getUsdEurRate, type UsdEurRate } from "@/custom/costs/server/fx";
 import { getCostSettings } from "@/custom/costs/server/settings";
 
@@ -103,6 +104,8 @@ export type CostOverview = {
     daysLeft: number | null;
     fetchedAt: number;
   } | null;
+  /** Credit left at OpenRouter (null without a key or when unreachable). */
+  openrouter: { eur: number; usd: number; fetchedAt: number } | null;
   reconciliation: {
     providerSpentEur: number;
     loggedEur: number;
@@ -114,6 +117,7 @@ export type CostOverview = {
 export async function getCostOverview(
   organizationId: string,
 ): Promise<CostOverview> {
+  const openrouterState = await syncOpenRouterUsage(organizationId);
   const day = madridDay();
   const monthStart = monthStartOf(day);
   const last7Start = addDays(day, -6);
@@ -185,7 +189,10 @@ export async function getCostOverview(
     )
       .bind(organizationId, recentStart, day)
       .first<{ eur: number | null }>(),
-    env.DB.prepare(`SELECT SUM(cost_usd) AS usd FROM cost_ledger`).first<{
+    env.DB.prepare(
+      `SELECT SUM(cost_usd) AS usd FROM cost_ledger
+        WHERE feature NOT IN ('openrouter', 'report-ai')`,
+    ).first<{
       usd: number | null;
     }>(),
   ]);
@@ -255,6 +262,14 @@ export async function getCostOverview(
     })),
     byUser: userRows.results,
     balance: balanceInfo,
+    openrouter:
+      openrouterState && openrouterState.balanceUsd !== null
+        ? {
+            eur: usdToEur(openrouterState.balanceUsd, fx.rate),
+            usd: openrouterState.balanceUsd,
+            fetchedAt: openrouterState.fetchedAt,
+          }
+        : null,
     reconciliation,
     alerts: buildCostAlerts({
       day,
@@ -269,6 +284,7 @@ export async function getCostOverview(
 
 /** Lighter than the overview: only what the sidebar and banners need. */
 export async function getCostSummary(organizationId: string) {
+  await syncOpenRouterUsage(organizationId);
   const day = madridDay();
   const [fx, settings, balance, month, today, recent] = await Promise.all([
     getUsdEurRate(),

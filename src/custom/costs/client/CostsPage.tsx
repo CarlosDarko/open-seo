@@ -157,6 +157,18 @@ export function CostsPage() {
             />
           </section>
 
+          {overview.openrouter ? (
+            <p className="text-xs text-muted-foreground">
+              Saldo en OpenRouter (IA de la investigación de marca y del
+              asistente):{" "}
+              <strong className="text-foreground">
+                {formatEur(overview.openrouter.eur)}
+              </strong>
+              . El gasto de IA aparece en el desglose como «IA de OpenRouter» y
+              «IA de los informes».
+            </p>
+          ) : null}
+
           <Card>
             <CardHeader>
               <CardTitle>Gasto diario</CardTitle>
