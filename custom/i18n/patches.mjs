@@ -6,18 +6,25 @@
 //
 // file: path ending of the file; from: RegExp or string; to: replacement.
 export const SOURCE_PATCHES = [
-  // The AI visibility setup runs in several Workflow steps instead of one
-  // (src/custom/ai/researchStaged.ts): each step has its own 50 subrequests on
-  // the free Workers plan, and the single upstream step went over them.
+  // The AI visibility setup runs as a chain of short Workflow instances
+  // (src/custom/ai/researchStaged.ts): on the free Workers plan one invocation
+  // (a whole instance, steps included) may make 50 subrequests, and the
+  // upstream research went over them.
   {
     file: "src/server/workflows/AiVisibilityWorkflow.ts",
     from: 'import { runAiResearchSetup } from "@/server/features/ai-visibility/services/aiResearchKeywords";',
-    to: 'import { runAiResearchSetup } from "@/server/features/ai-visibility/services/aiResearchKeywords";\nimport { runAiResearchSetupStaged } from "@/custom/ai/researchStaged";',
+    to: 'import { runAiResearchSetup } from "@/server/features/ai-visibility/services/aiResearchKeywords";\nimport { runAiResearchSetupStaged, runResearchPhase } from "@/custom/ai/researchStaged";',
   },
   {
     file: "src/server/workflows/AiVisibilityWorkflow.ts",
     from: /return pgStep\(\s*step,\s*"research-setup",[\s\S]*?\{ runSeededTracking: payload\.runSeededTracking \},\s*\),\s*\);/,
     to: "return runAiResearchSetupStaged(step, { projectId: payload.setupProjectId }, payload.customer, { runSeededTracking: payload.runSeededTracking });",
+  },
+  {
+    // A phase instance (one short slice of the research, its own invocation).
+    file: "src/server/workflows/AiVisibilityWorkflow.ts",
+    from: "const { payload } = event;",
+    to: "const { payload } = event;\n    if (\"researchPhase\" in payload) return runResearchPhase(payload);",
   },
   // The brand research of "AI visibility" runs as ONE Workflow step, and the
   // free Workers plan allows 50 subrequests per invocation: reading five
