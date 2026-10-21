@@ -34,6 +34,19 @@ export const SOURCE_PATCHES = [
     from: 'import { listAiResearchKeywords, researchAiPrompts } from "./aiPromptResearch";',
     to: 'import { listAiResearchKeywords } from "./aiPromptResearch";\nimport { researchAiPromptsLocal as researchAiPrompts } from "@/custom/ai/promptResearch";',
   },
+  {
+    // Our Prompt Research (src/custom/ai/promptResearch.ts) has not asked any
+    // AI: the "brand not mentioned" badge and "answered from memory" line of
+    // the original would be false. Tracking the prompt is what measures it.
+    file: "src/client/features/ai-visibility/PromptResearchTable.tsx",
+    from: /<Badge variant=\{prompt\.brandMentioned \? "success" : "outline"\}>[\s\S]*?<\/Badge>/,
+    to: "",
+  },
+  {
+    file: "src/client/features/ai-visibility/PromptResearchTable.tsx",
+    from: "The AI answered from memory and cited no sources.",
+    to: "Suggested prompt: no AI has been asked yet. Tracking it shows in which answers your brand appears and which sources they cite.",
+  },
   // The brand research of "AI visibility" runs as ONE Workflow step, and the
   // free Workers plan allows 50 subrequests per invocation: reading five
   // competitor sites (each one discovers and fetches several pages) plus the
