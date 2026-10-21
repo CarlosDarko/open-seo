@@ -47,6 +47,45 @@ export const SOURCE_PATCHES = [
     from: "The AI answered from memory and cited no sources.",
     to: "Suggested prompt: no AI has been asked yet. Tracking it shows in which answers your brand appears and which sources they cite.",
   },
+  // A city for the Prompt Research ("topic · city" travels in the keyword).
+  {
+    file: "src/client/features/ai-visibility/PromptResearchPage.tsx",
+    from: 'import { PromptResearchKeyword } from "./PromptResearchKeyword";',
+    to: 'import { Input } from "@/client/components/ui/input";\nimport { PromptResearchKeyword } from "./PromptResearchKeyword";',
+  },
+  {
+    file: "src/client/features/ai-visibility/PromptResearchPage.tsx",
+    from: 'const [draft, setDraft] = useState(keyword ?? "");',
+    to: 'const [draft, setDraft] = useState((keyword ?? "").split(" · ")[0]);\n  const [city, setCity] = useState((keyword ?? "").split(" · ")[1] ?? "");',
+  },
+  {
+    file: "src/client/features/ai-visibility/PromptResearchPage.tsx",
+    from: "search: { q: draft.trim() },",
+    to: 'search: { q: city.trim() ? draft.trim() + " · " + city.trim() : draft.trim() },',
+  },
+  {
+    file: "src/client/features/ai-visibility/PromptResearchPage.tsx",
+    from: /secondRow=\{\s*<p\s+id="ai-keyword-research-cost"[\s\S]*?<\/p>\s*\}/,
+    to: 'secondRow={<div className="flex flex-wrap items-center gap-3"><Input value={city} onChange={(event) => setCity(event.target.value)} placeholder="City or area (optional)" aria-label="City or area" maxLength={60} className="h-8 w-72" /><p id="ai-keyword-research-cost" className="text-xs text-muted-foreground">About $0.25 in credits per keyword.</p></div>}',
+  },
+  {
+    file: "src/client/features/ai-visibility/PromptResearchKeyword.tsx",
+    from: "normalizeAiSuggestion(name) === normalizeAiSuggestion(keyword),",
+    to: 'normalizeAiSuggestion(name) === normalizeAiSuggestion(keyword.split(" · ")[0]),',
+  },
+  {
+    file: "src/client/features/ai-visibility/PromptResearchKeyword.tsx",
+    from: ") ?? keyword,",
+    to: ') ?? keyword.split(" · ")[0],',
+  },
+  {
+    // Nothing is tracked on its own: after the brand research OpenSEO used to
+    // create the tracker with the first three topics and run a first
+    // measurement. Only the prompts picked by hand are tracked.
+    file: "src/server/features/ai-visibility/services/websiteTrackingSetup.ts",
+    from: "!input.suggestedTopics?.length ||",
+    to: "true ||",
+  },
   // The brand research of "AI visibility" runs as ONE Workflow step, and the
   // free Workers plan allows 50 subrequests per invocation: reading five
   // competitor sites (each one discovers and fetches several pages) plus the
