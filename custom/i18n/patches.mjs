@@ -79,6 +79,22 @@ export const SOURCE_PATCHES = [
     to: ') ?? keyword.split(" · ")[0],',
   },
   {
+    // The research works without a tracker (nothing is created on its own now).
+    file: "src/client/features/ai-visibility/PromptResearchPage.tsx",
+    from: "{!state?.configured ? (",
+    to: "{false ? (",
+  },
+  {
+    file: "src/client/features/ai-visibility/PromptResearchKeyword.tsx",
+    from: "selectedCount={selected.length}",
+    to: "selectedCount={state.configured ? selected.length : 0}",
+  },
+  {
+    file: "src/client/features/ai-visibility/PromptResearchKeyword.tsx",
+    from: "<TableBulkActionBar",
+    to: '{!state.configured && <p className="rounded-lg border bg-card p-3 text-sm text-muted-foreground border-border">Prompt tracking is not set up yet. Set it up first in Prompt tracking to be able to track prompts from here.</p>}\n      <TableBulkActionBar',
+  },
+  {
     // Nothing is tracked on its own: after the brand research OpenSEO used to
     // create the tracker with the first three topics and run a first
     // measurement. Only the prompts picked by hand are tracked.
