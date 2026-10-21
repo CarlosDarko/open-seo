@@ -187,7 +187,7 @@ export async function researchAiPromptsLocal(
     research = cachedRaw.data;
   } else {
     // DataForSEO's live Google search fails now and then ("Internal SE Server
-    // Error"): retry, and if it keeps failing write the prompts without it.
+    // Error"): retry a couple of times.
     let google: Awaited<ReturnType<typeof readGoogle>> = {
       questions: [],
       related: [],
@@ -207,8 +207,11 @@ export async function researchAiPromptsLocal(
         await new Promise((resolve) => setTimeout(resolve, 1500));
       }
     }
-    if (googleError)
+    // No Google data, no prompts: nothing is made up without it.
+    if (googleError) {
       console.error("[prompt-research] Google failed", googleError);
+      throw googleError;
+    }
     let written: string[] = [];
     try {
       written = await generate(keyword, market, project, google, city);
