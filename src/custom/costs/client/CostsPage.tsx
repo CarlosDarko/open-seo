@@ -105,7 +105,7 @@ export function CostsPage() {
     <div className="mx-auto w-full max-w-6xl space-y-6 px-4 py-6 md:px-6">
       <PageHeader
         title="Costes"
-        description="Todo el gasto en DataForSEO, en euros."
+        description="Todo el gasto en datos (DataForSEO) y en IA (OpenRouter y Anthropic), en euros."
         actions={
           overview ? (
             <p className="max-w-xs text-right text-xs text-muted-foreground">
@@ -143,7 +143,7 @@ export function CostsPage() {
             </div>
           ) : null}
 
-          <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
             <KpiCard label="Hoy" value={formatEur(overview.totals.today)} />
             <KpiCard
               label="Últimos 7 días"
@@ -155,19 +155,21 @@ export function CostsPage() {
               refreshing={refreshBalance.isPending}
               onRefresh={() => refreshBalance.mutate()}
             />
+            <KpiCard
+              label="Saldo en OpenRouter"
+              value={
+                overview.openrouter
+                  ? formatEur(overview.openrouter.eur)
+                  : "No disponible"
+              }
+            >
+              <p className="text-xs text-muted-foreground">
+                IA de la investigación de marca y del asistente. El gasto de IA
+                sale en el desglose como «IA de OpenRouter» y «IA de los
+                informes».
+              </p>
+            </KpiCard>
           </section>
-
-          {overview.openrouter ? (
-            <p className="text-xs text-muted-foreground">
-              Saldo en OpenRouter (IA de la investigación de marca y del
-              asistente):{" "}
-              <strong className="text-foreground">
-                {formatEur(overview.openrouter.eur)}
-              </strong>
-              . El gasto de IA aparece en el desglose como «IA de OpenRouter» y
-              «IA de los informes».
-            </p>
-          ) : null}
 
           <Card>
             <CardHeader>
