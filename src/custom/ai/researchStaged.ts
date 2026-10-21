@@ -53,7 +53,11 @@ const STEP = {
   timeout: "4 minutes" as const,
 };
 const SEARCH_RETRIES = 3;
-const MAX_CANDIDATES = 5;
+// More candidates are read than competitors are kept: the final step picks
+// the best verified ones with the pages in front of it, so one weak choice
+// from the search results does not cost a competitor.
+const MAX_CANDIDATES = 8;
+const CANDIDATE_PAGE_TEXT = 2500;
 const PAGE_TEXT = 3500;
 
 type Page = { url: string; title: string | null; text: string };
@@ -259,7 +263,7 @@ export async function runAiResearchSetupStaged(
             }),
             maxOutputTokens: 600,
             abortSignal: AbortSignal.timeout(90_000),
-            system: `From these Google results, choose up to five domains that look like real competitors: businesses that sell competing products or services to the same customers. Ranking sites, publishers, directories, marketplaces, customers and cited sources are not competitors. Return fewer, or none, if the evidence is thin. ${UNTRUSTED}`,
+            system: `From these Google results, choose up to eight domains that look like real competitors: businesses that sell competing products or services to the same customers. Ranking sites, publishers, directories, marketplaces, customers and cited sources are not competitors. Return fewer, or none, if the evidence is thin. ${UNTRUSTED}`,
             prompt: JSON.stringify({
               ownDomain: context.domain,
               businessSections: context.sections,
@@ -291,7 +295,12 @@ export async function runAiResearchSetupStaged(
           STEP,
           async () => ({
             domain: candidate,
-            pages: clipPages((await readSite(candidate, 2)).pages),
+            pages: clipPages((await readSite(candidate, 2)).pages).map(
+              (page) => ({
+                ...page,
+                text: page.text.slice(0, CANDIDATE_PAGE_TEXT),
+              }),
+            ),
           }),
         );
         candidates.push(read);
