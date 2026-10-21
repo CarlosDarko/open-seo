@@ -86,13 +86,8 @@ export const SOURCE_PATCHES = [
   },
   {
     file: "src/client/features/ai-visibility/PromptResearchKeyword.tsx",
-    from: "selectedCount={selected.length}",
-    to: "selectedCount={state.configured ? selected.length : 0}",
-  },
-  {
-    file: "src/client/features/ai-visibility/PromptResearchKeyword.tsx",
     from: "<TableBulkActionBar",
-    to: '{!state.configured && <p className="rounded-lg border bg-card p-3 text-sm text-muted-foreground border-border">Prompt tracking is not set up yet. Set it up first in Prompt tracking to be able to track prompts from here.</p>}\n      <TableBulkActionBar',
+    to: '{!state.configured && <p className="rounded-lg border bg-card p-3 text-sm text-muted-foreground border-border">Prompt tracking does not exist yet. Tracking your first prompt creates it: weekly checks, the first one in 7 days, so nothing is charged until then.</p>}\n      <TableBulkActionBar',
   },
   {
     // Nothing is tracked on its own: after the brand research OpenSEO used to
