@@ -148,7 +148,14 @@ export function translateEs() {
         }
         return { code: out, map: null };
       }
-      if (!UI_FILE.test(file) || file.includes("/node_modules/")) return null;
+      if (file.includes("/node_modules/")) return null;
+      if (!UI_FILE.test(file)) {
+        // Server files are not translated, but build patches (patches.mjs)
+        // can still target them, e.g. the AI visibility workflow.
+        if (!file.includes("/src/")) return null;
+        const patched = applySourcePatches(code, file);
+        return patched === code ? null : { code: patched, map: null };
+      }
       dataStrings ??= loadDataStrings();
       code = translateTemplates(applySourcePatches(code, file), file);
 

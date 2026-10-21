@@ -6,6 +6,19 @@
 //
 // file: path ending of the file; from: RegExp or string; to: replacement.
 export const SOURCE_PATCHES = [
+  // The AI visibility setup runs in several Workflow steps instead of one
+  // (src/custom/ai/researchStaged.ts): each step has its own 50 subrequests on
+  // the free Workers plan, and the single upstream step went over them.
+  {
+    file: "src/server/workflows/AiVisibilityWorkflow.ts",
+    from: 'import { runAiResearchSetup } from "@/server/features/ai-visibility/services/aiResearchKeywords";',
+    to: 'import { runAiResearchSetup } from "@/server/features/ai-visibility/services/aiResearchKeywords";\nimport { runAiResearchSetupStaged } from "@/custom/ai/researchStaged";',
+  },
+  {
+    file: "src/server/workflows/AiVisibilityWorkflow.ts",
+    from: /return pgStep\(\s*step,\s*"research-setup",[\s\S]*?\{ runSeededTracking: payload\.runSeededTracking \},\s*\),\s*\);/,
+    to: "return runAiResearchSetupStaged(step, { projectId: payload.setupProjectId }, payload.customer, { runSeededTracking: payload.runSeededTracking });",
+  },
   // The brand research of "AI visibility" runs as ONE Workflow step, and the
   // free Workers plan allows 50 subrequests per invocation: reading five
   // competitor sites (each one discovers and fetches several pages) plus the
