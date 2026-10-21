@@ -128,6 +128,12 @@ export async function runAiResearchSetupStaged(
   { runSeededTracking = false } = {},
 ): Promise<{ review: WebsiteResearch | null }> {
   const projectId = input.projectId;
+  // Steps that follow each other run inside the same Worker invocation and
+  // share its 50 subrequests (the run failed in the last step with every
+  // earlier one succeeded). A short sleep ends the invocation and the engine
+  // resumes in a fresh one, with a fresh budget; finished steps are replayed
+  // from their saved output without running again.
+  const rest = (name: string) => step.sleep(name, "1 second");
 
   // 1. What there already is, and the own site when it has to be summarised.
   const context = await pgStep<Context>(step, "setup-read", STEP, async () => {
@@ -247,6 +253,7 @@ export async function runAiResearchSetupStaged(
     searchOutage = searched.outage;
 
     if (!searchOutage) {
+      await rest("rest-pick");
       const picked = await pgStep<string[]>(
         step,
         "setup-pick",
@@ -289,6 +296,7 @@ export async function runAiResearchSetupStaged(
         .filter((value) => value !== context.domain)
         .slice(0, MAX_CANDIDATES);
       for (const [index, candidate] of wanted.entries()) {
+        await rest(`rest-read-${index}`);
         const read = await pgStep<{ domain: string; pages: Page[] }>(
           step,
           `setup-read-site-${index}`,
@@ -309,6 +317,7 @@ export async function runAiResearchSetupStaged(
   }
 
   // 6. The research itself, from all the evidence.
+  await rest("rest-final");
   const research = await pgStep<WebsiteResearch>(
     step,
     "setup-final",
@@ -441,6 +450,7 @@ export async function runAiResearchSetupStaged(
     },
   );
 
+  await rest("rest-finish");
   // 7. Only new basics or competitors need the user's review; a topics-only
   // result is saved directly, as OpenSEO does.
   return pgStep<{ review: WebsiteResearch | null }>(
