@@ -56,7 +56,7 @@ export const SOURCE_PATCHES = [
   {
     file: "src/client/features/ai-visibility/PromptResearchPage.tsx",
     from: 'const [draft, setDraft] = useState(keyword ?? "");',
-    to: 'const [draft, setDraft] = useState((keyword ?? "").split(" · ")[0]);\n  const [city, setCity] = useState((keyword ?? "").split(" · ")[1] ?? "");',
+    to: 'const [draft, setDraft] = useState((keyword ?? "").split(/ · ?/)[0]);\n  const [city, setCity] = useState((keyword ?? "").split(/ · ?/)[1] ?? "");',
   },
   {
     file: "src/client/features/ai-visibility/PromptResearchPage.tsx",
@@ -71,12 +71,12 @@ export const SOURCE_PATCHES = [
   {
     file: "src/client/features/ai-visibility/PromptResearchKeyword.tsx",
     from: "normalizeAiSuggestion(name) === normalizeAiSuggestion(keyword),",
-    to: 'normalizeAiSuggestion(name) === normalizeAiSuggestion(keyword.split(" · ")[0]),',
+    to: 'normalizeAiSuggestion(name) === normalizeAiSuggestion(keyword.split(/ · ?/)[0]),',
   },
   {
     file: "src/client/features/ai-visibility/PromptResearchKeyword.tsx",
     from: ") ?? keyword,",
-    to: ') ?? keyword.split(" · ")[0],',
+    to: ') ?? keyword.split(/ · ?/)[0],',
   },
   {
     // The research works without a tracker (nothing is created on its own now).
@@ -102,22 +102,29 @@ export const SOURCE_PATCHES = [
   {
     file: "src/client/features/ai-visibility/PromptResearchKeyword.tsx",
     from: "staleTime: 60 * 60 * 1000,",
-    to: "enabled: !keyword.endsWith(\" · \"),\n    staleTime: 60 * 60 * 1000,",
+    to: "enabled: !/ ·( )*$/.test(keyword),\n    staleTime: 60 * 60 * 1000,",
   },
   {
     file: "src/client/features/ai-visibility/PromptResearchKeyword.tsx",
     from: "isLoading={research.isPending}",
-    to: "isLoading={research.isPending && !keyword.endsWith(\" · \")}",
+    to: "isLoading={research.isPending && !/ ·( )*$/.test(keyword)}",
   },
   {
     file: "src/client/features/ai-visibility/PromptResearchKeyword.tsx",
     from: "title: `No prompts found for “${keyword}”`,",
-    to: "title: keyword.endsWith(\" · \") ? \"Add a city if you want, then press Search\" : `No prompts found for “${keyword}”`,",
+    to: "title: / ·( )*$/.test(keyword) ? \"Add a city if you want, then press Search\" : `No prompts found for “${keyword}”`,",
   },
   {
     file: "src/client/features/ai-visibility/PromptResearchKeyword.tsx",
     from: "description: \"Try a shorter, broader term.\",",
-    to: "description: keyword.endsWith(\" · \") ? \"Nothing is searched until you press Search, so it is not charged twice.\" : \"Try a shorter, broader term.\",",
+    to: "description: / ·( )*$/.test(keyword) ? \"Nothing is searched until you press Search, so it is not charged twice.\" : \"Try a shorter, broader term.\",",
+  },
+  {
+    // Almost no prompt has sources here: the Sources column and its
+    // expander only said "No sources", so the table keeps just the prompt.
+    file: "src/client/features/ai-visibility/PromptResearchTable.tsx",
+    from: "...promptColumns,",
+    to: "...promptColumns.slice(0, 1),",
   },
   {
     // Nothing is tracked on its own: after the brand research OpenSEO used to
