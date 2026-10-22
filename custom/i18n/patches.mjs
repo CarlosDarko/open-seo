@@ -90,6 +90,36 @@ export const SOURCE_PATCHES = [
     to: '{!state.configured && <p className="rounded-lg border bg-card p-3 text-sm text-muted-foreground border-border">Prompt tracking does not exist yet. Tracking your first prompt creates it: weekly checks, the first one in 7 days, so nothing is charged until then.</p>}\n      <TableBulkActionBar',
   },
   {
+    file: "src/client/features/ai-visibility/PromptResearchPage.tsx",
+    from: "search: { q: keyword },",
+    to: "search: { q: keyword + \" · \" },",
+  },
+  {
+    file: "src/client/features/ai-visibility/PromptResearchPage.tsx",
+    from: "search={{ q: keyword }}",
+    to: "search={{ q: keyword + \" · \" }}",
+  },
+  {
+    file: "src/client/features/ai-visibility/PromptResearchKeyword.tsx",
+    from: "staleTime: 60 * 60 * 1000,",
+    to: "enabled: !keyword.endsWith(\" · \"),\n    staleTime: 60 * 60 * 1000,",
+  },
+  {
+    file: "src/client/features/ai-visibility/PromptResearchKeyword.tsx",
+    from: "isLoading={research.isPending}",
+    to: "isLoading={research.isPending && !keyword.endsWith(\" · \")}",
+  },
+  {
+    file: "src/client/features/ai-visibility/PromptResearchKeyword.tsx",
+    from: "title: `No prompts found for “${keyword}”`,",
+    to: "title: keyword.endsWith(\" · \") ? \"Add a city if you want, then press Search\" : `No prompts found for “${keyword}”`,",
+  },
+  {
+    file: "src/client/features/ai-visibility/PromptResearchKeyword.tsx",
+    from: "description: \"Try a shorter, broader term.\",",
+    to: "description: keyword.endsWith(\" · \") ? \"Nothing is searched until you press Search, so it is not charged twice.\" : \"Try a shorter, broader term.\",",
+  },
+  {
     // Nothing is tracked on its own: after the brand research OpenSEO used to
     // create the tracker with the first three topics and run a first
     // measurement. Only the prompts picked by hand are tracked.
