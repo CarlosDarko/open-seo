@@ -526,7 +526,7 @@ span.dl.down{color:var(--down)}
 .cs{text-align:right;font-variant-numeric:tabular-nums}
 .cs b{font-size:16px}
 .cr .sb{margin:0}
-.ih{margin:6px 0 -6px}
+.ih{margin:18px 0 10px}
 .isl{display:grid;gap:14px}
 .is{border:1px solid var(--line);border-radius:14px;padding:18px 20px;background:#fff}
 .ish{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 12px}
