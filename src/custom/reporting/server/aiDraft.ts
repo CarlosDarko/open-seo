@@ -78,8 +78,24 @@ export async function aiStatus(): Promise<{
 }
 
 type CallResult =
-  | { ok: true; text: string; costEur: number }
-  | { ok: false; reason: "no_key" | "failed" };
+  | { ok: true; text: string; costEur: number; truncated: boolean }
+  | { ok: false; reason: "no_key" | "failed"; detail?: string };
+
+/** These texts need no long reasoning before they are written: the models
+ *  that think first by default would spend most of the answer's length on it
+ *  and the JSON would come back cut. Each model has its own way to keep that
+ *  short. */
+function modelOptions(model: string): Record<string, unknown> {
+  const lower = model.toLowerCase();
+  if (lower.includes("sonnet-5-5")) {
+    return { thinking: { type: "between_tools" } };
+  }
+  if (lower.includes("opus-5-5") || lower.includes("opus-5")) {
+    return { output_config: { effort: "low" } };
+  }
+  if (lower.includes("haiku-5-5")) return { thinking: { type: "disabled" } };
+  return {};
+}
 
 async function callClaude(input: {
   deep: boolean;
@@ -106,20 +122,27 @@ async function callClaude(input: {
       body: JSON.stringify({
         model,
         max_tokens: input.maxTokens,
+        ...modelOptions(model),
         system: input.system,
         messages: [{ role: "user", content: input.user }],
       }),
     });
     if (!response.ok) {
-      console.error("[report-ai] API answered", response.status);
-      return { ok: false, reason: "failed" };
+      const reply = (await response.text().catch(() => "")).slice(0, 220);
+      console.error("[report-ai] API answered", response.status, reply);
+      return {
+        ok: false,
+        reason: "failed",
+        detail: `Anthropic ha respondido ${response.status}: ${reply}`,
+      };
     }
     const body = (await response.json()) as {
       content?: { type: string; text?: string }[];
       stop_reason?: string;
       usage?: { input_tokens?: number; output_tokens?: number };
     };
-    if (body.stop_reason === "max_tokens") {
+    const truncated = body.stop_reason === "max_tokens";
+    if (truncated) {
       console.error("[report-ai] the answer was cut at max_tokens", input.kind);
     }
     const price = priceOf(model);
@@ -147,6 +170,7 @@ async function callClaude(input: {
     return {
       ok: true,
       costEur,
+      truncated,
       text: (body.content ?? [])
         .map((part) => (part.type === "text" ? (part.text ?? "") : ""))
         .join(""),
@@ -396,21 +420,29 @@ export async function draftWithAi(
   who: AiWho,
 ): Promise<
   | { ok: true; draft: AiDraft; costEur: number }
-  | { ok: false; reason: "no_key" | "failed" }
+  | { ok: false; reason: "no_key" | "failed"; detail?: string }
 > {
   const business = await businessContext(report.projectId);
   const answer = await callClaude({
     deep: true,
     system: WRITE_SYSTEM,
     user: `Datos del informe:\n${JSON.stringify(brief(report, business))}`,
-    maxTokens: 8000,
+    maxTokens: 10000,
     report,
     who,
     kind: "draft",
   });
   if (!answer.ok) return answer;
   const raw = parseJson<Partial<AiDraft>>(answer.text, "draft");
-  if (!raw) return { ok: false, reason: "failed" };
+  if (!raw) {
+    return {
+      ok: false,
+      reason: "failed",
+      detail: answer.truncated
+        ? "la respuesta de la IA se cortó por longitud"
+        : "la respuesta de la IA no tenía el formato esperado",
+    };
+  }
   const sectionNotes: Record<string, string> = {};
   for (const [key, value] of Object.entries(raw.sectionNotes ?? {})) {
     if (typeof value === "string" && value.trim()) {
@@ -460,7 +492,7 @@ export async function analyzeWithAi(
   who: AiWho,
 ): Promise<
   | ({ ok: true; costEur: number } & AiAnalysis)
-  | { ok: false; reason: "no_key" | "failed" | "nothing" }
+  | { ok: false; reason: "no_key" | "failed" | "nothing"; detail?: string }
 > {
   const { snapshot } = report;
   const losers = snapshot.pageLosers
@@ -545,7 +577,7 @@ export async function analyzeWithAi(
     deep: true,
     system: ANALYSIS_SYSTEM,
     user: `Datos:\n${JSON.stringify(payload)}`,
-    maxTokens: 8000,
+    maxTokens: 10000,
     report,
     who,
     kind: "analyze",
@@ -561,7 +593,15 @@ export async function analyzeWithAi(
       options?: { title?: string; description?: string }[];
     }[];
   }>(answer.text, "analysis");
-  if (!raw) return { ok: false, reason: "failed" };
+  if (!raw) {
+    return {
+      ok: false,
+      reason: "failed",
+      detail: answer.truncated
+        ? "la respuesta de la IA se cortó por longitud"
+        : "la respuesta de la IA no tenía el formato esperado",
+    };
+  }
 
   const knownUrls = new Set(urls);
   const knownQueries = new Set(opportunities.map((item) => item.query));

@@ -17,7 +17,12 @@ const lockKey = (reportId: string) => `report:prepare:${reportId}`;
 
 export type PrepareResult =
   | { ok: true; notes: ReportNotes; costEur: number }
-  | { ok: false; reason: "missing" | "busy" | "no_key" | "failed" };
+  | {
+      ok: false;
+      reason: "missing" | "busy" | "no_key" | "failed";
+      /** Why, in a few words, to show on screen. */
+      detail?: string;
+    };
 
 export async function prepareReportWithAi(
   projectId: string,
@@ -45,6 +50,7 @@ export async function prepareReportWithAi(
       return {
         ok: false,
         reason: drafted.reason === "no_key" ? "no_key" : "failed",
+        detail: drafted.detail ?? analysed.detail,
       };
     }
     let notes: ReportNotes = report.notes;

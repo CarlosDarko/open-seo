@@ -122,7 +122,7 @@ function Editor({
             ? "La redacción con IA no está activada (falta la clave de Anthropic)."
             : result.reason === "busy"
               ? "Este informe ya se está preparando. Espera un par de minutos."
-              : "La IA no ha podido redactar ahora. Prueba de nuevo.",
+              : `La IA no ha podido redactar ahora${result.detail ? ` (${result.detail})` : ""}. Prueba de nuevo.`,
         );
         return;
       }
@@ -240,7 +240,7 @@ function Editor({
             );
           } else {
             setError(
-              "La IA no ha podido redactar el informe. Prueba «Redactar con IA».",
+              `La IA no ha podido redactar el informe${prepared.detail ? ` (${prepared.detail})` : ""}. Prueba «Redactar con IA».`,
             );
           }
         }
