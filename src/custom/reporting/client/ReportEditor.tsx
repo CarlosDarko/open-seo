@@ -226,7 +226,7 @@ function Editor({
         }
         if (needsAi) {
           setInfo(
-            "Redactando el resumen y el análisis con IA (1 o 2 minutos)…",
+            "Redactando el resumen y el análisis con IA (hasta 3 minutos)…",
           );
           const prepared = await prepareClientReportWithAi({
             data: { projectId, reportId: report.id },

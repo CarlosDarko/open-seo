@@ -33,6 +33,7 @@ import { REPORT_CSS } from "@/custom/reporting/renderStyles";
 import {
   type AuditPage,
   type ChangeLine,
+  type OpportunityLine,
   type PageRow,
   type QueryRow,
   type QueryTableRow,
@@ -641,22 +642,96 @@ function executiveSummary(report: ReportFull, signer: Signer): string {
 
 // ------------------------------------------------------------- insights
 
-function insightCard(item: Insight): string {
-  const stats = item.stats
-    .map((stat) => `<span>${esc(stat.label)}<b>${esc(stat.value)}</b></span>`)
+/** Which tab explains each conclusion. */
+const INSIGHT_TAB: Record<string, string> = {
+  traffic: "trafico",
+  update: "trafico",
+  source: "trafico",
+  weekday: "trafico",
+  discover: "trafico",
+  top3: "posiciones",
+  queries: "busquedas",
+  brand: "busquedas",
+  winner: "paginas",
+  loser: "paginas",
+  concentration: "paginas",
+  mobile: "trafico",
+  device: "trafico",
+  topics: "temas",
+  opportunities: "oportunidades",
+  health: "tecnico",
+};
+
+const goLink = (item: Insight) =>
+  INSIGHT_TAB[item.id]
+    ? `<a class="go" href="#tabs" data-go="${INSIGHT_TAB[item.id]}">Ver el detalle →</a>`
+    : "";
+
+const statChips = (item: Insight, from: number) =>
+  item.stats
+    .slice(from)
+    .map(
+      (stat) =>
+        `<span class="sc2">${esc(stat.label)}<b>${esc(stat.value)}</b></span>`,
+    )
     .join("");
-  return `<article class="fd"><div class="top2"><span>${esc(item.topic)}</span><span class="tone ${item.tone}">${TONE_LABEL[item.tone]}</span></div><div class="t">${esc(item.title)}</div><p class="b">${esc(item.body)}</p><div class="st">${stats}</div></article>`;
+
+/** The conclusion with most weight, big: its main figure, what it says and
+ *  where to see more. */
+function featuredInsight(item: Insight, index: number): string {
+  const main = item.stats[0];
+  return `<article class="cf ${item.tone}"><div class="cft"><span class="no">${index + 1}</span><span class="tp2"><i class="dot ${item.tone}"></i>${esc(item.topic)}</span></div>${main ? `<div class="cfm"><b>${esc(main.value)}</b><span>${esc(main.label)}</span></div>` : ""}<h4>${esc(item.title)}</h4><p>${esc(item.body)}</p>${item.stats.length > 1 ? `<div class="cfs">${statChips(item, 1)}</div>` : ""}${goLink(item)}</article>`;
 }
 
+function insightRow(item: Insight): string {
+  const main = item.stats[0];
+  return `<div class="cr2"><div class="crm">${main ? `<b>${esc(main.value)}</b><span>${esc(main.label)}</span>` : `<i class="dot ${item.tone}"></i>`}</div><div class="crt"><span class="crk"><i class="dot ${item.tone}"></i>${esc(item.topic)}</span><h4>${esc(item.title)}</h4><p>${esc(item.body)}</p>${item.stats.length > 1 ? `<div class="cfs">${statChips(item, 1)}</div>` : ""}</div>${goLink(item)}</div>`;
+}
+
+const INSIGHT_GROUPS: {
+  title: string;
+  lead: string;
+  tones: Insight["tone"][];
+}[] = [
+  {
+    title: "Hay que actuar",
+    lead: "Lo que está perdiendo tráfico o visibilidad y conviene corregir primero.",
+    tones: ["bad"],
+  },
+  {
+    title: "A vigilar",
+    lead: "Cambios que todavía no son un problema pero pueden serlo.",
+    tones: ["warn", "info"],
+  },
+  {
+    title: "Va bien",
+    lead: "Lo que funciona y conviene proteger o repetir.",
+    tones: ["good"],
+  },
+];
+
 function insightsBlock(report: ReportFull): string {
-  const items = buildInsights(report.snapshot).slice(0, 12);
+  const items = buildInsights(report.snapshot).slice(0, 15);
   if (items.length === 0) return "";
+  const verdict = buildVerdict(report.snapshot);
+  const top = items.slice(0, 3);
+  const rest = items.slice(3);
+  const groups = INSIGHT_GROUPS.map((group) => ({
+    group,
+    list: rest.filter((item) => group.tones.includes(item.tone)),
+  }))
+    .filter(({ list }) => list.length > 0)
+    .map(
+      ({ group, list }) =>
+        `<section class="cg"><div class="cgh"><h3>${group.title}</h3><span>${list.length}</span></div><p class="cgl">${group.lead}</p><div class="crs2">${list.map(insightRow).join("")}</div></section>`,
+    )
+    .join("");
   return block(
     report,
     "hallazgos",
     "Conclusiones del periodo",
-    "Lectura conjunta de las distintas fuentes de Search Console: qué ha ocurrido, por qué y qué implica para el proyecto.",
-    `<div class="ins">${items.map(insightCard).join("")}</div>`,
+    "Lo que dicen los datos al cruzarlos, de lo más a lo menos importante. Cada conclusión enlaza con la pestaña donde se ve el detalle.",
+    `<div class="cv"><div class="cvk">En una frase</div><p>${esc(verdict.headline)}</p></div><h3 class="cs">Lo más importante</h3><div class="ctop">${top.map(featuredInsight).join("")}</div>${groups}`,
   );
 }
 
@@ -1172,51 +1247,206 @@ function brandBlock(report: ReportFull): string {
 
 // -------------------------------------------------------- opportunities
 
+const OPP_KIND_LABEL: Record<OpportunityLine["kind"], string> = {
+  push: "A un paso del top 3",
+  snippet: "Visible pero poco clicada",
+};
+
+const OPP_KIND_SHORT: Record<OpportunityLine["kind"], string> = {
+  push: "A un paso",
+  snippet: "Poco clicada",
+};
+
+/** How much work it takes: a title and a description are quick; climbing to
+ *  the top 3 from further down takes content and links. */
+function effortOf(row: OpportunityLine): 1 | 2 | 3 {
+  if (row.kind === "snippet") return 1;
+  return row.position <= 6 ? 2 : 3;
+}
+const EFFORT_NAME = ["", "Bajo", "Medio", "Alto"];
+
+const effortDots = (effort: 1 | 2 | 3) =>
+  `<span class="eff" title="Esfuerzo ${EFFORT_NAME[effort].toLowerCase()}"><i class="on"></i><i class="${effort >= 2 ? "on" : ""}"></i><i class="${effort >= 3 ? "on" : ""}"></i></span>`;
+
+/** The first thing to do is what gains most for the least work. */
+const priorityOf = (row: OpportunityLine) =>
+  row.potentialClicks / effortOf(row);
+
+function oppAnalysis(row: OpportunityLine): string {
+  const ctrNow = ctr(row.clicks, row.impressions);
+  const ctrWould = ctr(row.clicks + row.potentialClicks, row.impressions);
+  return row.kind === "snippet"
+    ? `La web se muestra **${num(row.impressions)} veces** pero solo el **${one.format(ctrNow * 100)} %** de las personas hace clic; en esa posición (${pos(row.position)}) lo normal sería cerca del **${one.format(ctrWould * 100)} %**. El título y la descripción no están convenciendo, y arreglarlo no exige tocar la página.`
+    : `La web aparece en la **posición ${pos(row.position)}** con **${num(row.impressions)} impresiones** y recibe ${num(row.clicks)} clics. Los tres primeros resultados se llevan la mayoría de los clics: llegar ahí podría traer unos **${num(row.clicks + row.potentialClicks)} clics**${row.clicks > 0 ? ` (${signedPctText(row.potentialClicks / row.clicks)})` : ""}.`;
+}
+
+const signedPctText = (value: number) =>
+  `${value >= 0 ? "+" : "−"}${one.format(Math.abs(value) * 100)} %`;
+
+function oppActions(row: OpportunityLine): string[] {
+  return row.kind === "snippet"
+    ? [
+        "Reescribir el título para que empiece por la búsqueda y diga qué se encuentra",
+        "Reescribir la descripción con un motivo claro para hacer clic",
+        "Medir el CTR de esta búsqueda en Search Console durante 4 semanas",
+      ]
+    : [
+        "Comprobar que la página responde justo a lo que busca la persona y ampliarla donde falte",
+        "Reforzar el enlazado interno hacia ella con un texto que contenga la búsqueda",
+        "Incluir la búsqueda de forma natural en el título y en los encabezados",
+      ];
+}
+
+function serpPreview(
+  host: string,
+  url: string | null,
+  title: string,
+  description: string,
+  label: string,
+): string {
+  const path = url ? pathOf(url) : "";
+  return `<div class="sl">${esc(label)}</div><div class="serp"><div class="su">${esc(host)}${esc(path)}</div><div class="st2">${esc(title)}</div>${description ? `<div class="sd">${esc(description)}</div>` : ""}</div>`;
+}
+
 function opportunitiesBlock(report: ReportFull): string {
   const rows = [...report.snapshot.opportunities].sort(
-    (a, b) => b.potentialClicks - a.potentialClicks,
+    (a, b) => priorityOf(b) - priorityOf(a),
   );
   if (rows.length === 0) return "";
+  const host = (() => {
+    try {
+      return new URL(report.snapshot.siteUrl).hostname;
+    } catch {
+      return report.snapshot.siteUrl.replace("sc-domain:", "");
+    }
+  })();
   const ideas = new Map(
     report.notes.opportunityIdeas.map((item) => [item.query, item] as const),
   );
-  const list = rows
-    .slice(0, 8)
+  const titles = new Map(
+    report.notes.titleIdeas
+      .filter((item) => item.options.length > 0)
+      .map((item) => [item.query, item] as const),
+  );
+  const total = rows.reduce((sum, row) => sum + row.potentialClicks, 0);
+  const quick = rows.filter((row) => effortOf(row) === 1);
+  const pushes = rows.filter((row) => row.kind === "push");
+  const topThree = rows
+    .slice(0, 3)
+    .reduce((sum, row) => sum + row.potentialClicks, 0);
+
+  const summary = chips([
+    {
+      value: `+${num(total)}`,
+      label: "clics posibles en un periodo como este",
+    },
+    { value: num(rows.length), label: "búsquedas con margen de mejora" },
+    {
+      value: `+${num(topThree)}`,
+      label: "solo con las 3 primeras de la lista",
+    },
+    {
+      value: num(quick.length),
+      label: "se arreglan solo con título y descripción",
+    },
+  ]);
+
+  const howTo = `<div class="how2"><div class="hw"><span class="kd push">${OPP_KIND_LABEL.push}</span><p>La web ya está cerca de los tres primeros resultados, que se llevan la mayoría de los clics. Un empujón de contenido y enlaces puede subirla. <b>${num(pushes.length)}</b> búsquedas.</p></div><div class="hw"><span class="kd snippet">${OPP_KIND_LABEL.snippet}</span><p>La web ya aparece, pero pocas personas hacen clic. Suele arreglarse reescribiendo el título y la descripción, sin tocar la página. <b>${num(quick.length)}</b> búsquedas.</p></div></div><p class="hwn">Están ordenadas por prioridad: primero lo que más clics puede traer con menos trabajo. El esfuerzo (<span class="eff"><i class="on"></i><i></i><i></i></span> bajo, <span class="eff"><i class="on"></i><i class="on"></i><i></i></span> medio, <span class="eff"><i class="on"></i><i class="on"></i><i class="on"></i></span> alto) es una estimación según el tipo de oportunidad y la posición actual.</p>`;
+
+  const maxImpressions = Math.max(...rows.map((row) => row.impressions), 1);
+  const maxPotential = Math.max(...rows.map((row) => row.potentialClicks), 1);
+  const overview = dataTable(
+    [
+      { label: "Prioridad", num: true, asc: true },
+      { label: "Búsqueda" },
+      { label: "Tipo" },
+      { label: "Posición", num: true, asc: true },
+      { label: "Impresiones", num: true },
+      { label: "Clics hoy", num: true },
+      { label: "Clics posibles", num: true },
+      { label: "Esfuerzo", num: true, asc: true },
+    ],
+    rows.map((row, index) => [
+      { h: `<b>${index + 1}</b>`, v: index + 1 },
+      { h: queryLink(row.query), v: row.query },
+      {
+        h: `<span class="kd ${row.kind}" title="${OPP_KIND_LABEL[row.kind]}">${OPP_KIND_SHORT[row.kind]}</span>`,
+        v: row.kind,
+      },
+      { h: pos(row.position), v: row.position },
+      impressionsCell(row.impressions, maxImpressions),
+      { h: num(row.clicks), v: row.clicks },
+      clicksCell(row.potentialClicks, null, maxPotential),
+      { h: effortDots(effortOf(row)), v: effortOf(row) },
+    ]),
+  );
+
+  const shown = rows.slice(0, 10);
+  const cards = shown
     .map((row, index) => {
       const idea = ideas.get(row.query);
-      const actions = idea
-        ? idea.actions.filter((action) => action.trim())
-        : [];
-      const ai = idea
-        ? `<div class="oai"><b>Análisis y acciones</b><p>${inline(idea.analysis)}</p>${actions.length ? `<ul>${actions.map((action) => `<li>${inline(action)}</li>`).join("")}</ul>` : ""}</div>`
+      const actions = (
+        idea?.actions.filter((a) => a.trim()).length
+          ? idea?.actions.filter((a) => a.trim())
+          : oppActions(row)
+      ) as string[];
+      const analysis = idea?.analysis.trim() || oppAnalysis(row);
+      const result =
+        idea?.result?.trim() ||
+        `Hasta **+${num(row.potentialClicks)} clics** en un periodo como este. Se comprueba en Search Console mirando los clics y el CTR de esta búsqueda tras 4 semanas.`;
+      const title = titles.get(row.query);
+      const serps = title
+        ? `<div class="os"><h5>Cómo se ve en Google</h5>${title.current ? serpPreview(host, title.url ?? row.page, title.current, "", "Hoy") : ""}${title.options
+            .map((option, at) =>
+              serpPreview(
+                host,
+                title.url ?? row.page,
+                option.title,
+                option.description,
+                `Propuesta ${String.fromCharCode(65 + at)}`,
+              ),
+            )
+            .join("")}</div>`
         : "";
-      return `<div class="opp"><div class="oh"><div class="rk">${index + 1}</div><div><div class="q">${queryLink(row.query)}</div><div class="m">${row.kind === "push" ? "A un paso del top 3" : "Se muestra mucho y se clica poco"} · posición ${one.format(row.position)} · ${num(row.impressions)} impresiones${row.page ? ` · ${pageLink(row.page)}` : ""}</div></div><div class="g">+${num(row.potentialClicks)}<small>clics posibles</small></div></div>${ai}</div>`;
+      return `<details class="op"${index < 3 ? " open" : ""}><summary><span class="rk">${index + 1}</span><span class="ot"><b>${queryLink(row.query)}</b><span class="kd ${row.kind}">${OPP_KIND_LABEL[row.kind]}</span></span><span class="om"><span><small>Posición</small>${pos(row.position)}</span><span><small>Impresiones</small>${num(row.impressions)}</span><span><small>Esfuerzo</small>${effortDots(effortOf(row))}</span><span class="og">+${num(row.potentialClicks)}<small>clics posibles</small></span></span></summary><div class="ob${serps ? " two" : ""}"><div class="oc"><h5>Qué pasa</h5><div class="rich">${paragraphs(analysis)}</div><h5>Qué hacer, en este orden</h5><ol class="oa">${actions.map((action) => `<li>${inline(action)}</li>`).join("")}</ol><h5>Resultado esperado</h5><div class="rich">${paragraphs(result)}</div>${row.page ? `<div class="opg">Página que hoy posiciona: ${pageLink(row.page)}</div>` : ""}</div>${serps}</div></details>`;
     })
     .join("");
-  const contentIdeas = report.notes.contentIdeas.filter((item) =>
-    item.title.trim(),
-  );
-  const content = contentIdeas.length
-    ? `<div class="ideas">${contentIdeas
-        .map(
-          (item) =>
-            `<div class="idea"><b>${esc(item.title)}</b><p>${inline(item.reason)}</p></div>`,
-        )
-        .join("")}</div>`
-    : "";
-  const total = rows.reduce((sum, row) => sum + row.potentialClicks, 0);
-  return block(
-    report,
-    "oportunidades",
-    `Oportunidades de crecimiento: unas ${num(total)} visitas más al alcance`,
-    "Búsquedas en las que la web ya aparece y que, con una mejora concreta de título, contenido o enlaces, pueden traducirse en más clics. Ordenadas por la ganancia estimada.",
-    `<div class="sheet">${list}${content}</div>`,
+
+  const content = report.notes.contentIdeas.filter((item) => item.title.trim());
+  const contentHtml =
+    content.length > 0
+      ? `<div class="blk"><div class="bh"><h2>Contenidos nuevos que merecen la pena</h2><p class="lead">Ideas de páginas o artículos que aún no existen, sacadas de los temas y las búsquedas donde la web ya tiene recorrido.</p></div><div class="ideas2">${content
+          .map(
+            (item) =>
+              `<article class="idea2"><div class="ik2">${esc(item.format || "Contenido")}</div><b>${esc(item.title)}</b>${item.target ? `<div class="itg">Apunta a: ${queryLink(item.target)}</div>` : ""}<p>${inline(item.reason)}</p></article>`,
+          )
+          .join("")}</div></div>`
+      : "";
+
+  return (
+    block(
+      report,
+      "oportunidades",
+      `Oportunidades de crecimiento: unos ${num(total)} clics más al alcance`,
+      "Búsquedas en las que la web ya aparece y que, con una mejora concreta de título, contenido o enlaces, pueden traducirse en más clics.",
+      `${summary}<div class="sheet">${howTo}</div><div class="sheet" style="margin-top:18px"><h3>Todas las oportunidades</h3>${overview}</div>`,
+    ) +
+    `<div class="blk"><div class="bh"><h2>Plan de acción por búsqueda</h2><p class="lead">Qué ocurre en cada una, qué hacer y en qué orden, y qué resultado cabe esperar.${rows.length > shown.length ? ` Se detallan las ${shown.length} primeras; el resto está en la tabla de arriba.` : ""}</p></div><div class="ops">${cards}</div></div>` +
+    contentHtml
   );
 }
 
+/** Title proposals for searches that are not among the opportunity cards
+ *  (the ones that are show their proposal inside their own card). */
 function titlesBlock(report: ReportFull): string {
+  const inCards = new Set(
+    [...report.snapshot.opportunities]
+      .sort((a, b) => priorityOf(b) - priorityOf(a))
+      .slice(0, 10)
+      .map((row) => row.query),
+  );
   const items = report.notes.titleIdeas.filter(
-    (item) => item.options.length > 0,
+    (item) => item.options.length > 0 && !inCards.has(item.query),
   );
   if (items.length === 0) return "";
   const host = (() => {
@@ -1228,11 +1458,15 @@ function titlesBlock(report: ReportFull): string {
   })();
   const cards = items
     .map((item) => {
-      const path = item.url ? pathOf(item.url) : "";
       const options = item.options
-        .map(
-          (option) =>
-            `<div class="serp"><div class="su">${esc(host)}${esc(path)}</div><div class="st2">${esc(option.title)}</div><div class="sd">${esc(option.description)}</div></div>`,
+        .map((option, at) =>
+          serpPreview(
+            host,
+            item.url,
+            option.title,
+            option.description,
+            `Propuesta ${String.fromCharCode(65 + at)}`,
+          ),
         )
         .join("");
       return `<article class="tic"><div class="tq2">${queryLink(item.query)}</div>${item.current ? `<div class="cur">Título actual: ${esc(item.current)}${item.url ? ` · ${pageLink(item.url)}` : ""}</div>` : ""}${options}</article>`;
@@ -1241,7 +1475,7 @@ function titlesBlock(report: ReportFull): string {
   return block(
     report,
     "titulos",
-    "Propuestas de títulos y descripciones",
+    "Más propuestas de títulos y descripciones",
     "En estas búsquedas la web ya aparece, pero recibe pocos clics. Se proponen títulos y descripciones alternativos, tal como se verían en los resultados de Google.",
     `<div class="tid">${cards}</div>`,
   );
@@ -1300,6 +1534,8 @@ type IssueAgg = {
   sources: { label: string; url: string }[];
   /** The example pages that have it, with the type of each. */
   pages: Map<string, string>;
+  /** Checks that fail for the same cause and share this card. */
+  related: IssueAgg[];
 };
 
 /** Every issue of the given pages, merged by name: a problem of a template
@@ -1320,6 +1556,7 @@ function mergeIssues(pages: AuditPage[]): IssueAgg[] {
           elements: [...issue.elements],
           sources: [...issue.sources],
           pages: new Map([[page.url, page.type]]),
+          related: [],
         });
         continue;
       }
@@ -1353,8 +1590,52 @@ function mergeIssues(pages: AuditPage[]): IssueAgg[] {
   );
 }
 
+const groupPoints = (item: IssueAgg) =>
+  item.points + item.related.reduce((sum, other) => sum + other.points, 0);
+
+/** The other checks of a group: what each one measures. */
+function relatedBlock(item: IssueAgg): string {
+  if (item.related.length === 0) return "";
+  const line = (other: IssueAgg) =>
+    `<div><b>${esc(other.title)}</b>${other.points > 0 ? ` (+${one.format(other.points)} pts)` : ""}${other.detail ? `: ${esc(other.detail)}` : ""}</div>`;
+  return `<div class="rel"><b>Comprobaciones relacionadas, misma causa</b>${item.related.map(line).join("")}</div>`;
+}
+
 const STATUS_RANK = { fail: 0, warn: 1, info: 2, pass: 3 } as const;
 const STATUS_MARK = { fail: "✕", warn: "!", pass: "✓", info: "" } as const;
+
+const significantWords = (title: string) =>
+  new Set(
+    title
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .split(/[^a-z0-9]+/)
+      .filter((word) => word.length >= 8),
+  );
+
+/** Microaudit has checks that overlap (no JSON-LD / no Schema detected): same
+ *  category, same kind, the same pages and a word in common in their names are
+ *  one problem seen twice, so they share one card. */
+function clusterIssues(list: IssueAgg[]): IssueAgg[] {
+  const pagesKey = (item: IssueAgg) => [...item.pages.keys()].sort().join("|");
+  const out: IssueAgg[] = [];
+  for (const item of list) {
+    const words = significantWords(item.title);
+    const host = out.find(
+      (other) =>
+        other.category === item.category &&
+        other.kind === item.kind &&
+        pagesKey(other) === pagesKey(item) &&
+        [...significantWords(other.title)].some((word) => words.has(word)),
+    );
+    if (host) host.related.push(item);
+    else out.push(item);
+  }
+  return out;
+}
+
+const issuesOf = (pages: AuditPage[]) => clusterIssues(mergeIssues(pages));
 
 function issueCard(item: IssueAgg, pageCount: number): string {
   // One pill per page type, linking to an example page of that type that has
@@ -1388,18 +1669,24 @@ function issueCard(item: IssueAgg, pageCount: number): string {
   const legend = marked
     ? `<div class="elk"><span>Lo que se ha comprobado:</span><span class="kp">✓ correcto</span><span class="kf">✕ a corregir</span></div>`
     : "";
-  const sources = item.sources
+  const sources = [
+    ...item.sources,
+    ...item.related.flatMap((other) => other.sources),
+  ]
+    .filter(
+      (source, at, all) => all.findIndex((x) => x.url === source.url) === at,
+    )
     .map(
       (source) =>
         `<a class="lk" href="${esc(source.url)}" target="_blank" rel="noopener noreferrer">${esc(source.label)} ↗</a>`,
     )
     .join(" · ");
-  return `<article class="is"><div class="ish"><span class="ik ${item.kind}">${item.kind === "fail" ? "A corregir" : "A mejorar"}</span><h4>${esc(item.title)}</h4>${item.points > 0 ? `<span class="ip">+${one.format(item.points)} pts</span>` : ""}</div>${pills ? `<div class="pills">${pills}</div>` : ""}<div class="im">${meta}</div>${item.detail ? `<p>${esc(item.detail)}</p>` : ""}${item.evidence ? `<p class="ev">${esc(item.evidence)}</p>` : ""}${elements ? `${legend}<div class="els">${elements}</div>` : ""}${sources ? `<div class="src">Documentación oficial: ${sources}</div>` : ""}</article>`;
+  return `<article class="is"><div class="ish"><span class="ik ${item.kind}">${item.kind === "fail" ? "A corregir" : "A mejorar"}</span><h4>${esc(item.title)}</h4>${groupPoints(item) > 0 ? `<span class="ip">+${one.format(groupPoints(item))} pts</span>` : ""}</div>${pills ? `<div class="pills">${pills}</div>` : ""}<div class="im">${meta}</div>${item.detail ? `<p>${esc(item.detail)}</p>` : ""}${item.evidence ? `<p class="ev">${esc(item.evidence)}</p>` : ""}${relatedBlock(item)}${elements ? `${legend}<div class="els">${elements}</div>` : ""}${sources ? `<div class="src">Documentación oficial: ${sources}</div>` : ""}</article>`;
 }
 
 /** The issues of a set of pages: first what to fix, then what to improve. */
 function issueLists(pages: AuditPage[]): string {
-  const issues = mergeIssues(pages);
+  const issues = issuesOf(pages);
   const list = (items: IssueAgg[], title: string) =>
     items.length > 0
       ? `<h3 class="ih">${title} (${items.length})</h3><div class="isl">${items.map((item) => issueCard(item, pages.length)).join("")}</div>`
@@ -1507,7 +1794,7 @@ function auditsBlock(report: ReportFull): string {
         ]),
     ],
   );
-  const everything = mergeIssues(audits);
+  const everything = issuesOf(audits);
   const average = mean(audits.map((audit) => audit.score));
   const summary = chips([
     {
@@ -1538,7 +1825,7 @@ function auditsBlock(report: ReportFull): string {
     ...types.map((type, index) => ({
       id: `t${index}`,
       label: type,
-      count: mergeIssues(byType(type)).length,
+      count: issuesOf(byType(type)).length,
       html: typePanel(type, byType(type)),
     })),
   ]);

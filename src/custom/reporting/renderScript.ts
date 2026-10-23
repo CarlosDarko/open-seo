@@ -128,7 +128,9 @@ export const REPORT_SCRIPT = `
     if(scroll){var pan=document.querySelector(".panels");if(pan)window.scrollTo({top:Math.max(0,pan.getBoundingClientRect().top+window.scrollY-150),behavior:reduce?"auto":"smooth"});}
   }
   each(tabBtns,function(b){b.addEventListener("click",function(){openTab(b.getAttribute("data-tab"),true);});});
-  each(document.querySelectorAll("[data-go]"),function(a){a.addEventListener("click",function(ev){ev.preventDefault();openTab(a.getAttribute("data-go"),true);});});
+  each(document.querySelectorAll("[data-go]"),function(a){
+    var has=false;each(tabBtns,function(b){if(b.getAttribute("data-tab")===a.getAttribute("data-go"))has=true;});
+    if(!has)a.style.display="none";a.addEventListener("click",function(ev){ev.preventDefault();openTab(a.getAttribute("data-go"),true);});});
   document.addEventListener("click",function(ev){
     var b=ev.target.closest?ev.target.closest("[data-sub]"):null;if(!b)return;
     var group=b.closest(".stg");if(!group)return;
@@ -201,6 +203,7 @@ export const REPORT_SCRIPT = `
       var t=parseFloat(n.getAttribute("data-count"));var k=n.getAttribute("data-kind");
       if(!isNaN(t))n.textContent=k==="pct"?dec(t)+" %":(k==="dec"?dec(t):grp(t));
     });
+    each(document.querySelectorAll("details"),function(d){d.open=true;});
     printing=true;draw();
   });
   window.addEventListener("afterprint",function(){printing=false;draw();});

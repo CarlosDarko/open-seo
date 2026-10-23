@@ -81,20 +81,13 @@ type CallResult =
   | { ok: true; text: string; costEur: number; truncated: boolean }
   | { ok: false; reason: "no_key" | "failed"; detail?: string };
 
-/** These texts need no long reasoning before they are written: the models
- *  that think first by default would spend most of the answer's length on it
- *  and the JSON would come back cut. Each model has its own way to keep that
- *  short. */
+/** The models of the 5.x generation reason before they answer. Medium effort
+ *  keeps that reasoning useful (the analysis crosses several sources) without
+ *  it using up the room the answer needs. */
 function modelOptions(model: string): Record<string, unknown> {
-  const lower = model.toLowerCase();
-  if (lower.includes("sonnet-5-5")) {
-    return { thinking: { type: "between_tools" } };
-  }
-  if (lower.includes("opus-5-5") || lower.includes("opus-5")) {
-    return { output_config: { effort: "low" } };
-  }
-  if (lower.includes("haiku-5-5")) return { thinking: { type: "disabled" } };
-  return {};
+  return /(sonnet|opus|haiku)-5/.test(model.toLowerCase())
+    ? { output_config: { effort: "medium" } }
+    : {};
 }
 
 async function callClaude(input: {
@@ -113,7 +106,7 @@ async function callClaude(input: {
   try {
     const response = await fetch(API_URL, {
       method: "POST",
-      signal: AbortSignal.timeout(120_000),
+      signal: AbortSignal.timeout(270_000),
       headers: {
         "content-type": "application/json",
         "x-api-key": key,
@@ -427,7 +420,7 @@ export async function draftWithAi(
     deep: true,
     system: WRITE_SYSTEM,
     user: `Datos del informe:\n${JSON.stringify(brief(report, business))}`,
-    maxTokens: 10000,
+    maxTokens: 16000,
     report,
     who,
     kind: "draft",
@@ -463,21 +456,24 @@ export async function draftWithAi(
 // ------------------------------------------------------------ analysis
 
 const ANALYSIS_SYSTEM = `Eres un consultor SEO senior que revisa un sitio web para un cliente. ${STYLE}
-Recibes: (1) páginas que han perdido tráfico, con lo que hay en cada una (título, descripción, H1, encabezados, número de palabras) y las búsquedas que más han caído con su posición antes y ahora; (2) oportunidades de crecimiento: búsquedas donde el sitio ya aparece, con su posición, impresiones, clics, clics potenciales, tipo ("push": está cerca del top 3; "snippet": se ve mucho y se clica poco) y la página que posiciona con su título y encabezados; (3) los temas con más tráfico y las búsquedas que más aportan.
+Recibes: (1) páginas que han perdido tráfico, con lo que hay en cada una (título, descripción, H1, encabezados, número de palabras) y las búsquedas que más han caído con su posición antes y ahora; (2) oportunidades de crecimiento: búsquedas donde el sitio ya aparece, con su posición, impresiones, clics, CTR actual y esperado, clics potenciales, tipo ("push": está cerca del top 3; "snippet": se ve mucho y se clica poco) y la página que posiciona con su título y encabezados; (3) los temas con más tráfico y las búsquedas que más aportan.
 Tu trabajo es dar ideas que de verdad aporten, no generalidades:
 - Diagnóstico de cada página que cae: causa más probable y arreglos concretos (qué cambiar en título, H1, encabezados o contenido respecto a la búsqueda que cae).
-- Para cada oportunidad: interpreta qué intención de búsqueda hay detrás, qué le falta a la página actual (apóyate en su título y encabezados) y 2 o 3 acciones concretas y distintas entre sí (por ejemplo ampliar una sección concreta, responder una pregunta, enlazar desde páginas relacionadas, separar la intención en una página nueva, mejorar el título). Evita consejos vacíos como "mejorar el contenido".
-- Ideas de contenido nuevo (3 a 5) basadas en los temas y las búsquedas dadas, cada una con el motivo por el que tendría recorrido. No inventes volúmenes de búsqueda.
-- Títulos nuevos: máximo 60 caracteres el título y 155 la descripción, naturales, con la búsqueda o su intención al principio, sin clickbait ni promesas falsas.
-Responde SOLO con un objeto JSON con esta forma exacta:
+- Para CADA oportunidad que recibes, sin dejar ninguna:
+  · "analysis": 3 o 4 frases. Qué intención de búsqueda hay detrás, qué pasa hoy (con las cifras: posición, impresiones, CTR actual frente al esperado) y qué le falta a la página actual, apoyándote en su título y encabezados. Puedes usar **negritas**.
+  · "actions": de 3 a 4 pasos concretos, distintos entre sí y en el orden en que conviene hacerlos. Cada paso empieza por un verbo y dice qué tocar exactamente (por ejemplo: ampliar tal sección, añadir un encabezado con la pregunta y una respuesta corta debajo, enlazar desde tal tipo de página con tal texto, separar la intención en una página nueva, reescribir el título para que empiece por la búsqueda). Sin consejos vacíos como «mejorar el contenido».
+  · "result": una frase con el resultado que se espera (usa los clics posibles de los datos) y cómo comprobarlo en Search Console: qué métrica mirar y en cuánto tiempo.
+- Ideas de contenido nuevo (de 4 a 6), basadas en los temas y las búsquedas dadas. Cada una con: "title" (el título del contenido), "format" (guía, comparativa, ficha, preguntas frecuentes, caso práctico...), "target" (la búsqueda principal a la que apunta, tomada de los datos) y "reason" (2 frases con el dato que lo justifica: tema, impresiones, posición). No inventes volúmenes de búsqueda.
+- Títulos nuevos para las oportunidades de tipo "snippet" y para las 3 primeras de tipo "push": máximo 60 caracteres el título y 155 la descripción, naturales, con la búsqueda o su intención al principio, sin clickbait ni promesas falsas.
+Responde SOLO con un objeto JSON válido con esta forma exacta (dentro de los textos escribe los saltos de línea como \\n, nunca reales):
 {"diagnoses": [{"url": "...", "text": "2 a 4 frases", "fixes": ["...", "...", "..."]}],
- "opportunityIdeas": [{"query": "...", "analysis": "2 o 3 frases", "actions": ["...", "..."]}],
- "contentIdeas": [{"title": "...", "reason": "1 o 2 frases"}],
+ "opportunityIdeas": [{"query": "...", "analysis": "...", "actions": ["...", "...", "..."], "result": "..."}],
+ "contentIdeas": [{"title": "...", "format": "...", "target": "...", "reason": "..."}],
  "titleIdeas": [{"query": "...", "url": "...", "options": [{"title": "...", "description": "..."}, {"title": "...", "description": "..."}]}]}`;
 
 const MAX_LOSERS = 3;
-const MAX_TITLES = 4;
-const MAX_OPPORTUNITIES = 6;
+const MAX_TITLES = 6;
+const MAX_OPPORTUNITIES = 10;
 
 export type AiAnalysis = {
   diagnoses: Diagnosis[];
@@ -556,6 +552,16 @@ export async function analyzeWithAi(
       posicion: item.position,
       impresiones: item.impressions,
       clics: item.clicks,
+      ctr_actual:
+        item.impressions > 0
+          ? Math.round((item.clicks / item.impressions) * 1000) / 10
+          : null,
+      ctr_esperado:
+        item.impressions > 0
+          ? Math.round(
+              ((item.clicks + item.potentialClicks) / item.impressions) * 1000,
+            ) / 10
+          : null,
       clics_potenciales: item.potentialClicks,
       pagina: item.page ? pageInfo(item.page) : undefined,
     })),
@@ -577,7 +583,7 @@ export async function analyzeWithAi(
     deep: true,
     system: ANALYSIS_SYSTEM,
     user: `Datos:\n${JSON.stringify(payload)}`,
-    maxTokens: 10000,
+    maxTokens: 16000,
     report,
     who,
     kind: "analyze",
@@ -618,15 +624,18 @@ export async function analyzeWithAi(
     .slice(0, MAX_OPPORTUNITIES)
     .map((item) => ({
       query: clip(item.query, 200),
-      analysis: clip(item.analysis, 900),
-      actions: (item.actions ?? []).slice(0, 4).map((a) => clip(a, 300)),
+      analysis: clip(item.analysis, 1500),
+      actions: (item.actions ?? []).slice(0, 5).map((a) => clip(a, 400)),
+      result: clip(item.result, 500) || undefined,
     }));
   const contentIdeas: ContentIdea[] = (raw.contentIdeas ?? [])
     .filter((item) => item.title)
-    .slice(0, 5)
+    .slice(0, 6)
     .map((item) => ({
       title: clip(item.title, 160),
-      reason: clip(item.reason, 400),
+      reason: clip(item.reason, 500),
+      format: clip(item.format, 60) || undefined,
+      target: clip(item.target, 120) || undefined,
     }));
   const titleIdeas: TitleIdea[] = (raw.titleIdeas ?? [])
     .filter((item) => item.query)

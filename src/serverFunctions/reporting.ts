@@ -59,19 +59,25 @@ const notesSchema = z.object({
           .max(4),
       }),
     )
-    .max(8),
+    .max(10),
   opportunityIdeas: z
     .array(
       z.object({
         query: z.string().max(300),
-        analysis: z.string().max(1500),
-        actions: z.array(z.string().max(400)).max(6),
+        analysis: z.string().max(2000),
+        actions: z.array(z.string().max(500)).max(6),
+        result: z.string().max(600).optional(),
       }),
     )
-    .max(8),
+    .max(12),
   contentIdeas: z
     .array(
-      z.object({ title: z.string().max(200), reason: z.string().max(600) }),
+      z.object({
+        title: z.string().max(200),
+        reason: z.string().max(700),
+        format: z.string().max(80).optional(),
+        target: z.string().max(160).optional(),
+      }),
     )
     .max(8),
 });

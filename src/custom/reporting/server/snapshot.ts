@@ -422,7 +422,7 @@ export async function buildReportSnapshot(
       opportunities: [
         ...report.ctrOpportunities
           .filter((item) => !isBrandQuery(item.query, tokens))
-          .slice(0, 6)
+          .slice(0, 8)
           .map((item) => ({
             query: item.query,
             page: item.page,
@@ -434,7 +434,7 @@ export async function buildReportSnapshot(
           })),
         ...report.nearTop
           .filter((item) => !isBrandQuery(item.query, tokens))
-          .slice(0, 6)
+          .slice(0, 8)
           .map((item) => ({
             query: item.query,
             page: item.page,

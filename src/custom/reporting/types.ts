@@ -280,10 +280,19 @@ export type OpportunityIdea = {
   query: string;
   analysis: string;
   actions: string[];
+  /** The result expected and how to check it in Search Console. */
+  result?: string;
 };
 
 /** A piece of content worth creating, with the reason. */
-export type ContentIdea = { title: string; reason: string };
+export type ContentIdea = {
+  title: string;
+  reason: string;
+  /** Guide, comparison, product page, FAQ… */
+  format?: string;
+  /** The main search it aims at. */
+  target?: string;
+};
 
 /** What the consultant adds on top of the numbers. */
 export type ReportNotes = {
