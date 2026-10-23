@@ -1433,7 +1433,7 @@ function opportunitiesBlock(report: ReportFull): string {
       { label: "Tipo" },
       { label: "Posición", num: true, asc: true },
       { label: "Impresiones", num: true },
-      { label: "Clics hoy", num: true },
+      { label: "Clics del periodo", num: true },
       { label: "Clics posibles", num: true },
       { label: "Esfuerzo", num: true, asc: true },
     ],
