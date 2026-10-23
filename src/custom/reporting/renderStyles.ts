@@ -769,11 +769,8 @@ details.op>summary:after{content:none}
 .crm b{font-size:40px;font-weight:800;letter-spacing:-.045em;line-height:1;color:var(--ink)}
 .crm.lg b{font-size:27px;line-height:1.1;letter-spacing:-.03em}
 .crm span{font-size:11.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
-.cr2.bad .crm{background:color-mix(in srgb,var(--down) 9%,#fff)}
 .cr2.bad .crm b{color:var(--down)}
-.cr2.good .crm{background:color-mix(in srgb,var(--up) 10%,#fff)}
 .cr2.good .crm b{color:var(--up)}
-.cr2.warn .crm{background:color-mix(in srgb,var(--warn) 11%,#fff)}
 .cr2.warn .crm b{color:var(--warn)}
 details.op.ct>summary{grid-template-columns:44px minmax(0,1fr) auto 18px}
 .ct .ik2{margin:0;white-space:nowrap;padding:3px 10px;border:1px solid var(--red);border-radius:999px;font-size:10.5px}
@@ -877,4 +874,25 @@ h3.gsh{margin:30px 0 12px}
 @media print{.sig .av{width:62px;height:62px}}
 .sig>span:last-child{line-height:1.45}
 .sig .soc{margin-top:8px}
+/* ---- v18: each section starts on its own page, after a cover ---- */
+.scover{display:none}
+@media print{
+.js .panel{break-before:auto!important;margin-top:0!important}
+.pgpanel{break-before:page}
+.tbox.full{overflow:visible!important}
+.tbox.full .tr{display:none}
+.tbox.full .qt td.pg{min-width:0}
+.tbox.full .qt.sm th,.tbox.full .qt.sm td{padding-left:5px;padding-right:5px}
+.pgwrap{table-layout:fixed}
+.pgwrap>tbody>tr>td{overflow-wrap:anywhere}
+.scover{display:block;position:relative;overflow:hidden;margin:0 -14mm;height:296mm;break-before:page;break-after:page;background:var(--ink);color:#f6f6f6;-webkit-print-color-adjust:exact;print-color-adjust:exact;background-image:radial-gradient(60% 45% at 85% 12%,rgba(241,28,65,.38),transparent 70%)}
+.scb{position:absolute;left:26mm;right:26mm;top:26mm;bottom:22mm;display:flex;flex-direction:column}
+.scm{display:flex;align-items:center;gap:12px;font-size:9pt;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:rgba(246,246,246,.7)}
+.scm svg{height:22px;width:auto}
+.scn{margin-top:auto;font-size:96pt;font-weight:800;letter-spacing:-.05em;line-height:1;color:var(--red)}
+.scover h2{margin:6mm 0 0;font-size:46pt;line-height:1.05;letter-spacing:-.03em;color:#fff}
+.scr{width:42mm;height:1.2mm;margin:9mm 0 7mm;background:var(--red)}
+.scover p{margin:0;max-width:130mm;font-size:15pt;line-height:1.45;color:rgba(246,246,246,.82)}
+.scp{margin-top:auto;padding-top:14mm;font-size:9.5pt;font-weight:600;letter-spacing:.08em;color:rgba(246,246,246,.55)}
+}
 `;

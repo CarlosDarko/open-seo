@@ -2207,6 +2207,28 @@ const TAB_ORDER = [
   "analisis",
 ];
 
+/** The space every printed page keeps at its top and bottom: a table repeats
+ *  its header and footer on each page. */
+const PAGE_SPACERS =
+  '<thead><tr><td><div class="pgsp h"></div></td></tr></thead><tfoot><tr><td><div class="pgsp f"></div></td></tr></tfoot>';
+
+/** What each section is about, for the cover page that opens it in print. */
+const SECTION_LEAD: Record<string, string> = {
+  trafico:
+    "Cómo ha evolucionado el tráfico, de dónde viene y qué lo ha movido.",
+  posiciones: "En qué posiciones de Google aparece la web y qué ha cambiado.",
+  busquedas:
+    "Las búsquedas que más mueven el tráfico: las que suben y las que bajan.",
+  paginas: "Las páginas que reciben el tráfico y las que más han cambiado.",
+  temas:
+    "Los temas donde la web tiene más peso y dónde hay margen para crecer.",
+  oportunidades:
+    "Dónde hay clics al alcance y qué hacer, en qué orden y con qué resultado.",
+  tecnico: "El estado técnico del sitio, tipología de página por tipología.",
+  analisis:
+    "Lo que dicen los datos al cruzarlos y qué implica para el negocio.",
+};
+
 export function renderReportDocument(
   source: ReportFull,
   mode: RenderMode,
@@ -2335,16 +2357,19 @@ export function renderReportDocument(
     )
     .sort((a, b) => TAB_ORDER.indexOf(a.id) - TAB_ORDER.indexOf(b.id));
 
+  const summaryHtml = executiveSummary(report, signer);
   const tabButtons = panels
     .map(
       (panel, index) =>
         `<button type="button" role="tab" data-tab="${panel.id}" class="${index === 0 ? "on" : ""}">${esc(panel.label)}</button>`,
     )
     .join("");
+  const sectionCover = (panel: Panel, index: number) =>
+    `<section class="scover" aria-hidden="true"><div class="scb"><div class="scm">${LOGO_MARK_LIGHT}<span>Informe SEO · ${esc(report.clientName?.trim() || host)}</span></div><div class="scn">${String(index + 1).padStart(2, "0")}</div><h2>${esc(panel.label)}</h2><div class="scr"></div><p>${esc(SECTION_LEAD[panel.id] ?? "")}</p><div class="scp">${esc(rangeShort(snapshot.range.startDate, snapshot.range.endDate))}</div></div></section>`;
   const panelHtml = panels
     .map(
       (panel, index) =>
-        `<div class="panel${index === 0 ? " on" : ""}" data-panel="${panel.id}" role="tabpanel"><div class="ptitle">${esc(panel.label)}</div>${panel.html}</div>`,
+        `${sectionCover(panel, index)}<table class="pgwrap pgpanel">${PAGE_SPACERS}<tbody><tr><td><div class="panel${index === 0 ? " on" : ""}" data-panel="${panel.id}" role="tabpanel"><div class="ptitle">${esc(panel.label)}</div>${panel.html}</div></td></tr></tbody></table>`,
     )
     .join("");
   const data = {
@@ -2374,11 +2399,9 @@ export function renderReportDocument(
 <div class="top" id="top"><div class="wrap"><span class="iso">${LOGO_MARK_LIGHT}</span><span class="ttl">${esc(clientName)} · Informe SEO</span><span class="per">${esc(rangeShort(snapshot.range.startDate, snapshot.range.endDate))}</span><button class="cta" type="button" onclick="window.print()">${mode === "preview" ? "Vista previa · " : ""}Imprimir / PDF</button></div></div>
 <div class="pfoot" aria-hidden="true"><span>${esc(clientName)} · Informe SEO · ${esc(rangeShort(snapshot.range.startDate, snapshot.range.endDate))}</span><span>carlosortega.page</span></div>
 ${hero(report, host)}
-<table class="pgwrap"><thead><tr><td><div class="pgsp h"></div></td></tr></thead><tfoot><tr><td><div class="pgsp f"></div></td></tr></tfoot><tbody><tr><td>
-${executiveSummary(report, signer)}
+${summaryHtml ? `<table class="pgwrap">${PAGE_SPACERS}<tbody><tr><td>${summaryHtml}</td></tr></tbody></table>` : ""}
 <div class="tabsbar" id="tabs"><div class="wrap"><div class="tabs2" role="tablist">${tabButtons}</div></div></div>
 <main class="wrap panels">${panelHtml}</main>
-</td></tr></tbody></table>
 ${hidden.has("proximos") ? "" : closing(report)}
 <button class="totop" id="totop" type="button" aria-label="Volver arriba"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
 <script type="application/json" id="report-data">${jsonForScript(data)}</script>
