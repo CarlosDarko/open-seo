@@ -1137,11 +1137,17 @@ function healthBlock(report: ReportFull): string {
 const scoreTone = (score: number | null) =>
   score === null ? "flat" : score >= 85 ? "up" : score >= 55 ? "mid" : "down";
 
+/** "73 /100": a score always says what it is out of. */
+const outOf100 = (score: number | null) =>
+  score === null
+    ? "—"
+    : `<b class="${scoreTone(score)}">${Math.round(score)}</b><i class="of">/100</i>`;
+
 /** A score out of 100 with a small bar; sorts by the number. */
 function scoreCell(score: number | null): Cell {
   if (score === null) return { h: '<span class="sn">—</span>', v: null };
   return {
-    h: `<div class="scv"><b class="${scoreTone(score)}">${Math.round(score)}</b><div class="sb"><i style="--w:${Math.max(2, score).toFixed(0)}%"></i></div></div>`,
+    h: `<div class="scv">${outOf100(score)}<div class="sb"><i style="--w:${Math.max(2, score).toFixed(0)}%"></i></div></div>`,
     v: score,
   };
 }
@@ -1153,20 +1159,152 @@ const mean = (values: (number | null)[]): number | null => {
     : real.reduce((sum, value) => sum + value, 0) / real.length;
 };
 
-/** Microaudit on one example page of each page type: how every template of
- *  the site scores, what fails in several of them and what to fix first. */
+type IssueAgg = {
+  kind: "fail" | "warn";
+  title: string;
+  category: string;
+  points: number;
+  detail: string;
+  evidence: string;
+  elements: string[];
+  sources: { label: string; url: string }[];
+  pages: Set<string>;
+};
+
+/** Every issue of the pages of one type, merged: a problem of the template
+ *  shows up once, with how many of the audited pages have it. */
+function mergeIssues(pages: AuditPage[]): IssueAgg[] {
+  const merged = new Map<string, IssueAgg>();
+  for (const page of pages) {
+    for (const issue of page.issues) {
+      const found = merged.get(issue.title);
+      if (!found) {
+        merged.set(issue.title, {
+          kind: issue.kind,
+          title: issue.title,
+          category: issue.category,
+          points: issue.points ?? 0,
+          detail: issue.detail,
+          evidence: issue.evidence,
+          elements: [...issue.elements],
+          sources: [...issue.sources],
+          pages: new Set([page.url]),
+        });
+        continue;
+      }
+      found.pages.add(page.url);
+      if (issue.kind === "fail") found.kind = "fail";
+      found.points = Math.max(found.points, issue.points ?? 0);
+      if (issue.detail.length > found.detail.length)
+        found.detail = issue.detail;
+      for (const element of issue.elements) {
+        if (found.elements.length < 8 && !found.elements.includes(element)) {
+          found.elements.push(element);
+        }
+      }
+      for (const source of issue.sources) {
+        if (!found.sources.some((item) => item.url === source.url)) {
+          found.sources.push(source);
+        }
+      }
+    }
+  }
+  return [...merged.values()].sort(
+    (x, y) =>
+      Number(y.kind === "fail") - Number(x.kind === "fail") ||
+      y.points - x.points ||
+      y.pages.size - x.pages.size,
+  );
+}
+
+function issueCard(item: IssueAgg, pageCount: number): string {
+  const where =
+    pageCount > 1 ? `Afecta a ${item.pages.size} de ${pageCount} páginas` : "";
+  const meta = [esc(item.category), where].filter(Boolean).join(" · ");
+  const elements =
+    item.elements.length > 0
+      ? `<ul class="el">${item.elements.map((element) => `<li>${esc(element)}</li>`).join("")}</ul>`
+      : "";
+  const sources =
+    item.sources.length > 0
+      ? `<div class="src">Documentación oficial: ${item.sources
+          .map(
+            (source) =>
+              `<a class="lk" href="${esc(source.url)}" target="_blank" rel="noopener noreferrer">${esc(source.label)} ↗</a>`,
+          )
+          .join(" · ")}</div>`
+      : "";
+  return `<article class="is"><div class="ish"><span class="ik ${item.kind}">${item.kind === "fail" ? "A corregir" : "A mejorar"}</span><h4>${esc(item.title)}</h4>${item.points > 0 ? `<span class="ip">+${one.format(item.points)} pts</span>` : ""}</div><div class="im">${meta}</div>${item.detail ? `<p>${esc(item.detail)}</p>` : ""}${item.evidence ? `<p class="ev">${esc(item.evidence)}</p>` : ""}${elements}${sources}</article>`;
+}
+
+/** The analysis of one page type: its score out of 100, the score of every
+ *  category and ALL the issues Microaudit found, with the detail it gives. */
+function typePanel(type: string, pages: AuditPage[]): string {
+  const score = mean(pages.map((page) => page.score));
+  const categories = new Map<
+    number,
+    { name: string; scores: (number | null)[]; fails: number; warns: number }
+  >();
+  for (const page of pages) {
+    for (const category of page.categories) {
+      const entry = categories.get(category.id) ?? {
+        name: category.name,
+        scores: [],
+        fails: 0,
+        warns: 0,
+      };
+      entry.scores.push(category.score);
+      entry.fails += category.fails;
+      entry.warns += category.warns;
+      categories.set(category.id, entry);
+    }
+  }
+  const bars = [...categories.entries()]
+    .sort((x, y) => x[0] - y[0])
+    .map(([, entry]) => {
+      const value = mean(entry.scores);
+      const note =
+        entry.fails + entry.warns === 0
+          ? "sin problemas"
+          : [
+              entry.fails ? `${entry.fails} a corregir` : "",
+              entry.warns ? `${entry.warns} a mejorar` : "",
+            ]
+              .filter(Boolean)
+              .join(" · ");
+      return `<div class="cr"><span class="cn">${esc(entry.name)}<small>${note}</small></span><div class="sb"><i style="--w:${Math.max(2, value ?? 0).toFixed(0)}%"></i></div><span class="cs">${outOf100(value)}</span></div>`;
+    })
+    .join("");
+  const issues = mergeIssues(pages);
+  const fails = issues.filter((item) => item.kind === "fail");
+  const warns = issues.filter((item) => item.kind === "warn");
+  const list = (items: IssueAgg[], title: string) =>
+    items.length > 0
+      ? `<h3 class="ih">${title} (${items.length})</h3><div class="isl">${items.map((item) => issueCard(item, pages.length)).join("")}</div>`
+      : "";
+  const links = pages
+    .map(
+      (page) =>
+        `<li>${pageLink(page.url)} <span class="pn">${page.score === null ? "—" : Math.round(page.score)}/100</span></li>`,
+    )
+    .join("");
+  return `<div class="tp"><div class="tph"><div class="tps">${outOf100(score)}<small>nota media de «${esc(type)}» sobre 100${pages.length > 1 ? ` (${pages.length} páginas)` : ""}</small></div><ul class="tpl">${links}</ul></div><div class="crs">${bars}</div>${list(fails, "Qué corregir")}${list(warns, "Qué mejorar")}</div>`;
+}
+
+/** Microaudit on the example pages of each page type: how every template of
+ *  the site scores and everything that is wrong or can improve in it. */
 function auditsBlock(report: ReportFull): string {
   const audits: AuditPage[] = report.snapshot.audits ?? [];
   if (audits.length === 0) return "";
   const types = [...new Set(audits.map((audit) => audit.type))];
+  const byType = (type: string) =>
+    audits.filter((audit) => audit.type === type);
   const categories = new Map<number, string>();
   for (const audit of audits) {
     for (const category of audit.categories) {
       categories.set(category.id, category.name);
     }
   }
-  const byType = (type: string) =>
-    audits.filter((audit) => audit.type === type);
   const matrix = dataTable(
     [
       { label: "Categoría" },
@@ -1180,7 +1318,7 @@ function auditsBlock(report: ReportFull): string {
         ),
       ],
       ...[...categories.entries()]
-        .sort((a, b) => a[0] - b[0])
+        .sort((x, y) => x[0] - y[0])
         .map(([id, name]) => [
           { h: esc(name), v: name },
           ...types.map((type) =>
@@ -1197,105 +1335,42 @@ function auditsBlock(report: ReportFull): string {
         ]),
     ],
   );
-
-  type Agg = {
-    kind: "fail" | "warn";
-    title: string;
-    category: string;
-    points: number;
-    detail: string;
-    pages: Set<string>;
-  };
-  const issues = new Map<string, Agg>();
-  for (const audit of audits) {
-    for (const issue of audit.issues) {
-      const found = issues.get(issue.title);
-      if (found) {
-        found.pages.add(audit.url);
-        found.points = Math.max(found.points, issue.points ?? 0);
-        if (issue.kind === "fail") found.kind = "fail";
-      } else {
-        issues.set(issue.title, {
-          kind: issue.kind,
-          title: issue.title,
-          category: issue.category,
-          points: issue.points ?? 0,
-          detail: issue.detail,
-          pages: new Set([audit.url]),
-        });
-      }
-    }
-  }
-  const ranked = [...issues.values()].sort(
-    (a, b) =>
-      Number(b.kind === "fail") - Number(a.kind === "fail") ||
-      b.pages.size - a.pages.size ||
-      b.points - a.points,
-  );
-  const fixes = dataTable(
-    [
-      { label: "Qué corregir" },
-      { label: "Categoría" },
-      { label: "Páginas", num: true },
-      { label: "Impacto", num: true },
-      { label: "Prioridad" },
-    ],
-    ranked.slice(0, 14).map((item) => [
-      {
-        h: `<b>${esc(item.title)}</b><small>${esc(item.detail)}</small>`,
-        v: item.title,
-        cls: "pg",
-      },
-      { h: esc(item.category), v: item.category },
-      {
-        h: `${item.pages.size} de ${audits.length}`,
-        v: item.pages.size,
-      },
-      {
-        h: item.points > 0 ? `+${one.format(item.points)} pts` : "—",
-        v: item.points,
-      },
-      {
-        h:
-          item.kind === "fail"
-            ? '<span class="dl down">A corregir</span>'
-            : '<span class="dl flat">A mejorar</span>',
-        v: item.kind === "fail" ? 0 : 1,
-      },
-    ]),
-  );
-
-  const cards = audits
-    .map((audit) => {
-      const top = audit.issues.slice(0, 3);
-      return `<article class="acard"><div class="at"><span class="atype">${esc(audit.type)}</span><b class="asc ${scoreTone(audit.score)}">${audit.score === null ? "—" : Math.round(audit.score)}</b></div><div class="au">${pageLink(audit.url)}</div>${audit.rating ? `<div class="ar">${esc(audit.rating)}</div>` : ""}<ul class="ai">${top
-        .map(
-          (issue) =>
-            `<li><span class="k ${issue.kind}">${issue.kind === "fail" ? "Corregir" : "Mejorar"}</span>${esc(issue.title)}<small>${esc(issue.category)}${issue.points ? ` · +${one.format(issue.points)} pts` : ""}</small></li>`,
-        )
-        .join("")}</ul></article>`;
-    })
-    .join("");
-
-  const scores = audits.map((audit) => audit.score);
-  const average = mean(scores);
-  const fails = ranked.filter((item) => item.kind === "fail").length;
-  const warns = ranked.length - fails;
+  const everyIssue = types.flatMap((type) => mergeIssues(byType(type)));
+  const average = mean(audits.map((audit) => audit.score));
   const summary = chips([
     {
-      value: average === null ? "—" : String(Math.round(average)),
-      label: "nota media sobre 100",
+      value:
+        average === null ? "—" : `${Math.round(average)}<i class="of">/100</i>`,
+      label: "nota media de la web",
     },
-    { value: num(audits.length), label: "páginas auditadas" },
-    { value: num(fails), label: "problemas a corregir" },
-    { value: num(warns), label: "aspectos a mejorar" },
+    {
+      value: num(types.length),
+      label: types.length === 1 ? "tipología auditada" : "tipologías auditadas",
+    },
+    {
+      value: num(everyIssue.filter((item) => item.kind === "fail").length),
+      label: "problemas a corregir",
+    },
+    {
+      value: num(everyIssue.filter((item) => item.kind === "warn").length),
+      label: "aspectos a mejorar",
+    },
   ]);
+  const panels = subTabs(
+    "aud",
+    types.map((type) => ({
+      id: `t${types.indexOf(type)}`,
+      label: type,
+      count: mergeIssues(byType(type)).length,
+      html: typePanel(type, byType(type)),
+    })),
+  );
   return block(
     report,
     "auditoria",
-    "Auditoría técnica de las páginas tipo",
-    `Microaudit ha revisado ${num(audits.length)} ${audits.length === 1 ? "página" : "páginas"} de ejemplo (${types.map(esc).join(", ")}) con más de 90 comprobaciones de SEO y de SEO para asistentes de IA. Una categoría con algún fallo queda limitada a 35 sobre 100 hasta corregirlo.`,
-    `${summary}<div class="sheet"><h3>Nota por categoría y tipo de página</h3>${matrix}</div><div class="sheet" style="margin-top:18px"><h3>Qué corregir primero</h3>${fixes}</div><div class="acards">${cards}</div>`,
+    "Auditoría técnica por tipología de página",
+    `Microaudit ha revisado ${num(audits.length)} ${audits.length === 1 ? "página" : "páginas"} de ejemplo con más de 90 comprobaciones de SEO y de SEO para asistentes de IA. Las páginas de una misma tipología se analizan juntas, como la media de esa plantilla. Cada nota va de 0 a 100 (100 es que no hay nada que corregir) y una categoría con algún fallo no pasa de 35 hasta corregirlo.`,
+    `${summary}<div class="sheet"><h3>Nota sobre 100 por categoría y tipología</h3>${matrix}</div><div class="sheet" style="margin-top:18px">${panels}</div>`,
   );
 }
 
@@ -1320,6 +1395,9 @@ function discoverBlock(report: ReportFull): string {
 
 // ---------------------------------------------------------------- close
 
+const shortPath = (path: string) =>
+  path.length > 38 ? `${path.slice(0, 35)}…` : path;
+
 /** Without AI text the roadmap is built from the data: the few moves that
  *  can change the figures, each as "action — why". */
 function suggestedSteps(report: ReportFull): string[] {
@@ -1337,7 +1415,7 @@ function suggestedSteps(report: ReportFull): string[] {
   const loser = snapshot.pageLosers[0];
   if (loser && loser.clicksDelta <= -30) {
     steps.push(
-      `Recuperar las páginas que han perdido tráfico, empezando por ${pathOf(loser.key)} — concentra la mayor caída (${signedNum(loser.clicksDelta)} clics) y ya tiene historial en Google`,
+      `Recuperar las páginas que han perdido tráfico, empezando por ${shortPath(pathOf(loser.key))} — concentra la mayor caída (${signedNum(loser.clicksDelta)} clics) y ya tiene historial en Google`,
     );
   }
   const topic = [...snapshot.topics].sort(

@@ -87,6 +87,8 @@ export type AuditCategory = {
   score: number | null;
   fails: number;
   warns: number;
+  /** How many checks of the category passed. */
+  passed: number;
 };
 
 /** One thing Microaudit says to fix, with the points it would add. */
@@ -95,7 +97,14 @@ export type AuditIssue = {
   title: string;
   category: string;
   points: number | null;
+  /** What Microaudit explains about it. */
   detail: string;
+  /** The measured evidence ("palabras/frase: 26.5"). */
+  evidence: string;
+  /** Elements that show the problem (image names, bots, pages…). */
+  elements: string[];
+  /** Official documentation Microaudit links to. */
+  sources: { label: string; url: string }[];
 };
 
 /** Microaudit's audit of one example page of a page type (home, category,

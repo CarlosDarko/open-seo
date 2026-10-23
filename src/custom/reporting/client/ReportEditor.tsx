@@ -35,6 +35,7 @@ import {
   draftClientReportWithAi,
   getClientReport,
   getReportingAiStatus,
+  prepareClientReportWithAi,
   getReportPageTypes,
   refreshClientReport,
   saveClientReport,
@@ -110,33 +111,28 @@ function Editor({
     queryFn: () => getReportingAiStatus({ data: { projectId } }),
     staleTime: 10 * 60_000,
   });
+  // "Redactar con IA": summary, analysis of every tab and ideas, saved by the
+  // server in one go.
   const draft = useMutation({
     mutationFn: () =>
-      draftClientReportWithAi({ data: { projectId, reportId: report.id } }),
+      prepareClientReportWithAi({ data: { projectId, reportId: report.id } }),
     onSuccess: (result) => {
       if (!result.ok) {
         setError(
           result.reason === "no_key"
             ? "La redacción con IA no está activada (falta la clave de Anthropic)."
-            : "La IA no ha podido redactar ahora. Prueba de nuevo.",
+            : result.reason === "busy"
+              ? "Este informe ya se está preparando. Espera un par de minutos."
+              : "La IA no ha podido redactar ahora. Prueba de nuevo.",
         );
         return;
       }
       setError(null);
-      setInfo(
-        `Texto redactado. Coste de esta llamada: ${euro(result.costEur)}.`,
-      );
+      setInfo(`Texto redactado y guardado. Coste: ${euro(result.costEur)}.`);
+      setNotes(result.notes);
+      setDirty(false);
       void refetch();
-      setNotes((previous) => ({
-        ...previous,
-        message: result.draft.message || previous.message,
-        sectionNotes: {
-          ...previous.sectionNotes,
-          ...result.draft.sectionNotes,
-        },
-        nextSteps: result.draft.nextSteps || previous.nextSteps,
-      }));
-      setDirty(true);
+      setVersion((value) => value + 1);
     },
     onError: () =>
       setError("La IA no ha podido redactar ahora. Prueba de nuevo."),
@@ -236,9 +232,14 @@ function Editor({
     const types = typesQuery.data;
     const needsAi =
       aiStatus.data.available &&
-      report.aiCalls === 0 &&
-      !report.notes.message.trim();
-    const needsAudit = types.length > 0 && report.snapshot.audits.length === 0;
+      !report.notes.message.trim() &&
+      Object.keys(report.notes.sectionNotes).length === 0;
+    // Audits stored before the detail was kept have no "passed" counts.
+    const stale = report.snapshot.audits.some((audit) =>
+      audit.categories.every((category) => category.passed === 0),
+    );
+    const needsAudit =
+      types.length > 0 && (report.snapshot.audits.length === 0 || stale);
     prepared.current = true;
     if (!needsAi && !needsAudit) return;
     void (async () => {
@@ -254,55 +255,25 @@ function Editor({
           );
           if (run.failed) setError(`Microaudit: ${run.failed}`);
         }
-        let merged = notesRef.current;
         if (needsAi) {
-          setInfo("Redactando el resumen y el análisis con IA…");
-          const written = await draftClientReportWithAi({
+          setInfo(
+            "Redactando el resumen y el análisis con IA (1 o 2 minutos)…",
+          );
+          const prepared = await prepareClientReportWithAi({
             data: { projectId, reportId: report.id },
           });
-          if (written.ok) {
-            merged = {
-              ...merged,
-              message: written.draft.message || merged.message,
-              sectionNotes: {
-                ...merged.sectionNotes,
-                ...written.draft.sectionNotes,
-              },
-              nextSteps: written.draft.nextSteps || merged.nextSteps,
-            };
-          }
-          setInfo("Analizando las páginas con IA…");
-          const analysed = await analyzeClientReportWithAi({
-            data: { projectId, reportId: report.id },
-          });
-          if (analysed.ok) {
-            merged = {
-              ...merged,
-              diagnoses: analysed.diagnoses,
-              titleIdeas: analysed.titleIdeas,
-              opportunityIdeas: analysed.opportunityIdeas,
-              contentIdeas: analysed.contentIdeas,
-              hidden: merged.hidden.filter(
-                (id) => id !== "diagnostico" && id !== "titulos",
-              ),
-            };
-          }
-          if (!written.ok && !analysed.ok) {
+          if (prepared.ok) {
+            setNotes(prepared.notes);
+            setDirty(false);
+          } else if (prepared.reason === "busy") {
             setError(
-              "La IA no ha podido redactar ahora. Usa «Redactar con IA».",
+              "Este informe ya se está preparando en otra pestaña. Espera un par de minutos y recarga.",
+            );
+          } else {
+            setError(
+              "La IA no ha podido redactar el informe. Prueba «Redactar con IA».",
             );
           }
-          await saveClientReport({
-            data: {
-              projectId,
-              reportId: report.id,
-              title: title.trim() || report.title,
-              clientName: client.trim() || null,
-              notes: merged,
-            },
-          });
-          setNotes(merged);
-          setDirty(false);
         }
         setInfo("Informe preparado.");
         await refetch();

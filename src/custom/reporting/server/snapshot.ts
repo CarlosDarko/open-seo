@@ -2,6 +2,8 @@
 // numbers, trend, what moved and why, where the queries rank, who brings the
 // traffic and the opportunities, all trimmed to what a client reads.
 import { GscService } from "@/server/features/gsc/services/GscService";
+import { ProjectContextService } from "@/server/features/project-context/services/ProjectContextService";
+import { classifyIntents } from "@/custom/reporting/server/intent";
 import { updatesBetween } from "@/custom/radar/googleUpdates";
 import {
   canonicalPageKey,
@@ -232,10 +234,8 @@ export async function buildReportSnapshot(
       position: row.position,
       prevPosition: row.prevPosition,
     }));
-  const queryTable: QueryTableRow[] = compareDimension(
-    queries.rows,
-    prevQueries?.rows ?? [],
-  )
+  const queryChanges = compareDimension(queries.rows, prevQueries?.rows ?? []);
+  const queryTable: QueryTableRow[] = queryChanges
     .filter((row) => row.status !== "lost")
     .sort((a, b) => b.clicks - a.clicks || b.impressions - a.impressions)
     .slice(0, 120)
@@ -249,6 +249,43 @@ export async function buildReportSnapshot(
       position: row.position,
       prevPosition: row.prevPosition,
     }));
+
+  // Intent of every search: brand, informational, comparative or transactional.
+  const business = await ProjectContextService.getProjectContext(projectId)
+    .then((context) =>
+      ProjectContextService.renderProjectContextMarkdown(context),
+    )
+    .catch(() => "");
+  const intents = await classifyIntents({
+    projectId,
+    business,
+    brandTokens: tokens,
+    rows: queryChanges.map((row) => ({
+      query: row.key,
+      impressions: Math.max(row.impressions, row.prevImpressions),
+      clicks: Math.max(row.clicks, row.prevClicks),
+    })),
+  });
+  const intentTotals = new Map<
+    string,
+    { label: string; clicks: number; prevClicks: number; impressions: number }
+  >();
+  for (const row of queryChanges) {
+    const label = intents.get(row.key) ?? "Informativa";
+    const entry = intentTotals.get(label) ?? {
+      label,
+      clicks: 0,
+      prevClicks: 0,
+      impressions: 0,
+    };
+    entry.clicks += row.clicks;
+    entry.prevClicks += row.prevClicks;
+    entry.impressions += row.impressions;
+    intentTotals.set(label, entry);
+  }
+  const intentLines = segmentLines(
+    [...intentTotals.values()].sort((a, b) => b.clicks - a.clicks),
+  );
 
   const extras = await Promise.all([
     buildTopicsReport(projectId, {
@@ -341,7 +378,10 @@ export async function buildReportSnapshot(
       segments: {
         device: segmentLines(report.segments.device),
         pageType: segmentLines(report.segments.pageType),
-        intent: segmentLines(report.segments.intent),
+        intent:
+          intentLines.length > 0
+            ? intentLines
+            : segmentLines(report.segments.intent),
       },
       opportunities: [
         ...report.ctrOpportunities.slice(0, 6).map((item) => ({

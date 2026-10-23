@@ -93,7 +93,19 @@ export function normalizeSnapshot(
     pageCount: raw.pageCount ?? (raw.pages ?? []).length,
     queryRows: raw.queryRows ?? [],
     queryCount: raw.queryCount ?? (raw.queryRows ?? []).length,
-    audits: raw.audits ?? [],
+    audits: (raw.audits ?? []).map((audit) => ({
+      ...audit,
+      categories: (audit.categories ?? []).map((category) => ({
+        ...category,
+        passed: category.passed ?? 0,
+      })),
+      issues: (audit.issues ?? []).map((issue) => ({
+        ...issue,
+        evidence: issue.evidence ?? "",
+        elements: issue.elements ?? [],
+        sources: issue.sources ?? [],
+      })),
+    })),
     pageWinners: raw.pageWinners ?? [],
     pageLosers: raw.pageLosers ?? [],
     queryWinners: raw.queryWinners ?? [],

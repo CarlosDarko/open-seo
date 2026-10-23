@@ -15,6 +15,7 @@ import {
   draftWithAi,
 } from "@/custom/reporting/server/aiDraft";
 import { parseMicroaudit } from "@/custom/reporting/microauditParse";
+import { prepareReportWithAi } from "@/custom/reporting/server/prepare";
 import {
   getPageTypes,
   pageTypesSchema,
@@ -148,6 +149,18 @@ export const refreshClientReport = createServerFn({ method: "POST" })
     });
     return { ok: true as const };
   });
+
+/** The AI writes the summary and the analysis of every tab and the result
+ *  is saved on the server, in one go. */
+export const prepareClientReportWithAi = createServerFn({ method: "POST" })
+  .middleware(requireProjectContext)
+  .validator(reportInput)
+  .handler(({ data, context }) =>
+    prepareReportWithAi(context.projectId, data.reportId, {
+      organizationId: context.organizationId,
+      userEmail: context.userEmail,
+    }),
+  );
 
 /** The page types (and their example URLs) saved for the project. */
 export const getReportPageTypes = createServerFn({ method: "POST" })
