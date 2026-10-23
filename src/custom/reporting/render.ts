@@ -1840,14 +1840,35 @@ function typePanel(type: string, pages: AuditPage[]): string {
   return `<div class="tp"><div class="tph"><div class="tps">${outOf100(score)}<small>nota media de «${esc(type)}» sobre 100${pages.length > 1 ? ` (${pages.length} páginas)` : ""}</small></div><ul class="tpl">${links}</ul></div><div class="crs">${bars}</div><div class="noprint">${issueLists(pages)}</div></div>`;
 }
 
+/** The page types always read in the same order: home, category, product,
+ *  post; any other type comes after, in the order it was created. */
+const TYPE_ORDER = [
+  /^(home|inicio|portada)/,
+  /^categor/,
+  /^producto/,
+  /^(post|blog|art[ií]culo|entrada)/,
+];
+function byTypeOrder(types: string[]): string[] {
+  const rank = (type: string) => {
+    const at = TYPE_ORDER.findIndex((pattern) =>
+      pattern.test(type.trim().toLowerCase()),
+    );
+    return at < 0 ? TYPE_ORDER.length : at;
+  };
+  return types
+    .map((type, index) => ({ type, index }))
+    .sort((a, b) => rank(a.type) - rank(b.type) || a.index - b.index)
+    .map((item) => item.type);
+}
+
 /** Microaudit on the example pages of each page type: how every template of
  *  the site scores and everything that is wrong or can improve in it. */
 function auditsBlock(report: ReportFull, missing: string[] = []): string {
   const audits: AuditPage[] = report.snapshot.audits ?? [];
   if (audits.length === 0) return "";
-  const types = [
+  const types = byTypeOrder([
     ...new Set([...audits.map((audit) => audit.type), ...missing]),
-  ];
+  ]);
   const byType = (type: string) =>
     audits.filter((audit) => audit.type === type);
   const categories = new Map<number, string>();
