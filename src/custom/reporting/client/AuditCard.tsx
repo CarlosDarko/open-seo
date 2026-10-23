@@ -122,7 +122,9 @@ export async function auditPageTypes(
           markdown: result.markdown,
         },
       });
-      if (stored.ok) done += 1;
+      if (stored.ok && stored.unreadable) {
+        failed ??= `Microaudit no pudo leer ${job.url}: la web parece bloquear el rastreo.`;
+      } else if (stored.ok) done += 1;
       else failed ??= "No se pudo leer la respuesta de Microaudit.";
     }
   }

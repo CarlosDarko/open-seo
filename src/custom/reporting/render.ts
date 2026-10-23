@@ -9,6 +9,7 @@
 // escaped here. The text never addresses the reader as "tú": the subject is
 // the website.
 import { integer } from "@/custom/radar/format";
+import { looksUnreadable } from "@/custom/reporting/auditQuality";
 import {
   KIND_COLOR,
   KIND_NAME,
@@ -1888,6 +1889,12 @@ function auditsBlock(report: ReportFull): string {
 }
 
 /** Shown only to the consultant, in the editor's preview. */
+/** Only the consultant sees it: the pages Microaudit could not read. */
+function unreadableNotice(pages: AuditPage[]): string {
+  if (pages.length === 0) return "";
+  return `<div class="note"><b>Páginas que Microaudit no ha podido leer</b>No devolvieron título ni contenido (normalmente por un bloqueo anti-bots), así que no cuentan en la nota ni en los fallos para no dar datos falsos: ${pages.map((page) => `${esc(page.type)} (${pageLink(page.url)})`).join(", ")}. Vuelve a auditar más tarde o prueba con otra página de ejemplo.</div>`;
+}
+
 function auditsHint(): string {
   return `<div class="note"><b>Solo en la vista previa</b>Este informe aún no tiene auditoría técnica. Define las tipologías de página en el Contexto del proyecto y usa «Auditar» en el editor: el cliente no verá este aviso.</div>`;
 }
@@ -2076,10 +2083,24 @@ const TAB_ORDER = [
 ];
 
 export function renderReportDocument(
-  report: ReportFull,
+  source: ReportFull,
   mode: RenderMode,
   signer: Signer = CARLOS,
 ): string {
+  // Audits of pages Microaudit could not read are left out of every figure.
+  const unreadable = (source.snapshot.audits ?? []).filter(looksUnreadable);
+  const report: ReportFull =
+    unreadable.length === 0
+      ? source
+      : {
+          ...source,
+          snapshot: {
+            ...source.snapshot,
+            audits: source.snapshot.audits.filter(
+              (audit) => !looksUnreadable(audit),
+            ),
+          },
+        };
   const { snapshot } = report;
   const host = snapshot.siteUrl.startsWith("sc-domain:")
     ? snapshot.siteUrl.slice("sc-domain:".length)
@@ -2160,7 +2181,9 @@ export function renderReportDocument(
         lead("tecnico") +
         show(
           "auditoria",
-          () => auditsBlock(report) || (mode === "preview" ? auditsHint() : ""),
+          () =>
+            (mode === "preview" ? unreadableNotice(unreadable) : "") +
+            (auditsBlock(report) || (mode === "preview" ? auditsHint() : "")),
         ) +
         columns(show("tecnico", () => healthBlock(report))),
     },

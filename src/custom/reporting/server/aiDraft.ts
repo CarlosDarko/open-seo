@@ -15,6 +15,7 @@ import {
   updateImpacts,
   weekdayStats,
 } from "@/custom/reporting/insights";
+import { looksUnreadable } from "@/custom/reporting/auditQuality";
 import { parseJson } from "@/custom/reporting/jsonLoose";
 import { buildVerdict } from "@/custom/reporting/narrative";
 import { addAiCost } from "@/custom/reporting/server/reportingDb";
@@ -291,6 +292,9 @@ function pct(now: number, before: number | null): number | null {
 
 function brief(report: ReportFull, business: string) {
   const { snapshot } = report;
+  const readableAudits = (snapshot.audits ?? []).filter(
+    (audit) => !looksUnreadable(audit),
+  );
   const lines = (
     items: {
       label: string;
@@ -437,8 +441,8 @@ function brief(report: ReportFull, business: string) {
       clicsPosibles: item.potentialClicks,
     })),
     sitemap_y_cobertura: snapshot.health ?? undefined,
-    auditoria_tecnica: snapshot.audits?.length
-      ? snapshot.audits.map((audit) => ({
+    auditoria_tecnica: readableAudits.length
+      ? readableAudits.map((audit) => ({
           tipologia: audit.type,
           pagina: pathOf(audit.url),
           url: audit.url,

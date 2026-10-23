@@ -1,4 +1,5 @@
 import { env } from "cloudflare:workers";
+import { looksUnreadable } from "@/custom/reporting/auditQuality";
 import type { AuditPage } from "@/custom/reporting/types";
 
 // Microaudit limits audits per IP and per day, and an audit takes a minute. So
@@ -50,6 +51,7 @@ export async function cacheAudit(
   projectId: string,
   audit: AuditPage,
 ): Promise<void> {
+  if (looksUnreadable(audit)) return;
   const cache = await read(projectId);
   cache[audit.url] = audit;
   const kept = Object.entries(cache)
@@ -83,7 +85,7 @@ export async function cachedAudits(
       const hit = cache[url];
       // Audits saved in the first, shorter format (no "passed" counts) lack
       // the detail the report shows: they are asked again.
-      const complete = hit?.version === 3;
+      const complete = hit?.version === 3 && !looksUnreadable(hit);
       if (hit && complete && Date.parse(hit.checkedAt) >= limit) {
         found.push({ ...hit, type: type.name });
       }

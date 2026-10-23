@@ -15,6 +15,7 @@ import {
   draftWithAi,
 } from "@/custom/reporting/server/aiDraft";
 import { parseMicroaudit } from "@/custom/reporting/microauditParse";
+import { looksUnreadable } from "@/custom/reporting/auditQuality";
 import { cachedAudits, cacheAudit } from "@/custom/reporting/server/auditCache";
 import { prepareReportWithAi } from "@/custom/reporting/server/prepare";
 import {
@@ -213,7 +214,11 @@ export const saveReportAudit = createServerFn({ method: "POST" })
       audits,
     });
     await cacheAudit(context.projectId, audit).catch(() => undefined);
-    return { ok: true as const, score: audit.score };
+    return {
+      ok: true as const,
+      score: audit.score,
+      unreadable: looksUnreadable(audit),
+    };
   });
 
 /** Fills the report with the audits already saved for the example pages,

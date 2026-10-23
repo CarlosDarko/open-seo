@@ -24,6 +24,7 @@ import { Switch } from "@/client/components/ui/switch";
 import { Textarea } from "@/client/components/ui/textarea";
 import { AuditCard, auditPageTypes } from "@/custom/reporting/client/AuditCard";
 import { pageTypesKey } from "@/custom/reporting/client/PageTypesSection";
+import { needsNewAudit } from "@/custom/reporting/auditQuality";
 import { publicUrl } from "@/custom/reporting/client/ReportingPage";
 import {
   REPORT_SECTIONS,
@@ -202,7 +203,7 @@ function Editor({
       !report.notes.message.trim() &&
       Object.keys(report.notes.sectionNotes).length === 0;
     // Audits stored before the detail was kept have no "passed" counts.
-    const stale = report.snapshot.audits.some((audit) => audit.version !== 3);
+    const stale = report.snapshot.audits.some((audit) => needsNewAudit(audit));
     const needsAudit =
       types.length > 0 && (report.snapshot.audits.length === 0 || stale);
     prepared.current = true;
