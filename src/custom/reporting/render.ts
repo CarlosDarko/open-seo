@@ -290,11 +290,14 @@ function analysisCard(report: ReportFull, id: SectionId): string {
     : "";
 }
 
+/** First name of whoever signs the report this page is being drawn for. */
+let noteAuthor = CARLOS.name.split(" ")[0];
+
 function noteOf(report: ReportFull, id: SectionId): string {
   if (PANEL_NOTE_IDS.has(id)) return "";
   const text = report.notes.sectionNotes[id]?.trim();
   return text
-    ? `<div class="note"><b>Nota de Carlos</b>${esc(text)}</div>`
+    ? `<div class="note"><b>Nota de ${esc(noteAuthor)}</b>${paragraphs(text)}</div>`
     : "";
 }
 
@@ -883,6 +886,16 @@ ${cards ? `<div class="uimp">${cards}</div>` : ""}
   );
 }
 
+/** Brand red for the biggest group, then the ink and greys of the report. */
+const MIX_COLORS = [
+  "#f11c41",
+  "#1a1a1a",
+  "#4a4a52",
+  "#7a7a84",
+  "#a8a8b0",
+  "#d0d0d6",
+];
+
 /** One dimension of the traffic: each group with its share of the clicks and
  *  what it added or took away since the previous period. */
 function mixCard(
@@ -893,19 +906,25 @@ function mixCard(
   if (lines.length === 0) return "";
   const total = lines.reduce((sum, line) => sum + line.clicks, 0);
   const prevTotal = lines.reduce((sum, line) => sum + line.prevClicks, 0);
-  const rows = lines
-    .slice(0, 6)
+  const shown = lines.slice(0, 6);
+  const stack = `<div class="stk" aria-hidden="true">${shown
+    .map(
+      (line, index) =>
+        `<i style="width:${Math.max(1.5, line.share * 100).toFixed(1)}%;background:${MIX_COLORS[index]}" title="${esc(line.label)}"></i>`,
+    )
+    .join("")}</div>`;
+  const rows = shown
     .map((line, index) => {
       const diff = line.clicks - line.prevClicks;
       const change = percentChange(line.clicks, line.prevClicks);
       const delta = comparable
         ? `<span class="dl ${diff > 0 ? "up" : diff < 0 ? "down" : "flat"}">${diff > 0 ? "▲" : diff < 0 ? "▼" : "="} ${diff === 0 ? "igual" : signedNum(diff)}${change !== null && diff !== 0 ? ` <i>(${change > 0 ? "+" : "−"}${one.format(Math.abs(change) * 100)} %)</i>` : ""}</span>`
         : "";
-      return `<div class="mr${index === 0 ? " first" : ""}"><div class="ml"><span class="mn" title="${esc(line.label)}">${esc(line.label)}</span><span class="mp">${one.format(line.share * 100)} % de los clics</span></div><div class="mb"><i style="--w:${Math.max(2, line.share * 100).toFixed(1)}%"></i></div><div class="mv"><b>${num(line.clicks)}</b>${delta}</div></div>`;
+      return `<div class="mxr"><i class="sw" style="background:${MIX_COLORS[index]}"></i><div class="mxb"><div class="mxt"><span class="mxn" title="${esc(line.label)}">${esc(line.label)}</span><b class="mxp${index === 0 ? " first" : ""}">${one.format(line.share * 100)}<small>%</small></b></div><div class="mxm"><span>${num(line.clicks)} clics</span>${delta}</div></div></div>`;
     })
     .join("");
   const net = comparable ? countDelta(total, prevTotal) : "";
-  return `<div class="sheet mix"><div class="mh"><h3>${esc(title)}</h3>${net}</div>${rows}</div>`;
+  return `<div class="sheet mix"><div class="mh"><h3>${esc(title)}</h3>${net}</div>${stack}${rows}</div>`;
 }
 
 function trafficMixBlock(report: ReportFull): string {
@@ -2166,7 +2185,7 @@ function closing(report: ReportFull): string {
   return `<footer class="end" id="proximos"><div class="wrap">
 <div class="kick">Próximos pasos</div><h2>Hoja de ruta para el próximo periodo</h2>
 <ol class="steps">${steps.map(stepHtml).join("")}</ol>
-${note ? `<div class="note" style="background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.16);color:#f6f6f6"><b style="color:#ffb3c0">Nota de Carlos</b>${esc(note)}</div>` : ""}
+${note ? `<div class="note" style="background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.16);color:#f6f6f6"><b style="color:#ffb3c0">Nota de ${esc(noteAuthor)}</b>${paragraphs(note)}</div>` : ""}
 <div class="foot"><span class="fm">${LOGO_MARK_LIGHT}</span><span>Informe generado el ${day(report.snapshot.generatedAt.slice(0, 10))} con datos de Google Search Console · <a href="https://carlosortega.page/contacto/" target="_blank" rel="noopener noreferrer">carlosortega.page</a></span></div>
 </div></footer>`;
 }
@@ -2193,6 +2212,7 @@ export function renderReportDocument(
   mode: RenderMode,
   signer: Signer = CARLOS,
 ): string {
+  noteAuthor = signer.name.split(" ")[0];
   // Audits of pages Microaudit could not read are left out of every figure.
   const unreadable = (source.snapshot.audits ?? []).filter(looksUnreadable);
   const report: ReportFull =

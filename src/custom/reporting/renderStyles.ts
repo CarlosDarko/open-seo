@@ -847,4 +847,34 @@ h3.gsh{margin:30px 0 12px}
 .soc a{display:inline-flex;color:var(--ink);border:0}
 .soc a:hover{color:var(--red);text-decoration:none}
 .soc svg{display:block;width:18px;height:18px}
+/* ---- v16: traffic mix cards, notes ---- */
+.mix.sheet{padding:24px 26px}
+.mh{margin-bottom:14px}
+.stk{display:flex;gap:3px;height:10px;margin:0 0 8px}
+.stk i{display:block;height:100%;border-radius:5px;min-width:4px}
+.mxr{display:flex;align-items:flex-start;gap:14px;padding:13px 0;border-top:1px solid var(--line)}
+.mxr:first-of-type{border-top:0}
+.mxr .sw{flex:none;width:12px;height:12px;margin-top:7px;border-radius:4px}
+.mxb{flex:1;min-width:0}
+.mxt{display:flex;justify-content:space-between;align-items:baseline;gap:14px}
+.mxn{font-size:15.5px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mxp{font-size:24px;font-weight:800;letter-spacing:-.03em;line-height:1.1;font-variant-numeric:tabular-nums;color:var(--ink)}
+.mxp small{margin-left:2px;font-size:13px;font-weight:700;color:var(--muted)}
+.mxp.first{color:var(--red)}
+.mxm{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-top:2px;font-size:13px;color:var(--muted)}
+.mxm .dl{font-size:12.5px}
+.mxm .dl i{font-style:normal;font-weight:600;opacity:.8}
+.note{white-space:normal}
+.note p{margin:0 0 8px;font-size:15.5px;line-height:1.65;color:var(--ink2)}
+.note p:last-child{margin:0}
+.note strong{color:var(--ink)}
+.end .note strong{color:#fff}
+.end .note p{color:#f6f6f6}
+@media print{.mix.sheet{padding:10px 14px}.mxr{padding:6px 0}.mxp{font-size:15pt}.mxn{font-size:10pt}.mxm{font-size:8pt}.stk{height:7px}}
+/* ---- v17: avatar as tall as name + title + networks ---- */
+.sig{gap:16px}
+.sig .av{width:74px;height:74px}
+@media print{.sig .av{width:62px;height:62px}}
+.sig>span:last-child{line-height:1.45}
+.sig .soc{margin-top:8px}
 `;
