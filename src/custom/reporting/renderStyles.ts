@@ -895,4 +895,8 @@ h3.gsh{margin:30px 0 12px}
 .scover p{margin:0;max-width:130mm;font-size:15pt;line-height:1.45;color:rgba(246,246,246,.82)}
 .scp{margin-top:auto;padding-top:14mm;font-size:9.5pt;font-weight:600;letter-spacing:.08em;color:rgba(246,246,246,.55)}
 }
+/* ---- v19: room between the summary text and the signature ---- */
+.sumt{margin-bottom:34px}
+.sig{margin-top:0}
+@media print{.sumt{margin-bottom:12mm}}
 `;
