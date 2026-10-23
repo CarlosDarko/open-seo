@@ -591,7 +591,7 @@ a.el:hover{color:var(--red);background:#fde8ec;text-decoration:none}
 .steps .si b{display:block;margin-bottom:2px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#ff8da1}
 .steps mark.ac{color:#ff8da1}
 .steps strong{color:#fff}
-.sig .av{width:54px;height:54px;padding:3px;background:var(--red);overflow:hidden}
+.sig .av{width:54px;height:54px;padding:0;background:none;overflow:hidden}
 .sig .av img{display:block;width:100%;height:100%;border-radius:50%;object-fit:cover}
 @media screen and (max-width:560px){.steps li.st{grid-template-columns:38px minmax(0,1fr)}.tbr{grid-template-columns:38px minmax(0,1fr) 48px 56px}}
 @media print{
