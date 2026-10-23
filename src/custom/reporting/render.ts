@@ -1438,8 +1438,15 @@ function opportunitiesBlock(report: ReportFull): string {
       { label: "Esfuerzo", num: true, asc: true },
     ],
     rows.map((row, index) => [
-      { h: `<b>${index + 1}</b>`, v: index + 1 },
-      { h: queryLink(row.query), v: row.query },
+      {
+        h: `<span class="rkm${index < 3 ? " top" : ""}">${index + 1}</span>`,
+        v: index + 1,
+      },
+      {
+        h: `${queryLink(row.query)}${row.page ? `<small class="pp">${esc(pathOf(row.page))}</small>` : ""}`,
+        v: row.query,
+        cls: "pg",
+      },
       {
         h: `<span class="kd ${row.kind}" title="${OPP_KIND_LABEL[row.kind]}">${OPP_KIND_SHORT[row.kind]}</span>`,
         v: row.kind,
@@ -1447,9 +1454,17 @@ function opportunitiesBlock(report: ReportFull): string {
       { h: pos(row.position), v: row.position },
       impressionsCell(row.impressions, maxImpressions),
       { h: num(row.clicks), v: row.clicks },
-      clicksCell(row.potentialClicks, null, maxPotential),
+      {
+        h: barNumber(row.potentialClicks, maxPotential).replace(
+          "<b>",
+          '<b class="gain">+',
+        ),
+        v: row.potentialClicks,
+      },
       { h: effortDots(effortOf(row)), v: effortOf(row) },
     ]),
+    "No hay datos.",
+    true,
   );
 
   const shown = rows;
@@ -1827,10 +1842,12 @@ function typePanel(type: string, pages: AuditPage[]): string {
 
 /** Microaudit on the example pages of each page type: how every template of
  *  the site scores and everything that is wrong or can improve in it. */
-function auditsBlock(report: ReportFull): string {
+function auditsBlock(report: ReportFull, missing: string[] = []): string {
   const audits: AuditPage[] = report.snapshot.audits ?? [];
   if (audits.length === 0) return "";
-  const types = [...new Set(audits.map((audit) => audit.type))];
+  const types = [
+    ...new Set([...audits.map((audit) => audit.type), ...missing]),
+  ];
   const byType = (type: string) =>
     audits.filter((audit) => audit.type === type);
   const categories = new Map<number, string>();
@@ -1869,14 +1886,13 @@ function auditsBlock(report: ReportFull): string {
     up: "Bien",
     mid: "Mejorable",
     down: "Hay mucho que corregir",
-    flat: "",
+    flat: "Sin datos",
   };
   const typeCards = `<div class="gsc">${types
     .map((type) => {
       const score = mean(byType(type).map((audit) => audit.score));
       const tone = scoreTone(score);
-      const count = byType(type).length;
-      return `<div class="gs ${tone}"><span class="gk">${esc(type)}</span><b>${score === null ? "—" : Math.round(score)}<i>/100</i></b><span class="gl">${TONE_WORD[tone]}</span><span class="gm">${num(count)} ${count === 1 ? "página auditada" : "páginas auditadas"}</span></div>`;
+      return `<div class="gs ${tone}"><span class="gk">${esc(type)}</span><b>${score === null ? "—" : Math.round(score)}<i>/100</i></b><span class="gl">${TONE_WORD[tone]}</span></div>`;
     })
     .join("")}</div>`;
   const everything = issuesOf(audits);
@@ -1919,7 +1935,7 @@ function auditsBlock(report: ReportFull): string {
     "auditoria",
     "Auditoría técnica por tipología de página",
     `Microaudit ha revisado ${num(audits.length)} ${audits.length === 1 ? "página" : "páginas"} de ejemplo con más de 90 comprobaciones de SEO y de SEO para asistentes de IA. Las páginas de una misma tipología se analizan juntas, como la media de esa plantilla. Cada nota va de 0 a 100 (100 es que no hay nada que corregir) y una categoría con algún fallo no pasa de 35 hasta corregirlo.`,
-    `${summary}<div class="sheet"><h3>Nota global de cada tipología</h3><p class="gsn">Media de la nota (sobre 100) de las páginas de ejemplo de cada tipología.</p>${typeCards}<h3 class="gsh">Nota por categoría</h3>${matrix}</div><div class="sheet" style="margin-top:18px">${panels}</div>`,
+    `${summary}<div class="sheet"><h3>Nota global de cada tipología</h3><p class="gsn">Nota media sobre 100 de cada tipología de página.</p>${typeCards}<h3 class="gsh">Nota por categoría</h3>${matrix}</div><div class="sheet" style="margin-top:18px">${panels}</div>`,
   );
 }
 
@@ -2137,6 +2153,17 @@ export function renderReportDocument(
           },
         };
   const { snapshot } = report;
+  // Types whose pages could not be read still show, as "no data".
+  const readableTypes = new Set(
+    (report.snapshot.audits ?? []).map((audit) => audit.type),
+  );
+  const missingTypes = [
+    ...new Set(
+      unreadable
+        .map((audit) => audit.type)
+        .filter((type) => !readableTypes.has(type)),
+    ),
+  ];
   const host = snapshot.siteUrl.startsWith("sc-domain:")
     ? snapshot.siteUrl.slice("sc-domain:".length)
     : (() => {
@@ -2218,7 +2245,8 @@ export function renderReportDocument(
           "auditoria",
           () =>
             (mode === "preview" ? unreadableNotice(unreadable) : "") +
-            (auditsBlock(report) || (mode === "preview" ? auditsHint() : "")),
+            (auditsBlock(report, missingTypes) ||
+              (mode === "preview" ? auditsHint() : "")),
         ) +
         columns(show("tecnico", () => healthBlock(report))),
     },
