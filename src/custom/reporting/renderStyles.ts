@@ -638,4 +638,17 @@ section#resumen{break-after:auto;margin-bottom:8mm}
 .noprint{display:none}
 .end{min-height:297mm;break-before:page;margin-top:0;padding:16mm 0 0}
 }
+
+a.pill{text-decoration:none;cursor:pointer}
+a.pill:hover{background:var(--red);color:#fff;text-decoration:none}
+.elk{display:flex;flex-wrap:wrap;gap:4px 14px;margin:2px 0 6px;font-size:12px;color:var(--muted)}
+.elk .kp{color:var(--up);font-weight:600}
+.elk .kf{color:var(--down);font-weight:600}
+.el .m{font-style:normal;font-weight:800;margin-right:5px}
+.el.pass .m{color:var(--up)}
+.el.fail .m{color:var(--down)}
+.el.warn .m{color:var(--warn)}
+.el.fail{background:#fbe9e9;color:var(--ink)}
+.el.pass{color:var(--muted)}
+@media print{.elk{font-size:8pt}}
 `;

@@ -112,7 +112,9 @@ export function normalizeSnapshot(
         evidence: issue.evidence ?? "",
         // Version 1 kept only the names.
         elements: (issue.elements ?? []).map((element) =>
-          typeof element === "string" ? { label: element, url: null } : element,
+          typeof element === "string"
+            ? { label: element, url: null, status: "info" as const }
+            : { ...element, status: element.status ?? ("info" as const) },
         ),
         sources: issue.sources ?? [],
       })),

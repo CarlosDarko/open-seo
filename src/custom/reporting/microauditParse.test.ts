@@ -47,6 +47,7 @@ nodos totales: 1700
 
 - [fail] iebs-logo.svg: https://carlosortega.page/wp-content/uploads/iebs-logo.svg
 - [fail] quondos-logo.svg: https://carlosortega.page/wp-content/uploads/quondos-logo.svg
+- [pass] ok-logo.svg: https://carlosortega.page/wp-content/uploads/ok-logo.svg
 
 - Fuente: [web.dev: Establece el tamaño de imágenes y vídeos](https://web.dev/articles/optimize-cls?hl=es#images_without_dimensions)
 
@@ -90,10 +91,17 @@ describe("parseMicroaudit", () => {
         {
           label: "iebs-logo.svg",
           url: "https://carlosortega.page/wp-content/uploads/iebs-logo.svg",
+          status: "fail",
         },
         {
           label: "quondos-logo.svg",
           url: "https://carlosortega.page/wp-content/uploads/quondos-logo.svg",
+          status: "fail",
+        },
+        {
+          label: "ok-logo.svg",
+          url: "https://carlosortega.page/wp-content/uploads/ok-logo.svg",
+          status: "pass",
         },
       ],
       evidence: "nodos totales: 1700",

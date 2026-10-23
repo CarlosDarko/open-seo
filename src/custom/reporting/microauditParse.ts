@@ -34,7 +34,7 @@ type Open = {
   points: number | null;
   detail: string[];
   evidence: string[];
-  elements: { label: string; url: string | null }[];
+  elements: AuditIssue["elements"];
   sources: { label: string; url: string }[];
 };
 
@@ -154,18 +154,24 @@ export function parseMicroaudit(
       open.sources.push({ label: source[1].trim(), url: source[2] });
       continue;
     }
-    const element = /^-\s*\[(?:fail|warning|warn|pass|info)\]\s*(.+)$/i.exec(
+    const element = /^-\s*\[(fail|warning|warn|pass|info)\]\s*(.+)$/i.exec(
       line,
     );
     if (element) {
       // "logo.svg: https://…" is a name and its address.
-      const [name, ...rest] = element[1].split(/:\s+(?=https?:\/\/)/);
+      const found = element[1].toLowerCase();
+      const status: AuditIssue["elements"][number]["status"] =
+        found === "pass" || found === "fail" || found === "info"
+          ? found
+          : "warn";
+      const [name, ...rest] = element[2].split(/:\s+(?=https?:\/\/)/);
       const label = name.trim();
       const link = rest.join(": ").trim();
       if (label) {
         open.elements.push({
           label: label.slice(0, 120),
           url: /^https?:\/\/\S+$/.test(link) ? link : null,
+          status,
         });
       }
       continue;
@@ -175,7 +181,7 @@ export function parseMicroaudit(
   finish();
 
   return {
-    version: 2,
+    version: 3,
     type,
     url,
     score: number(score[1]),

@@ -83,7 +83,7 @@ export async function cachedAudits(
       const hit = cache[url];
       // Audits saved in the first, shorter format (no "passed" counts) lack
       // the detail the report shows: they are asked again.
-      const complete = hit?.version === 2;
+      const complete = hit?.version === 3;
       if (hit && complete && Date.parse(hit.checkedAt) >= limit) {
         found.push({ ...hit, type: type.name });
       }

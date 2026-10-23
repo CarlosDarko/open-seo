@@ -202,7 +202,7 @@ function Editor({
       !report.notes.message.trim() &&
       Object.keys(report.notes.sectionNotes).length === 0;
     // Audits stored before the detail was kept have no "passed" counts.
-    const stale = report.snapshot.audits.some((audit) => audit.version !== 2);
+    const stale = report.snapshot.audits.some((audit) => audit.version !== 3);
     const needsAudit =
       types.length > 0 && (report.snapshot.audits.length === 0 || stale);
     prepared.current = true;

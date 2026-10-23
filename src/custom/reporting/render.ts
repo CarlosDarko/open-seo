@@ -1296,7 +1296,7 @@ type IssueAgg = {
   points: number;
   detail: string;
   evidence: string;
-  elements: { label: string; url: string | null }[];
+  elements: AuditPage["issues"][number]["elements"];
   sources: { label: string; url: string }[];
   /** The example pages that have it, with the type of each. */
   pages: Map<string, string>;
@@ -1329,10 +1329,14 @@ function mergeIssues(pages: AuditPage[]): IssueAgg[] {
       if (issue.detail.length > found.detail.length)
         found.detail = issue.detail;
       for (const element of issue.elements) {
-        const same = found.elements.some(
+        const same = found.elements.find(
           (item) => item.label === element.label && item.url === element.url,
         );
-        if (found.elements.length < 10 && !same) found.elements.push(element);
+        if (same) {
+          if (element.status === "fail") same.status = "fail";
+        } else if (found.elements.length < 10) {
+          found.elements.push({ ...element });
+        }
       }
       for (const source of issue.sources) {
         if (!found.sources.some((item) => item.url === source.url)) {
@@ -1349,45 +1353,56 @@ function mergeIssues(pages: AuditPage[]): IssueAgg[] {
   );
 }
 
-function issueCard(
-  item: IssueAgg,
-  pageCount: number,
-  showTypes: boolean,
-): string {
-  const types = [...new Set(item.pages.values())];
-  const pills =
-    showTypes && types.length > 0
-      ? `<div class="pills">${types.map((type) => `<span class="pill">${esc(type)}</span>`).join("")}</div>`
-      : "";
+const STATUS_RANK = { fail: 0, warn: 1, info: 2, pass: 3 } as const;
+const STATUS_MARK = { fail: "✕", warn: "!", pass: "✓", info: "" } as const;
+
+function issueCard(item: IssueAgg, pageCount: number): string {
+  // One pill per page type, linking to an example page of that type that has
+  // the problem.
+  const examples = new Map<string, string>();
+  for (const [url, type] of item.pages) {
+    if (!examples.has(type)) examples.set(type, url);
+  }
+  const pills = [...examples.entries()]
+    .map(
+      ([type, url]) =>
+        `<a class="pill" href="${esc(url)}" target="_blank" rel="noopener noreferrer" title="Ver una página de ejemplo con este problema: ${esc(pathOf(url))}">${esc(type)}</a>`,
+    )
+    .join("");
   const where =
     pageCount > 1 ? `Afecta a ${item.pages.size} de ${pageCount} páginas` : "";
   const meta = [esc(item.category), where].filter(Boolean).join(" · ");
-  const examples = [...item.pages.keys()]
-    .slice(0, 4)
-    .map((url) => pageLink(url))
-    .join(", ");
-  const elements = item.elements
-    .map((element) =>
-      element.url && isWeb(element.url)
-        ? `<a class="el" href="${esc(element.url)}" target="_blank" rel="noopener noreferrer" title="${esc(element.url)}">${esc(element.label)}</a>`
-        : `<span class="el">${esc(element.label)}</span>`,
-    )
+  const sorted = [...item.elements].sort(
+    (x, y) => STATUS_RANK[x.status] - STATUS_RANK[y.status],
+  );
+  const marked = sorted.some((element) => element.status !== "info");
+  const elements = sorted
+    .map((element) => {
+      const mark = STATUS_MARK[element.status];
+      const label = `${mark ? `<i class="m">${mark}</i>` : ""}${esc(element.label)}`;
+      return element.url && isWeb(element.url)
+        ? `<a class="el ${element.status}" href="${esc(element.url)}" target="_blank" rel="noopener noreferrer" title="${esc(element.url)}">${label}</a>`
+        : `<span class="el ${element.status}">${label}</span>`;
+    })
     .join("");
+  const legend = marked
+    ? `<div class="elk"><span>Lo que se ha comprobado:</span><span class="kp">✓ correcto</span><span class="kf">✕ a corregir</span></div>`
+    : "";
   const sources = item.sources
     .map(
       (source) =>
         `<a class="lk" href="${esc(source.url)}" target="_blank" rel="noopener noreferrer">${esc(source.label)} ↗</a>`,
     )
     .join(" · ");
-  return `<article class="is"><div class="ish"><span class="ik ${item.kind}">${item.kind === "fail" ? "A corregir" : "A mejorar"}</span><h4>${esc(item.title)}</h4>${item.points > 0 ? `<span class="ip">+${one.format(item.points)} pts</span>` : ""}</div>${pills}<div class="im">${meta}</div>${item.detail ? `<p>${esc(item.detail)}</p>` : ""}${item.evidence ? `<p class="ev">${esc(item.evidence)}</p>` : ""}${elements ? `<div class="els">${elements}</div>` : ""}${examples ? `<div class="exs"><span>Para verlo en la web:</span> ${examples}</div>` : ""}${sources ? `<div class="src">Documentación oficial: ${sources}</div>` : ""}</article>`;
+  return `<article class="is"><div class="ish"><span class="ik ${item.kind}">${item.kind === "fail" ? "A corregir" : "A mejorar"}</span><h4>${esc(item.title)}</h4>${item.points > 0 ? `<span class="ip">+${one.format(item.points)} pts</span>` : ""}</div>${pills ? `<div class="pills">${pills}</div>` : ""}<div class="im">${meta}</div>${item.detail ? `<p>${esc(item.detail)}</p>` : ""}${item.evidence ? `<p class="ev">${esc(item.evidence)}</p>` : ""}${elements ? `${legend}<div class="els">${elements}</div>` : ""}${sources ? `<div class="src">Documentación oficial: ${sources}</div>` : ""}</article>`;
 }
 
 /** The issues of a set of pages: first what to fix, then what to improve. */
-function issueLists(pages: AuditPage[], showTypes: boolean): string {
+function issueLists(pages: AuditPage[]): string {
   const issues = mergeIssues(pages);
   const list = (items: IssueAgg[], title: string) =>
     items.length > 0
-      ? `<h3 class="ih">${title} (${items.length})</h3><div class="isl">${items.map((item) => issueCard(item, pages.length, showTypes)).join("")}</div>`
+      ? `<h3 class="ih">${title} (${items.length})</h3><div class="isl">${items.map((item) => issueCard(item, pages.length)).join("")}</div>`
       : "";
   return (
     list(
@@ -1445,7 +1460,7 @@ function typePanel(type: string, pages: AuditPage[]): string {
         `<li>${pageLink(page.url)} <span class="pn">${page.score === null ? "—" : Math.round(page.score)}/100</span></li>`,
     )
     .join("");
-  return `<div class="tp"><div class="tph"><div class="tps">${outOf100(score)}<small>nota media de «${esc(type)}» sobre 100${pages.length > 1 ? ` (${pages.length} páginas)` : ""}</small></div><ul class="tpl">${links}</ul></div><div class="crs">${bars}</div><div class="noprint">${issueLists(pages, false)}</div></div>`;
+  return `<div class="tp"><div class="tph"><div class="tps">${outOf100(score)}<small>nota media de «${esc(type)}» sobre 100${pages.length > 1 ? ` (${pages.length} páginas)` : ""}</small></div><ul class="tpl">${links}</ul></div><div class="crs">${bars}</div><div class="noprint">${issueLists(pages)}</div></div>`;
 }
 
 /** Microaudit on the example pages of each page type: how every template of
@@ -1518,7 +1533,7 @@ function auditsBlock(report: ReportFull): string {
       id: "all",
       label: "Todo el sitio",
       count: everything.length,
-      html: `<p class="lead tabl">Cada tarea indica las tipologías de página a las que afecta y páginas de ejemplo para ver el problema.</p>${issueLists(audits, true)}`,
+      html: `<p class="lead tabl">Cada tarea indica las tipologías de página a las que afecta y páginas de ejemplo para ver el problema.</p>${issueLists(audits)}`,
     },
     ...types.map((type, index) => ({
       id: `t${index}`,

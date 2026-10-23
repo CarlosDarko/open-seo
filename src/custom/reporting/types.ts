@@ -103,7 +103,12 @@ export type AuditIssue = {
   evidence: string;
   /** Elements that show the problem (image names, bots, pages…), each with
    *  its address when Microaudit gives one. */
-  elements: { label: string; url: string | null }[];
+  elements: {
+    label: string;
+    url: string | null;
+    /** What Microaudit found in it: right, failing, to improve or just listed. */
+    status: "pass" | "fail" | "warn" | "info";
+  }[];
   /** Official documentation Microaudit links to. */
   sources: { label: string; url: string }[];
 };
@@ -111,7 +116,7 @@ export type AuditIssue = {
 /** Microaudit's audit of one example page of a page type (home, category,
  *  product, blog…). */
 export type AuditPage = {
-  /** 2 keeps every detail and the addresses of the elements. */
+  /** 3 keeps every detail, the addresses of the elements and their status. */
   version: number;
   type: string;
   url: string;
