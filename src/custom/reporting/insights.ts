@@ -261,7 +261,7 @@ function trafficInsight(snapshot: ReportSnapshot): Insight | null {
       tone: "bad",
       weight: 100,
       title: "El tráfico baja por pérdida de posiciones",
-      body: `Los clics bajan un ${pct(clicks)} y las impresiones un ${pct(impressions)}, con la posición media pasando de ${one.format(prevTotals.position)} a ${one.format(totals.position)}. Hay competidores por delante o contenido que ha perdido relevancia: conviene revisar las páginas que más caen.`,
+      body: `Los clics bajan un ${pct(clicks)} y las impresiones un ${pct(impressions)}, con la posición media pasando de ${one.format(prevTotals.position)} a ${one.format(totals.position)} (${signedPct(change(totals.position, prevTotals.position) ?? 0)}). Hay competidores por delante o contenido que ha perdido relevancia: conviene revisar las páginas que más caen.`,
     };
   }
   if (clicks <= -0.05) {
@@ -331,7 +331,7 @@ function pageInsight(
     title: up
       ? `${pathOf(row.key)} es el mayor avance (${signed(row.clicksDelta)} clics)`
       : `${pathOf(row.key)} es la mayor caída (${signed(row.clicksDelta)} clics)`,
-    body: `Pasa de ${num(row.prevClicks)} a ${num(row.clicks)} clics.${queries.length ? ` Lo explican ${queries.join(" y ")}.` : ""}${!up && cause ? ` Causa probable: ${cause}.` : ""}${up ? " Conviene analizar qué tiene esa página (formato, enlaces, actualización) y replicarlo en páginas similares." : " Es la primera página que conviene revisar."}`,
+    body: `Pasa de ${num(row.prevClicks)} a ${num(row.clicks)} clics${change(row.clicks, row.prevClicks) !== null ? ` (${signedPct(change(row.clicks, row.prevClicks) ?? 0)})` : ""}.${queries.length ? ` Lo explican ${queries.join(" y ")}.` : ""}${!up && cause ? ` Causa probable: ${cause}.` : ""}${up ? " Conviene analizar qué tiene esa página (formato, enlaces, actualización) y replicarlo en páginas similares." : " Es la primera página que conviene revisar."}`,
     stats: [
       {
         label: "Posición",
@@ -560,7 +560,7 @@ function topicInsight(snapshot: ReportSnapshot): Insight | null {
     title: star
       ? `«${star.topic.label}» es el tema en alza (${signed(star.delta)} clics)`
       : `«${biggest.label}» es el tema con más tráfico`,
-    body: `${star ? `Es el tema que más crece: de ${num(star.topic.prevClicks)} a ${num(star.topic.clicks)} clics. ` : ""}El mayor tema por tráfico es «${biggest.label}» (${num(biggest.clicks)} clics en ${num(biggest.queries)} búsquedas)${reach && reach.label !== biggest.label && reach.nearTopShare >= 0.4 ? `; y «${reach.label}» tiene el ${pct(reach.nearTopShare)} de sus impresiones en posiciones 4 a 20, a un paso de subir` : ""}.`,
+    body: `${star ? `Es el tema que más crece: de ${num(star.topic.prevClicks)} a ${num(star.topic.clicks)} clics (${signedPct(change(star.topic.clicks, star.topic.prevClicks) ?? 0)}). ` : ""}El mayor tema por tráfico es «${biggest.label}» (${num(biggest.clicks)} clics en ${num(biggest.queries)} búsquedas)${reach && reach.label !== biggest.label && reach.nearTopShare >= 0.4 ? `; y «${reach.label}» tiene el ${pct(reach.nearTopShare)} de sus impresiones en posiciones 4 a 20, a un paso de subir` : ""}.`,
     stats: topics.slice(0, 3).map((topic) => ({
       label: topic.label,
       value: `${num(topic.clicks)} clics`,
@@ -695,7 +695,7 @@ export function highlights(snapshot: ReportSnapshot): string[] {
   }
   if (comparable && prevTotals.position - totals.position >= 0.3) {
     out.push(
-      `Posición media: de ${one.format(prevTotals.position)} a ${one.format(totals.position)}`,
+      `Posición media: de ${one.format(prevTotals.position)} a ${one.format(totals.position)} (${signedPct(change(totals.position, prevTotals.position) ?? 0)})`,
     );
   }
   const band = snapshot.bands[0];

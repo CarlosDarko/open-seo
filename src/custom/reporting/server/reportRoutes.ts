@@ -4,6 +4,7 @@ import { SHARE_TOKEN_PATTERN } from "@/server/features/reports/shareAccess";
 import { asAppError } from "@/server/lib/errors";
 import { textResponse } from "@/shared/report-sandbox";
 import { renderReportDocument } from "@/custom/reporting/render";
+import { signerFor } from "@/custom/reporting/signers";
 import {
   getReportById,
   getReportByToken,
@@ -41,12 +42,13 @@ function htmlResponse(html: string): Response {
 }
 
 /** A report that cannot be drawn must say so, not answer with a bare 500. */
-function renderSafely(
+async function renderSafely(
   report: Parameters<typeof renderReportDocument>[0],
   mode: "public" | "preview",
-): Response {
+): Promise<Response> {
   try {
-    return htmlResponse(renderReportDocument(report, mode));
+    const signer = await signerFor(report.createdBy);
+    return htmlResponse(renderReportDocument(report, mode, signer));
   } catch (error) {
     console.error("[client-report] render failed", report.id, error);
     return textResponse(

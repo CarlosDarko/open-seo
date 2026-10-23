@@ -102,7 +102,7 @@ export async function buildReportSnapshot(
 ): Promise<SnapshotResult> {
   const report = await buildRadarReport(projectId, {
     ...input,
-    includeBrand: false,
+    includeBrand: true,
   });
   if (!report.connected) return { ok: false, reason: report.reason };
 
@@ -148,7 +148,7 @@ export async function buildReportSnapshot(
 
   const ownQueries = queries.rows.flatMap((row) => {
     const query = row.keys?.[0];
-    return query && !isBrandQuery(query, tokens)
+    return query
       ? [
           {
             query,
@@ -287,6 +287,41 @@ export async function buildReportSnapshot(
     [...intentTotals.values()].sort((a, b) => b.clicks - a.clicks),
   );
 
+  // What the brand searches did: impressions, average position and how many.
+  const brandStats = (() => {
+    const rows = queryChanges.filter((row) => isBrandQuery(row.key, tokens));
+    const weighted = (
+      pick: (row: (typeof rows)[number]) => {
+        impressions: number;
+        position: number | null;
+      },
+    ) => {
+      let impressions = 0;
+      let sum = 0;
+      for (const row of rows) {
+        const { impressions: weight, position } = pick(row);
+        if (position === null || weight <= 0) continue;
+        impressions += weight;
+        sum += position * weight;
+      }
+      return impressions > 0 ? sum / impressions : null;
+    };
+    return {
+      impressions: rows.reduce((sum, row) => sum + row.impressions, 0),
+      prevImpressions: rows.reduce((sum, row) => sum + row.prevImpressions, 0),
+      position: weighted((row) => ({
+        impressions: row.impressions,
+        position: row.position,
+      })),
+      prevPosition: weighted((row) => ({
+        impressions: row.prevImpressions,
+        position: row.prevPosition,
+      })),
+      queries: rows.filter((row) => row.status !== "lost").length,
+      prevQueries: rows.filter((row) => row.status !== "new").length,
+    };
+  })();
+
   const extras = await Promise.all([
     buildTopicsReport(projectId, {
       ...input,
@@ -332,6 +367,7 @@ export async function buildReportSnapshot(
         prevClicks: report.brand.prevClicks,
         otherClicks: report.brand.otherClicks,
         prevOtherClicks: report.brand.prevOtherClicks,
+        ...brandStats,
       },
       topQueries,
       topPages,
@@ -384,24 +420,30 @@ export async function buildReportSnapshot(
             : segmentLines(report.segments.intent),
       },
       opportunities: [
-        ...report.ctrOpportunities.slice(0, 6).map((item) => ({
-          query: item.query,
-          page: item.page,
-          position: item.position,
-          impressions: item.impressions,
-          clicks: item.clicks,
-          potentialClicks: item.potentialClicks,
-          kind: "snippet" as const,
-        })),
-        ...report.nearTop.slice(0, 6).map((item) => ({
-          query: item.query,
-          page: item.page,
-          position: item.position,
-          impressions: item.impressions,
-          clicks: item.clicks,
-          potentialClicks: item.potentialClicks,
-          kind: "push" as const,
-        })),
+        ...report.ctrOpportunities
+          .filter((item) => !isBrandQuery(item.query, tokens))
+          .slice(0, 6)
+          .map((item) => ({
+            query: item.query,
+            page: item.page,
+            position: item.position,
+            impressions: item.impressions,
+            clicks: item.clicks,
+            potentialClicks: item.potentialClicks,
+            kind: "snippet" as const,
+          })),
+        ...report.nearTop
+          .filter((item) => !isBrandQuery(item.query, tokens))
+          .slice(0, 6)
+          .map((item) => ({
+            query: item.query,
+            page: item.page,
+            position: item.position,
+            impressions: item.impressions,
+            clicks: item.clicks,
+            potentialClicks: item.potentialClicks,
+            kind: "push" as const,
+          })),
       ],
       updates,
       topics:
@@ -414,6 +456,8 @@ export async function buildReportSnapshot(
               position: topic.position,
               queries: topic.queries,
               nearTopShare: topic.nearTopShare,
+              bands: topic.bands,
+              prevBands: topic.prevBands,
               topQueries: topic.topQueries.slice(0, 3).map((item) => ({
                 query: item.query,
                 clicks: item.clicks,

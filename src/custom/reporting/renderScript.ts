@@ -40,11 +40,12 @@ export const REPORT_SCRIPT = `
     position:{label:"Posición media",key:"position",prev:"prevPosition",fmt:dec,invert:true}
   };
   var geo=null;
+  var printing=false;
   function draw(){
     if(!svg||!D.daily.length)return;
     var m=METRICS[metric];
     var box=svg.getBoundingClientRect();
-    var W=Math.max(320,box.width),H=340;
+    var W=printing?700:Math.max(320,box.width),H=printing?290:340;
     svg.setAttribute("viewBox","0 0 "+W+" "+H);
     while(svg.firstChild)svg.removeChild(svg.firstChild);
     var padL=50,padR=14,padT=34,padB=30;
@@ -200,7 +201,8 @@ export const REPORT_SCRIPT = `
       var t=parseFloat(n.getAttribute("data-count"));var k=n.getAttribute("data-kind");
       if(!isNaN(t))n.textContent=k==="pct"?dec(t)+" %":(k==="dec"?dec(t):grp(t));
     });
-    draw();
+    printing=true;draw();
   });
+  window.addEventListener("afterprint",function(){printing=false;draw();});
 })();
 `;

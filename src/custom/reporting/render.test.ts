@@ -254,6 +254,63 @@ describe("renderReportDocument", () => {
     expect(html).toContain("https://carlosortega.page/contacto/");
   });
 
+  it("formats the texts: bold, accent and lists, never raw HTML", () => {
+    const rich = renderReportDocument(
+      {
+        ...report,
+        notes: {
+          ...report.notes,
+          message:
+            "Suben **mucho** los clics. ==Lo más importante.==\n- uno\n- dos <b>x</b>",
+        },
+      },
+      "public",
+    );
+    expect(rich).toContain("<strong>mucho</strong>");
+    expect(rich).toContain('<mark class="hl">Lo más importante.</mark>');
+    expect(rich).toContain(
+      '<ul class="rl"><li>uno</li><li>dos &lt;b&gt;x&lt;/b&gt;</li></ul>',
+    );
+  });
+
+  it("lays the roadmap out as action, why, how and impact, starting with a capital", () => {
+    const withSteps = renderReportDocument(
+      {
+        ...report,
+        notes: {
+          ...report.notes,
+          nextSteps:
+            "Recuperar la página de producto\nPor qué: cae un 40 %\nCómo: revisar el título; reforzar enlaces\nImpacto: +100 clics",
+        },
+      },
+      "public",
+    );
+    expect(withSteps).toContain(
+      '<b class="stt">Recuperar la página de producto</b>',
+    );
+    expect(withSteps).toContain('<p class="sw">Cae un 40 %</p>');
+    expect(withSteps).toContain("<li>Reforzar enlaces</li>");
+    expect(withSteps).toContain("Impacto esperado");
+  });
+
+  it("counts the brand searches and gives them their own block", () => {
+    const counted = renderReportDocument(
+      { ...report, snapshot: { ...report.snapshot, scope: "todo" } },
+      "public",
+    );
+    expect(counted).toContain("incluye las búsquedas de marca");
+    expect(counted).not.toContain("sin contar las búsquedas de marca");
+    expect(counted).toContain("Búsquedas de marca");
+  });
+
+  it("keeps the technical section free of Discover, which lives in traffic", () => {
+    const traffic =
+      /data-panel="trafico"[\s\S]*?(?=data-panel="posiciones")/.exec(
+        html,
+      )?.[0] ?? "";
+    expect(traffic).not.toContain("Tráfico procedente de Google Discover");
+  });
+
   it("leaves out the sections the consultant hides", () => {
     const hidden = renderReportDocument(
       { ...report, notes: { ...report.notes, hidden: ["temas", "reparto"] } },

@@ -175,7 +175,10 @@ async function businessContext(projectId: string): Promise<string> {
   }
 }
 
-const STYLE = `Estilo obligatorio: castellano claro, sencillo y profesional, propio de un informe para un cliente no técnico. NO tutees al lector y no uses "tú", "tu", "tus", "te": el sujeto es la web, el sitio, el proyecto o las páginas (por ejemplo "la web gana posiciones", "las páginas principales concentran el 60 % de los clics"). Si usas un término técnico, explícalo en pocas palabras. Sé honesto con los datos pero constructivo: si algo va mal, dilo con claridad y explica por qué es recuperable. No escribas nunca etiquetas ni frases como "en positivo" o "el lado bueno": el cliente no debe notar ninguna instrucción interna, solo un análisis serio y equilibrado. Nunca inventes cifras, causas ni contenido que no se te haya dado; si no hay base suficiente para afirmar algo, usa un tono prudente ("conviene comprobar", "posiblemente").`;
+const STYLE = `Estilo obligatorio: castellano claro, sencillo y profesional, propio de un informe para un cliente no técnico. NO tutees al lector y no uses "tú", "tu", "tus", "te": el sujeto es la web, el sitio, el proyecto o las páginas (por ejemplo "la web gana posiciones", "las páginas principales concentran el 60 % de los clics"). Si usas un término técnico, explícalo en pocas palabras. Sé honesto con los datos pero constructivo: si algo va mal, dilo con claridad y explica por qué es recuperable. No escribas nunca etiquetas ni frases como "en positivo" o "el lado bueno": el cliente no debe notar ninguna instrucción interna, solo un análisis serio y equilibrado. Nunca inventes cifras, causas ni contenido que no se te haya dado; si no hay base suficiente para afirmar algo, usa un tono prudente ("conviene comprobar", "posiblemente").
+Lenguaje: claro, cercano y sencillo, como se lo explicarías a un cliente listo que no es técnico: frases cortas y palabras de uso diario, sin jerga ni palabras rebuscadas (nada de «reservorio», «sinergia», «apalancar», «holístico», «catalizador»...). Si hace falta un término SEO, usa el normal y explícalo en pocas palabras entre paréntesis. Cercano no es informal: el tono sigue siendo profesional.
+Formato: puedes usar **negritas** para las cifras, páginas o ideas clave; ==resaltado== (se pinta en el rojo de la marca) solo para LA idea más importante del texto, una o dos veces como máximo; y listas con guion («- » al principio de la línea) cuando enumeres tres o más cosas. No uses nada más: ni cursivas, ni títulos, ni tablas, ni HTML.
+Porcentajes: siempre que digas que algo «pasa de X a Y», «sube de X a Y», «baja de X a Y», «crece de X a Y» o similar, añade enseguida entre paréntesis el porcentaje de subida o bajada, por ejemplo «pasa de 1.200 a 1.500 clics (+25 %)». Usa el campo cambioPorcentual (o parecido) de los datos: ya está calculado, no lo recalcules de cabeza. Si un dato no lo trae, calcúlalo con cuidado y redondea a un decimal. Escribe los números en formato español (1.234,5).`;
 
 // ------------------------------------------------------------- writing
 
@@ -184,7 +187,7 @@ Tu trabajo es ARGUMENTAR, no describir: el cliente ya ve las tablas y las gráfi
 1. Di qué ha ocurrido con las cifras exactas de los datos (nunca redondees ni inventes).
 2. Explica la causa cruzando fuentes: por ejemplo, una página que cae porque las búsquedas que la sostienen han perdido posiciones, un dispositivo que arrastra el total, el efecto de una actualización de Google en las fechas en que coincidió, una marca que crece mientras el resto se estanca. Si los datos no permiten afirmar una causa, dilo y propón cómo comprobarla.
 3. Cierra con lo que implica para el negocio o con la acción concreta que recomiendas.
-Cada sección debe aportar información NUEVA: no repitas en una sección las cifras ya dadas en el resumen o en otra sección, salvo que sean imprescindibles para el razonamiento. Nombra páginas y búsquedas concretas de los datos. Nada de frases hechas ("es importante", "conviene seguir trabajando") ni consejos genéricos. Párrafos cortos y claros.
+Los totales y las tablas INCLUYEN las búsquedas de marca (los temas no). Para distinguir cuánto viene de la marca usa los datos de la clave «marca» y di cuánto pesa en cada análisis donde importe. Cada sección debe aportar información NUEVA: no repitas en una sección las cifras ya dadas en el resumen o en otra sección, salvo que sean imprescindibles para el razonamiento. Nombra páginas y búsquedas concretas de los datos. Nada de frases hechas ("es importante", "conviene seguir trabajando") ni consejos genéricos. Párrafos cortos y claros.
 Responde SOLO con un objeto JSON válido con esta forma exacta (dentro de los textos escribe los saltos de párrafo como \\n\\n, nunca con saltos de línea reales):
 {"message": "RESUMEN EJECUTIVO: dos párrafos separados por una línea en blanco, de 120 a 180 palabras en total. El primero responde a «¿cómo ha ido el periodo y por qué?» con las dos o tres cifras y causas que de verdad lo explican; el segundo, a «¿qué hay que hacer ahora?» con las prioridades. Puede usar la primera persona del plural.",
  "sectionNotes": {
@@ -197,8 +200,16 @@ Responde SOLO con un objeto JSON válido con esta forma exacta (dentro de los te
    "oportunidades": "Análisis de qué oportunidades merecen priorizarse y por qué: 60 a 100 palabras.",
    "tecnico": "Análisis del estado técnico (sitemap, indexación y, si hay, la auditoría de las páginas tipo): 50 a 100 palabras."
  },
- "nextSteps": "HOJA DE RUTA: 4 o 5 acciones ESTRATÉGICAS y ejecutables, ordenadas por impacto esperado frente a esfuerzo, una por línea, sin numerar, con este formato exacto: «Acción concreta que empieza por un verbo — por qué y qué impacto se espera, con la cifra de los datos». Cada acción debe ser una palanca que mueva los resultados (por ejemplo, reorientar o crear un grupo de páginas, corregir un fallo de plantilla que afecta a muchas páginas, recuperar un tema que cae, aprovechar un tramo 4-20 con mucho volumen), no un detalle menor como cambiar un título suelto o retocar una página de poco tráfico, salvo que sea la palanca principal. Sin vaguedades como «seguir trabajando» o «mejorar el contenido»."}
+ "nextSteps": "HOJA DE RUTA: 4 o 5 acciones ESTRATÉGICAS, ordenadas de más a menos impacto frente a esfuerzo. Cada acción es un bloque; los bloques se separan con una línea en blanco (\\n\\n) y cada bloque tiene exactamente estas cuatro líneas, separadas por \\n: la primera es la acción concreta (empieza por un verbo, sin punto final); las otras empiezan por «Por qué: » (argumenta en 2 o 3 frases con las cifras de los datos y la causa), «Cómo: » (de 2 a 4 pasos concretos, separados por punto y coma) e «Impacto: » (qué resultado se espera y en qué plazo, con una cifra si es posible). Cada acción debe ser una palanca que mueva los resultados (reorientar o crear un grupo de páginas, corregir un fallo de plantilla que afecta a muchas páginas, recuperar un tema que cae, aprovechar un tramo 4-20 con mucho volumen), no un detalle menor como cambiar un título suelto, salvo que sea la palanca principal. Sin vaguedades como «seguir trabajando» o «mejorar el contenido»."}
 Si una sección no tiene datos suficientes, déjala como cadena vacía.`;
+
+/** The change in percent between two figures (one decimal), or null when
+ *  there is nothing to compare with. The model is given these ready made so
+ *  it never has to do the arithmetic. */
+function pct(now: number, before: number | null): number | null {
+  if (before === null || before <= 0) return null;
+  return Math.round(((now - before) / before) * 1000) / 10;
+}
 
 function brief(report: ReportFull, business: string) {
   const { snapshot } = report;
@@ -214,6 +225,7 @@ function brief(report: ReportFull, business: string) {
       grupo: item.label,
       clics: item.clicks,
       clicsAntes: item.prevClicks,
+      cambioPorcentual: pct(item.clicks, item.prevClicks),
       porcentajeDelTotal: Math.round(item.share * 1000) / 10,
     }));
   const move = (row: {
@@ -227,10 +239,12 @@ function brief(report: ReportFull, business: string) {
     clave: row.key,
     clics: row.clicks,
     clicsAntes: row.prevClicks,
+    cambioPorcentual: pct(row.clicks, row.prevClicks),
     posicion: row.position,
     posicionAntes: row.prevPosition,
     busquedasQueExplican: row.queries?.slice(0, 3),
   });
+  const { brand } = snapshot;
   return {
     cliente: report.clientName,
     contexto_del_negocio: business || undefined,
@@ -241,22 +255,51 @@ function brief(report: ReportFull, business: string) {
         ? "mismo periodo del año anterior"
         : "periodo anterior"
       : "sin comparación",
+    aviso:
+      "Los totales y las tablas INCLUYEN las búsquedas de marca (los temas no); la clave «marca» desglosa lo que aportan.",
     totales: snapshot.totals,
     totalesAnteriores: snapshot.prevTotals,
+    cambioPorcentualTotales: {
+      clics: pct(snapshot.totals.clicks, snapshot.prevTotals.clicks),
+      impresiones: pct(
+        snapshot.totals.impressions,
+        snapshot.prevTotals.impressions,
+      ),
+      ctr: pct(snapshot.totals.ctr, snapshot.prevTotals.ctr),
+    },
     veredicto: buildVerdict(snapshot),
     datos_favorables: silverLining(snapshot),
     reparto_de_clics: {
       tipoDePagina: lines(snapshot.segments.pageType),
       dispositivo: lines(snapshot.segments.device),
       intencion: lines(snapshot.segments.intent),
-      marca: snapshot.brand.hasBrand ? snapshot.brand : undefined,
     },
+    marca: brand.hasBrand
+      ? {
+          clics: brand.clicks,
+          clicsAntes: brand.prevClicks,
+          cambioPorcentualClics: pct(brand.clicks, brand.prevClicks),
+          impresiones: brand.impressions,
+          impresionesAntes: brand.prevImpressions,
+          cambioPorcentualImpresiones: pct(
+            brand.impressions,
+            brand.prevImpressions,
+          ),
+          posicionMedia: brand.position,
+          posicionMediaAntes: brand.prevPosition,
+          busquedasDistintas: brand.queries,
+          clicsDelResto: brand.otherClicks,
+          clicsDelRestoAntes: brand.prevOtherClicks,
+        }
+      : undefined,
     tramos_de_posicion: snapshot.bands.map((band) => ({
       tramo: band.label,
       busquedas: band.queries,
       busquedasAntes: band.prevQueries,
+      cambioPorcentualBusquedas: pct(band.queries, band.prevQueries),
       clics: band.clicks,
       clicsAntes: band.prevClicks,
+      cambioPorcentualClics: pct(band.clicks, band.prevClicks),
       entranEnElTramo: band.enteredCount,
       salenDelTramo: band.leftCount,
     })),
@@ -267,6 +310,7 @@ function brief(report: ReportFull, business: string) {
         esMarca: row.brand,
         clics: row.clicks,
         clicsAntes: row.prevClicks,
+        cambioPorcentual: pct(row.clicks, row.prevClicks),
         impresiones: row.impressions,
         posicion: row.position,
         posicionAntes: row.prevPosition,
@@ -279,6 +323,7 @@ function brief(report: ReportFull, business: string) {
       pagina: pathOf(row.url),
       clics: row.clicks,
       clicsAntes: row.prevClicks,
+      cambioPorcentual: pct(row.clicks, row.prevClicks),
       posicion: row.position,
       posicionAntes: row.prevPosition,
     })),
@@ -296,7 +341,14 @@ function brief(report: ReportFull, business: string) {
       tema: topic.label,
       clics: topic.clicks,
       clicsAntes: topic.prevClicks,
+      cambioPorcentual: pct(topic.clicks, topic.prevClicks),
       posicionMedia: topic.position,
+      impresionesPorPosicion: {
+        top3: topic.bands?.[0] ?? 0,
+        de4a10: topic.bands?.[1] ?? 0,
+        de11a20: topic.bands?.[2] ?? 0,
+        masDe20: topic.bands?.[3] ?? 0,
+      },
     })),
     oportunidades: snapshot.opportunities.slice(0, 6).map((item) => ({
       busqueda: item.query,
@@ -310,20 +362,28 @@ function brief(report: ReportFull, business: string) {
       ? snapshot.audits.map((audit) => ({
           tipologia: audit.type,
           pagina: pathOf(audit.url),
-          nota: audit.score,
+          notaSobre100: audit.score,
           categorias: audit.categories.map((category) => ({
             nombre: category.name,
-            nota: category.score,
+            notaSobre100: category.score,
           })),
-          problemas: audit.issues.slice(0, 6).map((issue) => ({
+          problemas: audit.issues.slice(0, 10).map((issue) => ({
             tipo: issue.kind === "fail" ? "a corregir" : "a mejorar",
             titulo: issue.title,
-            detalle: issue.detail,
+            categoria: issue.category,
+            detalle: issue.detail.slice(0, 220),
           })),
         }))
       : undefined,
     discover: snapshot.discover
-      ? { clics: snapshot.discover.clicks, antes: snapshot.discover.prevClicks }
+      ? {
+          clics: snapshot.discover.clicks,
+          antes: snapshot.discover.prevClicks,
+          cambioPorcentual: pct(
+            snapshot.discover.clicks,
+            snapshot.discover.prevClicks,
+          ),
+        }
       : undefined,
     hallazgos_calculados: buildInsights(snapshot)
       .slice(0, 9)

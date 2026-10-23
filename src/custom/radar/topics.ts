@@ -12,6 +12,10 @@ import type { GscSearchAnalyticsRow } from "@/server/lib/gscClient";
 
 export type CustomTopic = { name: string; terms: string[] };
 
+/** 0: positions 1-3, 1: 4-10, 2: 11-20, 3: beyond (the Radar's bands). */
+const bandOfPosition = (position: number) =>
+  position <= 3.5 ? 0 : position <= 10.5 ? 1 : position <= 20.5 ? 2 : 3;
+
 export type TopicQuery = {
   query: string;
   clicks: number;
@@ -33,6 +37,10 @@ export type Topic = {
   /** Share of the impressions that sit in positions 4 to 20: the closer to 1,
    *  the more of the topic is within reach. */
   nearTopShare: number;
+  /** Impressions by position: 1-3, 4-10, 11-20 and beyond 20; this period
+   *  and the previous one. */
+  bands: number[];
+  prevBands: number[];
   topQueries: TopicQuery[];
   /** Frequent expressions inside the topic. */
   subtopics: { label: string; queries: number }[];
@@ -481,6 +489,8 @@ export function buildTopics(input: {
     impressions: number;
     weighted: number;
     near: number;
+    bands: number[];
+    prevBands: number[];
     queries: TopicQuery[];
     gramCounts: Map<string, number>;
     prev: { queries: number; clicks: number; impressions: number };
@@ -493,6 +503,8 @@ export function buildTopics(input: {
       impressions: 0,
       weighted: 0,
       near: 0,
+      bands: [0, 0, 0, 0],
+      prevBands: [0, 0, 0, 0],
       queries: [],
       gramCounts: new Map(),
       prev: { queries: 0, clicks: 0, impressions: 0 },
@@ -508,6 +520,7 @@ export function buildTopics(input: {
     target.impressions += impressions;
     target.weighted += position * impressions;
     if (position >= 3.5 && position <= 20.5) target.near += impressions;
+    target.bands[bandOfPosition(position)] += impressions;
     target.queries.push({ query: item.query, clicks, impressions, position });
     for (const gram of item.grams) {
       if (gram.includes(" ")) {
@@ -522,6 +535,7 @@ export function buildTopics(input: {
     target.prev.queries += 1;
     target.prev.clicks += row.clicks;
     target.prev.impressions += row.impressions;
+    target.prevBands[bandOfPosition(row.position)] += row.impressions;
   }
   for (const row of input.queryPages ?? []) {
     const [query, page] = row.keys ?? [];
@@ -553,6 +567,8 @@ export function buildTopics(input: {
         position: acc.impressions > 0 ? acc.weighted / acc.impressions : 0,
         prev: acc.prev,
         nearTopShare: acc.impressions > 0 ? acc.near / acc.impressions : 0,
+        bands: acc.bands,
+        prevBands: acc.prevBands,
         topQueries: [...acc.queries]
           .sort((a, b) => b.clicks - a.clicks || b.impressions - a.impressions)
           .slice(0, 6),

@@ -76,12 +76,19 @@ export function normalizeSnapshot(
     totals: raw.totals ?? empty,
     prevTotals: raw.prevTotals ?? empty,
     daily: raw.daily ?? [],
-    brand: raw.brand ?? {
+    brand: {
       hasBrand: false,
       clicks: 0,
       prevClicks: 0,
       otherClicks: 0,
       prevOtherClicks: 0,
+      impressions: 0,
+      prevImpressions: 0,
+      position: null,
+      prevPosition: null,
+      queries: 0,
+      prevQueries: 0,
+      ...raw.brand,
     },
     topQueries: raw.topQueries ?? [],
     topPages: (raw.topPages ?? []).map((page) => ({
@@ -95,6 +102,7 @@ export function normalizeSnapshot(
     queryCount: raw.queryCount ?? (raw.queryRows ?? []).length,
     audits: (raw.audits ?? []).map((audit) => ({
       ...audit,
+      version: audit.version ?? 1,
       categories: (audit.categories ?? []).map((category) => ({
         ...category,
         passed: category.passed ?? 0,
@@ -102,7 +110,10 @@ export function normalizeSnapshot(
       issues: (audit.issues ?? []).map((issue) => ({
         ...issue,
         evidence: issue.evidence ?? "",
-        elements: issue.elements ?? [],
+        // Version 1 kept only the names.
+        elements: (issue.elements ?? []).map((element) =>
+          typeof element === "string" ? { label: element, url: null } : element,
+        ),
         sources: issue.sources ?? [],
       })),
     })),
@@ -135,7 +146,11 @@ export function normalizeSnapshot(
     },
     opportunities: raw.opportunities ?? [],
     updates: raw.updates ?? [],
-    topics: raw.topics ?? [],
+    topics: (raw.topics ?? []).map((topic) => ({
+      ...topic,
+      bands: topic.bands ?? [0, 0, 0, 0],
+      prevBands: topic.prevBands ?? [0, 0, 0, 0],
+    })),
     health: raw.health ?? null,
     discover: raw.discover ?? null,
   };

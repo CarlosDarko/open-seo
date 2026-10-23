@@ -34,7 +34,7 @@ type Open = {
   points: number | null;
   detail: string[];
   evidence: string[];
-  elements: string[];
+  elements: { label: string; url: string | null }[];
   sources: { label: string; url: string }[];
 };
 
@@ -158,9 +158,16 @@ export function parseMicroaudit(
       line,
     );
     if (element) {
-      // "logo.svg: https://…" keeps the name only.
-      const label = element[1].split(/:\s+https?:\/\//)[0].trim();
-      if (label) open.elements.push(label.slice(0, 120));
+      // "logo.svg: https://…" is a name and its address.
+      const [name, ...rest] = element[1].split(/:\s+(?=https?:\/\/)/);
+      const label = name.trim();
+      const link = rest.join(": ").trim();
+      if (label) {
+        open.elements.push({
+          label: label.slice(0, 120),
+          url: /^https?:\/\/\S+$/.test(link) ? link : null,
+        });
+      }
       continue;
     }
     if (line.trim() && !line.startsWith("- ")) open.detail.push(line.trim());
@@ -168,6 +175,7 @@ export function parseMicroaudit(
   finish();
 
   return {
+    version: 2,
     type,
     url,
     score: number(score[1]),

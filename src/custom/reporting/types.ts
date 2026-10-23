@@ -101,8 +101,9 @@ export type AuditIssue = {
   detail: string;
   /** The measured evidence ("palabras/frase: 26.5"). */
   evidence: string;
-  /** Elements that show the problem (image names, bots, pages…). */
-  elements: string[];
+  /** Elements that show the problem (image names, bots, pages…), each with
+   *  its address when Microaudit gives one. */
+  elements: { label: string; url: string | null }[];
   /** Official documentation Microaudit links to. */
   sources: { label: string; url: string }[];
 };
@@ -110,6 +111,8 @@ export type AuditIssue = {
 /** Microaudit's audit of one example page of a page type (home, category,
  *  product, blog…). */
 export type AuditPage = {
+  /** 2 keeps every detail and the addresses of the elements. */
+  version: number;
   type: string;
   url: string;
   score: number | null;
@@ -157,6 +160,9 @@ export type TopicLine = {
   queries: number;
   /** Share of the topic that sits in positions 4 to 20 (within reach). */
   nearTopShare: number;
+  /** Impressions by position (1-3, 4-10, 11-20, beyond), now and before. */
+  bands: number[];
+  prevBands: number[];
   topQueries: { query: string; clicks: number; position: number }[];
 };
 
@@ -183,6 +189,13 @@ export type ReportSnapshot = {
     prevClicks: number;
     otherClicks: number;
     prevOtherClicks: number;
+    /** What brand searches did: impressions, average position, how many. */
+    impressions: number;
+    prevImpressions: number;
+    position: number | null;
+    prevPosition: number | null;
+    queries: number;
+    prevQueries: number;
   };
   topQueries: {
     query: string;
@@ -306,6 +319,7 @@ export const REPORT_SECTIONS = [
   { id: "posiciones", label: "Posicionamiento" },
   { id: "temas", label: "Temas" },
   { id: "consultas", label: "Búsquedas" },
+  { id: "marca", label: "Búsquedas de marca" },
   { id: "reparto", label: "De dónde vienen los clics" },
   { id: "semana", label: "Distribución semanal" },
   { id: "oportunidades", label: "Oportunidades de crecimiento" },

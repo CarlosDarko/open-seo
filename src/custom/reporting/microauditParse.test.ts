@@ -86,7 +86,16 @@ describe("parseMicroaudit", () => {
       title: "Imágenes con dimensiones reservadas",
       category: "Rendimiento y Core Web Vitals",
       points: 5.1,
-      elements: ["iebs-logo.svg", "quondos-logo.svg"],
+      elements: [
+        {
+          label: "iebs-logo.svg",
+          url: "https://carlosortega.page/wp-content/uploads/iebs-logo.svg",
+        },
+        {
+          label: "quondos-logo.svg",
+          url: "https://carlosortega.page/wp-content/uploads/quondos-logo.svg",
+        },
+      ],
       evidence: "nodos totales: 1700",
     });
     expect(images?.detail).toContain("saltos de diseño");

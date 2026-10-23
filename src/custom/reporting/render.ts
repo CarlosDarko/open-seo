@@ -28,6 +28,7 @@ import {
 } from "@/custom/reporting/insights";
 import { buildVerdict, percentChange } from "@/custom/reporting/narrative";
 import { REPORT_SCRIPT } from "@/custom/reporting/renderScript";
+import { CARLOS, type Signer } from "@/custom/reporting/signers";
 import { REPORT_CSS } from "@/custom/reporting/renderStyles";
 import {
   type AuditPage,
@@ -38,6 +39,7 @@ import {
   type ReportFull,
   type SectionId,
   type SegmentLine,
+  type TopicLine,
 } from "@/custom/reporting/types";
 
 const BACKSLASH = String.fromCharCode(92);
@@ -173,13 +175,40 @@ const PANEL_NOTE: Record<string, SectionId> = {
 };
 const PANEL_NOTE_IDS = new Set<string>(Object.values(PANEL_NOTE));
 
+/** Light formatting for any text of the report (the AI's and Carlos's):
+ *  **bold**, ==accent== in the brand red, and lines starting with "- " as a
+ *  list. Escaped first, so nothing typed can become HTML. */
+function inline(text: string): string {
+  return esc(text)
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/==(.+?)==/g, '<mark class="hl">$1</mark>');
+}
+
+const capital = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
+
 function paragraphs(text: string): string {
-  return text
-    .split(/\n\s*\n|\n/)
-    .map((part) => part.trim())
-    .filter(Boolean)
-    .map((part) => `<p>${esc(part)}</p>`)
-    .join("");
+  const out: string[] = [];
+  let list: string[] = [];
+  const flush = () => {
+    if (list.length > 0) out.push(`<ul class="rl">${list.join("")}</ul>`);
+    list = [];
+  };
+  for (const raw of text.split("\n")) {
+    const line = raw.trim();
+    if (!line) {
+      flush();
+      continue;
+    }
+    const bullet = /^[-•]\s+(.*)$/.exec(line);
+    if (bullet) {
+      list.push(`<li>${inline(bullet[1])}</li>`);
+    } else {
+      flush();
+      out.push(`<p>${inline(line)}</p>`);
+    }
+  }
+  flush();
+  return out.join("");
 }
 
 /** The reading of a tab: what happened, why and what it means. */
@@ -308,13 +337,29 @@ const ctr = (clicks: number, impressions: number) =>
 const ctrText = (clicks: number, impressions: number) =>
   impressions > 0 ? `${one.format(ctr(clicks, impressions) * 100)} %` : "—";
 
+/** A figure with a small red bar next to it, sized against the biggest figure
+ *  of its column, so a table can be read at a glance. */
+function barNumber(value: number, max: number, sub = ""): string {
+  const width = max > 0 ? Math.max(value > 0 ? 3 : 0, (value / max) * 100) : 0;
+  return `<div class="nb"><span class="nv"><b>${num(value)}</b>${sub}</span><span class="tr"><i style="--w:${width.toFixed(0)}%"></i></span></div>`;
+}
+
 /** The clicks of a row, with the previous period's under them. */
-function clicksCell(clicks: number, prev: number | null): Cell {
+function clicksCell(clicks: number, prev: number | null, max: number): Cell {
   return {
-    h: `<b>${num(clicks)}</b>${prev === null ? "" : `<small>antes ${num(prev)}</small>`}`,
+    h: barNumber(
+      clicks,
+      max,
+      prev === null ? "" : `<small>antes ${num(prev)}</small>`,
+    ),
     v: clicks,
   };
 }
+
+const impressionsCell = (value: number, max: number): Cell => ({
+  h: barNumber(value, max),
+  v: value,
+});
 
 /** The change of a row in clicks, with the percentage under it. */
 function deltaCell(clicks: number, prev: number): Cell {
@@ -339,6 +384,8 @@ const positionCell = (prev: number | null, now: number | null): Cell => ({
 
 /** Searches with their figures of both periods. */
 function queriesTable(rows: QueryTableRow[], comparable: boolean): string {
+  const maxClicks = Math.max(...rows.map((row) => row.clicks), 1);
+  const maxImpressions = Math.max(...rows.map((row) => row.impressions), 1);
   const columns: Column[] = [
     { label: "Búsqueda" },
     { label: "Posición", num: true, asc: true },
@@ -357,9 +404,9 @@ function queriesTable(rows: QueryTableRow[], comparable: boolean): string {
       comparable
         ? positionCell(row.prevPosition, row.position)
         : { h: pos(row.position), v: row.position },
-      clicksCell(row.clicks, comparable ? row.prevClicks : null),
+      clicksCell(row.clicks, comparable ? row.prevClicks : null, maxClicks),
       ...(comparable ? [deltaCell(row.clicks, row.prevClicks)] : []),
-      { h: num(row.impressions), v: row.impressions },
+      impressionsCell(row.impressions, maxImpressions),
       {
         h: ctrText(row.clicks, row.impressions),
         v: ctr(row.clicks, row.impressions),
@@ -370,6 +417,9 @@ function queriesTable(rows: QueryTableRow[], comparable: boolean): string {
 
 /** The searches of a position band, new searches and lost ones. */
 function simpleQueries(rows: QueryRow[], lost: boolean): string {
+  const clicksOf = (row: QueryRow) => (lost ? row.prevClicks : row.clicks);
+  const maxClicks = Math.max(...rows.map(clicksOf), 1);
+  const maxImpressions = Math.max(...rows.map((row) => row.impressions), 1);
   return dataTable(
     [
       { label: "Búsqueda" },
@@ -384,11 +434,8 @@ function simpleQueries(rows: QueryRow[], lost: boolean): string {
         h: pos(lost ? row.prevPosition : row.position),
         v: lost ? row.prevPosition : row.position,
       },
-      {
-        h: num(lost ? row.prevClicks : row.clicks),
-        v: lost ? row.prevClicks : row.clicks,
-      },
-      { h: num(row.impressions), v: row.impressions },
+      clicksCell(clicksOf(row), null, maxClicks),
+      impressionsCell(row.impressions, maxImpressions),
       ...(lost
         ? []
         : [
@@ -412,6 +459,7 @@ function moveTable(
   }[],
   entering: boolean,
 ): string {
+  const maxImpressions = Math.max(...rows.map((row) => row.impressions), 1);
   return dataTable(
     [
       { label: "Búsqueda" },
@@ -421,7 +469,7 @@ function moveTable(
     rows.map((row) => [
       { h: queryLink(row.query), v: row.query },
       positionCell(row.prevPosition, row.position),
-      { h: num(row.impressions), v: row.impressions },
+      impressionsCell(row.impressions, maxImpressions),
     ]),
     entering ? "Ninguna búsqueda ha entrado." : "Ninguna búsqueda ha salido.",
   );
@@ -430,6 +478,7 @@ function moveTable(
 /** Pages or searches that gained or lost clicks, with what explains it. */
 function changeTable(rows: ChangeLine[]): string {
   const pages = rows.length > 0 && isWeb(rows[0].key);
+  const maxClicks = Math.max(...rows.map((row) => row.clicks), 1);
   return dataTable(
     [
       { label: pages ? "Página" : "Búsqueda" },
@@ -450,11 +499,11 @@ function changeTable(rows: ChangeLine[]): string {
                 .join("")}</div>`
             : ""
         }`,
-        v: pages ? row.key : row.key,
+        v: row.key,
         cls: pages ? "pg" : "",
       },
       deltaCell(row.clicks, row.prevClicks),
-      clicksCell(row.clicks, row.prevClicks),
+      clicksCell(row.clicks, row.prevClicks, maxClicks),
       positionCell(row.prevPosition, row.position),
     ]),
     "Sin variaciones destacables.",
@@ -463,7 +512,8 @@ function changeTable(rows: ChangeLine[]): string {
 
 /** The pages with most clicks, each with its share drawn as a bar. */
 function pagesTable(rows: PageRow[], comparable: boolean): string {
-  const max = Math.max(...rows.map((row) => row.clicks), 1);
+  const maxClicks = Math.max(...rows.map((row) => row.clicks), 1);
+  const maxImpressions = Math.max(...rows.map((row) => row.impressions), 1);
   return dataTable(
     [
       { label: "Página" },
@@ -474,17 +524,13 @@ function pagesTable(rows: PageRow[], comparable: boolean): string {
       { label: "CTR", num: true },
     ],
     rows.map((row) => [
-      {
-        h: `${pageLink(row.url)}<div class="sb"><i style="--w:${Math.max(2, (row.clicks / max) * 100).toFixed(0)}%"></i></div>`,
-        v: row.url,
-        cls: "pg",
-      },
-      clicksCell(row.clicks, comparable ? row.prevClicks : null),
+      { h: pageLink(row.url), v: row.url, cls: "pg" },
+      clicksCell(row.clicks, comparable ? row.prevClicks : null, maxClicks),
       ...(comparable ? [deltaCell(row.clicks, row.prevClicks)] : []),
       comparable
         ? positionCell(row.prevPosition, row.position)
         : { h: pos(row.position), v: row.position },
-      { h: num(row.impressions), v: row.impressions },
+      impressionsCell(row.impressions, maxImpressions),
       {
         h: ctrText(row.clicks, row.impressions),
         v: ctr(row.clicks, row.impressions),
@@ -517,6 +563,16 @@ function periodCard(report: ReportFull): string {
     ? `<div class="pi"><div><small>Comparado con</small><b>${esc(rangeText(period.prevStartDate, period.prevEndDate))}</b><span>${period.compare === "year" ? "mismo periodo del año anterior" : "periodo anterior de la misma duración"}</span></div></div>`
     : "";
   return `<div class="period rv d2"><div class="pi main">${CALENDAR}<div><small>Periodo analizado</small><b>${esc(rangeText(range.startDate, range.endDate))}</b><span>${num(period.days)} días de datos de Google Search Console</span></div></div>${compare}</div>`;
+}
+
+/** What the cover says about the brand searches: they are counted. */
+function heroBrandNote(snapshot: ReportFull["snapshot"]): string {
+  if (snapshot.scope === "sin marca")
+    return " · sin contar las búsquedas de marca";
+  const { brand } = snapshot;
+  const total = brand.clicks + brand.otherClicks;
+  if (!brand.hasBrand || total <= 0) return "";
+  return ` · incluye las búsquedas de marca (${one.format((brand.clicks / total) * 100)} % de los clics)`;
 }
 
 function hero(report: ReportFull, host: string): string {
@@ -555,7 +611,7 @@ ${areaPath(snapshot.daily.map((point) => point.clicks))}
 <div class="logo rv">${LOGO_HORIZONTAL_LIGHT}</div>
 <span class="eyebrow rv">Informe de rendimiento SEO</span>
 <h1 class="rv d1">${esc(heading)} de <em>${esc(name)}</em></h1>
-<p class="sub rv d1">${esc(host)}${snapshot.scope === "sin marca" ? " · sin contar las búsquedas de marca" : ""}</p>
+<p class="sub rv d1">${esc(host)}${heroBrandNote(snapshot)}</p>
 ${periodCard(report)}
 <div class="kpis rv d3">
 ${kpi("Clics", totals.clicks, "int", num(totals.clicks), comparable ? pctDelta(totals.clicks, prevTotals.clicks) : "")}
@@ -571,7 +627,7 @@ ${kpi("Posición media", totals.position, "dec", one.format(totals.position), po
 
 /** The summary is a written paragraph or nothing: a list of findings would
  *  only repeat the conclusions tab. */
-function executiveSummary(report: ReportFull): string {
+function executiveSummary(report: ReportFull, signer: Signer): string {
   const message = report.notes.message.trim();
   if (!message) return "";
   const verdict = buildVerdict(report.snapshot);
@@ -579,7 +635,7 @@ function executiveSummary(report: ReportFull): string {
 <div class="kick">Resumen ejecutivo</div>
 <h2 class="sumh">${esc(verdict.headline)}</h2>
 <div class="sumt">${paragraphs(message)}</div>
-<div class="sig"><span class="av">${LOGO_MARK_LIGHT}</span><span><b>Carlos Ortega</b>Consultor SEO</span></div>
+<div class="sig"><span class="av"><img src="${signer.avatar}" alt=""></span><span><b>${esc(signer.name)}</b>${esc(signer.title)}</span></div>
 </div></section>`;
 }
 
@@ -1000,9 +1056,9 @@ function diagnosisBlock(report: ReportFull): string {
         : "";
       const fixes = item.fixes
         .filter((fix) => fix.trim())
-        .map((fix) => `<li>${esc(fix)}</li>`)
+        .map((fix) => `<li>${inline(fix)}</li>`)
         .join("");
-      return `<article class="dgc"><div class="u">${pageLink(item.url)}</div>${meta}<p>${esc(item.text)}</p>${fixes ? `<h3>Actuaciones previstas</h3><ul class="fix">${fixes}</ul>` : ""}</article>`;
+      return `<article class="dgc"><div class="u">${pageLink(item.url)}</div>${meta}<p>${inline(item.text)}</p>${fixes ? `<h3>Actuaciones previstas</h3><ul class="fix">${fixes}</ul>` : ""}</article>`;
     })
     .join("");
   return block(
@@ -1016,27 +1072,101 @@ function diagnosisBlock(report: ReportFull): string {
 
 // --------------------------------------------------------------- topics
 
+const BAND_NAMES = ["Top 3", "4-10", "11-20", "+20"];
+
+/** Where the impressions of a topic are, by position, with the change since
+ *  the previous period; the band with most impressions is the red one. */
+function topicBands(topic: TopicLine, comparable: boolean): string {
+  const bands = topic.bands ?? [0, 0, 0, 0];
+  const before = topic.prevBands ?? [0, 0, 0, 0];
+  const total = bands.reduce((sum, value) => sum + value, 0);
+  const biggest = Math.max(...bands);
+  const rows = BAND_NAMES.map((name, index) => {
+    const share = total > 0 ? (bands[index] / total) * 100 : 0;
+    const change =
+      comparable && before[index] > 0
+        ? pctDelta(bands[index], before[index])
+        : "";
+    return `<div class="tbr${bands[index] === biggest && biggest > 0 ? " max" : ""}"><span class="tl">${name}</span><span class="tbar"><i style="--w:${Math.max(share > 0 ? 3 : 0, share).toFixed(0)}%"></i></span><span class="tv">${num(bands[index])}</span><span class="td">${change}</span></div>`;
+  }).join("");
+  return `<div class="tbh">Impresiones según la posición en Google</div><div class="tbs">${rows}</div>`;
+}
+
 function topicsBlock(report: ReportFull): string {
   const { snapshot } = report;
   if (snapshot.topics.length === 0) return "";
+  const comparable = snapshot.period.comparable;
   const cards = snapshot.topics
     .map((topic) => {
-      const delta = snapshot.period.comparable
-        ? pctDelta(topic.clicks, topic.prevClicks)
-        : "";
+      const delta = comparable ? pctDelta(topic.clicks, topic.prevClicks) : "";
       const queries = topic.topQueries
         .map((item) => `<li>${queryLink(item.query)}</li>`)
         .join("");
-      const reach = Math.round(topic.nearTopShare * 100);
-      return `<div class="topic"><div class="tn">${esc(topic.label)}</div><div class="tk"><b>${num(topic.clicks)}</b><span>clics</span>${delta}</div><small>${num(topic.queries)} búsquedas · ${num(topic.impressions)} impresiones · posición media ${one.format(topic.position)}</small><ul class="tq">${queries}</ul><div><small>Impresiones en posiciones 4 a 20: ${reach} %</small><div class="meter"><i style="--w:${reach}%"></i></div></div></div>`;
+      return `<div class="topic"><div class="tn">${esc(topic.label)}</div><div class="tk"><b>${num(topic.clicks)}</b><span>clics</span>${delta}</div><small>${num(topic.queries)} búsquedas · ${num(topic.impressions)} impresiones · posición media ${one.format(topic.position)}</small><ul class="tq">${queries}</ul>${topicBands(topic, comparable)}</div>`;
     })
     .join("");
   return block(
     report,
     "temas",
     "Temas con más tráfico orgánico",
-    "Las búsquedas se agrupan por tema para identificar dónde está la autoridad del sitio. La barra indica qué parte del tema está en posiciones 4 a 20, la más fácil de subir.",
+    "Las búsquedas (sin las de marca, que no dicen de qué trata el sitio) se agrupan por tema para ver dónde tiene autoridad. En cada tema, las barras muestran en qué posiciones de Google están sus impresiones: la barra roja es donde más se concentran y la flecha, lo que ha cambiado frente al periodo anterior.",
     `<div class="topics">${cards}</div>`,
+  );
+}
+
+/** What searches that carry the brand name did: kept out of the rest of the
+ *  report on purpose, so here they have their own place. */
+function brandBlock(report: ReportFull): string {
+  const { snapshot } = report;
+  const { brand } = snapshot;
+  if (!brand.hasBrand || (brand.clicks <= 0 && brand.impressions <= 0)) {
+    return "";
+  }
+  const comparable = snapshot.period.comparable;
+  const rows = (snapshot.queryRows ?? []).filter((row) => row.brand);
+  const positionChange =
+    comparable && brand.position !== null && brand.prevPosition !== null
+      ? (() => {
+          const diff = brand.prevPosition - brand.position;
+          if (Math.abs(diff) < 0.05)
+            return `<span class="dl flat">= igual</span>`;
+          return `<span class="dl ${diff > 0 ? "up" : "down"}">${diff > 0 ? "▲" : "▼"} ${one.format(Math.abs(diff))} posiciones</span>`;
+        })()
+      : "";
+  const summary = chips([
+    {
+      value: num(brand.clicks),
+      label: "clics de búsquedas de marca",
+      delta: comparable ? pctDelta(brand.clicks, brand.prevClicks) : "",
+    },
+    {
+      value: num(brand.impressions),
+      label: "impresiones de la marca",
+      delta: comparable
+        ? pctDelta(brand.impressions, brand.prevImpressions)
+        : "",
+    },
+    ...(brand.position !== null
+      ? [
+          {
+            value: pos(brand.position),
+            label: "posición media de la marca",
+            delta: positionChange,
+          },
+        ]
+      : []),
+    {
+      value: num(brand.queries),
+      label: "búsquedas de marca distintas",
+      delta: comparable ? countDelta(brand.queries, brand.prevQueries) : "",
+    },
+  ]);
+  return block(
+    report,
+    "marca",
+    "Búsquedas de marca",
+    "Son las búsquedas que llevan el nombre de la marca: quien las hace ya conoce al cliente. Están incluidas en las cifras de todo el informe (en las tablas llevan la etiqueta «Marca»); aquí se ven aparte para distinguir lo que viene de la marca de lo que trae tráfico nuevo.",
+    `${summary}${rows.length > 0 ? `<div class="sheet">${queriesTable(rows, comparable)}</div>` : ""}`,
   );
 }
 
@@ -1058,7 +1188,7 @@ function opportunitiesBlock(report: ReportFull): string {
         ? idea.actions.filter((action) => action.trim())
         : [];
       const ai = idea
-        ? `<div class="oai"><b>Análisis y acciones</b><p>${esc(idea.analysis)}</p>${actions.length ? `<ul>${actions.map((action) => `<li>${esc(action)}</li>`).join("")}</ul>` : ""}</div>`
+        ? `<div class="oai"><b>Análisis y acciones</b><p>${inline(idea.analysis)}</p>${actions.length ? `<ul>${actions.map((action) => `<li>${inline(action)}</li>`).join("")}</ul>` : ""}</div>`
         : "";
       return `<div class="opp"><div class="oh"><div class="rk">${index + 1}</div><div><div class="q">${queryLink(row.query)}</div><div class="m">${row.kind === "push" ? "A un paso del top 3" : "Se muestra mucho y se clica poco"} · posición ${one.format(row.position)} · ${num(row.impressions)} impresiones${row.page ? ` · ${pageLink(row.page)}` : ""}</div></div><div class="g">+${num(row.potentialClicks)}<small>clics posibles</small></div></div>${ai}</div>`;
     })
@@ -1070,7 +1200,7 @@ function opportunitiesBlock(report: ReportFull): string {
     ? `<div class="ideas">${contentIdeas
         .map(
           (item) =>
-            `<div class="idea"><b>${esc(item.title)}</b><p>${esc(item.reason)}</p></div>`,
+            `<div class="idea"><b>${esc(item.title)}</b><p>${inline(item.reason)}</p></div>`,
         )
         .join("")}</div>`
     : "";
@@ -1166,13 +1296,14 @@ type IssueAgg = {
   points: number;
   detail: string;
   evidence: string;
-  elements: string[];
+  elements: { label: string; url: string | null }[];
   sources: { label: string; url: string }[];
-  pages: Set<string>;
+  /** The example pages that have it, with the type of each. */
+  pages: Map<string, string>;
 };
 
-/** Every issue of the pages of one type, merged: a problem of the template
- *  shows up once, with how many of the audited pages have it. */
+/** Every issue of the given pages, merged by name: a problem of a template
+ *  shows up once, with the page types and the example pages it affects. */
 function mergeIssues(pages: AuditPage[]): IssueAgg[] {
   const merged = new Map<string, IssueAgg>();
   for (const page of pages) {
@@ -1188,19 +1319,20 @@ function mergeIssues(pages: AuditPage[]): IssueAgg[] {
           evidence: issue.evidence,
           elements: [...issue.elements],
           sources: [...issue.sources],
-          pages: new Set([page.url]),
+          pages: new Map([[page.url, page.type]]),
         });
         continue;
       }
-      found.pages.add(page.url);
+      found.pages.set(page.url, page.type);
       if (issue.kind === "fail") found.kind = "fail";
       found.points = Math.max(found.points, issue.points ?? 0);
       if (issue.detail.length > found.detail.length)
         found.detail = issue.detail;
       for (const element of issue.elements) {
-        if (found.elements.length < 8 && !found.elements.includes(element)) {
-          found.elements.push(element);
-        }
+        const same = found.elements.some(
+          (item) => item.label === element.label && item.url === element.url,
+        );
+        if (found.elements.length < 10 && !same) found.elements.push(element);
       }
       for (const source of issue.sources) {
         if (!found.sources.some((item) => item.url === source.url)) {
@@ -1217,28 +1349,60 @@ function mergeIssues(pages: AuditPage[]): IssueAgg[] {
   );
 }
 
-function issueCard(item: IssueAgg, pageCount: number): string {
+function issueCard(
+  item: IssueAgg,
+  pageCount: number,
+  showTypes: boolean,
+): string {
+  const types = [...new Set(item.pages.values())];
+  const pills =
+    showTypes && types.length > 0
+      ? `<div class="pills">${types.map((type) => `<span class="pill">${esc(type)}</span>`).join("")}</div>`
+      : "";
   const where =
     pageCount > 1 ? `Afecta a ${item.pages.size} de ${pageCount} páginas` : "";
   const meta = [esc(item.category), where].filter(Boolean).join(" · ");
-  const elements =
-    item.elements.length > 0
-      ? `<ul class="el">${item.elements.map((element) => `<li>${esc(element)}</li>`).join("")}</ul>`
+  const examples = [...item.pages.keys()]
+    .slice(0, 4)
+    .map((url) => pageLink(url))
+    .join(", ");
+  const elements = item.elements
+    .map((element) =>
+      element.url && isWeb(element.url)
+        ? `<a class="el" href="${esc(element.url)}" target="_blank" rel="noopener noreferrer" title="${esc(element.url)}">${esc(element.label)}</a>`
+        : `<span class="el">${esc(element.label)}</span>`,
+    )
+    .join("");
+  const sources = item.sources
+    .map(
+      (source) =>
+        `<a class="lk" href="${esc(source.url)}" target="_blank" rel="noopener noreferrer">${esc(source.label)} ↗</a>`,
+    )
+    .join(" · ");
+  return `<article class="is"><div class="ish"><span class="ik ${item.kind}">${item.kind === "fail" ? "A corregir" : "A mejorar"}</span><h4>${esc(item.title)}</h4>${item.points > 0 ? `<span class="ip">+${one.format(item.points)} pts</span>` : ""}</div>${pills}<div class="im">${meta}</div>${item.detail ? `<p>${esc(item.detail)}</p>` : ""}${item.evidence ? `<p class="ev">${esc(item.evidence)}</p>` : ""}${elements ? `<div class="els">${elements}</div>` : ""}${examples ? `<div class="exs"><span>Para verlo en la web:</span> ${examples}</div>` : ""}${sources ? `<div class="src">Documentación oficial: ${sources}</div>` : ""}</article>`;
+}
+
+/** The issues of a set of pages: first what to fix, then what to improve. */
+function issueLists(pages: AuditPage[], showTypes: boolean): string {
+  const issues = mergeIssues(pages);
+  const list = (items: IssueAgg[], title: string) =>
+    items.length > 0
+      ? `<h3 class="ih">${title} (${items.length})</h3><div class="isl">${items.map((item) => issueCard(item, pages.length, showTypes)).join("")}</div>`
       : "";
-  const sources =
-    item.sources.length > 0
-      ? `<div class="src">Documentación oficial: ${item.sources
-          .map(
-            (source) =>
-              `<a class="lk" href="${esc(source.url)}" target="_blank" rel="noopener noreferrer">${esc(source.label)} ↗</a>`,
-          )
-          .join(" · ")}</div>`
-      : "";
-  return `<article class="is"><div class="ish"><span class="ik ${item.kind}">${item.kind === "fail" ? "A corregir" : "A mejorar"}</span><h4>${esc(item.title)}</h4>${item.points > 0 ? `<span class="ip">+${one.format(item.points)} pts</span>` : ""}</div><div class="im">${meta}</div>${item.detail ? `<p>${esc(item.detail)}</p>` : ""}${item.evidence ? `<p class="ev">${esc(item.evidence)}</p>` : ""}${elements}${sources}</article>`;
+  return (
+    list(
+      issues.filter((item) => item.kind === "fail"),
+      "Qué corregir",
+    ) +
+    list(
+      issues.filter((item) => item.kind === "warn"),
+      "Qué mejorar",
+    )
+  );
 }
 
 /** The analysis of one page type: its score out of 100, the score of every
- *  category and ALL the issues Microaudit found, with the detail it gives. */
+ *  category and ALL the issues Microaudit found for its example pages. */
 function typePanel(type: string, pages: AuditPage[]): string {
   const score = mean(pages.map((page) => page.score));
   const categories = new Map<
@@ -1275,20 +1439,13 @@ function typePanel(type: string, pages: AuditPage[]): string {
       return `<div class="cr"><span class="cn">${esc(entry.name)}<small>${note}</small></span><div class="sb"><i style="--w:${Math.max(2, value ?? 0).toFixed(0)}%"></i></div><span class="cs">${outOf100(value)}</span></div>`;
     })
     .join("");
-  const issues = mergeIssues(pages);
-  const fails = issues.filter((item) => item.kind === "fail");
-  const warns = issues.filter((item) => item.kind === "warn");
-  const list = (items: IssueAgg[], title: string) =>
-    items.length > 0
-      ? `<h3 class="ih">${title} (${items.length})</h3><div class="isl">${items.map((item) => issueCard(item, pages.length)).join("")}</div>`
-      : "";
   const links = pages
     .map(
       (page) =>
         `<li>${pageLink(page.url)} <span class="pn">${page.score === null ? "—" : Math.round(page.score)}/100</span></li>`,
     )
     .join("");
-  return `<div class="tp"><div class="tph"><div class="tps">${outOf100(score)}<small>nota media de «${esc(type)}» sobre 100${pages.length > 1 ? ` (${pages.length} páginas)` : ""}</small></div><ul class="tpl">${links}</ul></div><div class="crs">${bars}</div>${list(fails, "Qué corregir")}${list(warns, "Qué mejorar")}</div>`;
+  return `<div class="tp"><div class="tph"><div class="tps">${outOf100(score)}<small>nota media de «${esc(type)}» sobre 100${pages.length > 1 ? ` (${pages.length} páginas)` : ""}</small></div><ul class="tpl">${links}</ul></div><div class="crs">${bars}</div><div class="noprint">${issueLists(pages, false)}</div></div>`;
 }
 
 /** Microaudit on the example pages of each page type: how every template of
@@ -1314,7 +1471,7 @@ function auditsBlock(report: ReportFull): string {
       [
         { h: "<b>Nota global</b>", v: "" },
         ...types.map((type) =>
-          scoreCell(mean(byType(type).map((a) => a.score))),
+          scoreCell(mean(byType(type).map((audit) => audit.score))),
         ),
       ],
       ...[...categories.entries()]
@@ -1335,7 +1492,7 @@ function auditsBlock(report: ReportFull): string {
         ]),
     ],
   );
-  const everyIssue = types.flatMap((type) => mergeIssues(byType(type)));
+  const everything = mergeIssues(audits);
   const average = mean(audits.map((audit) => audit.score));
   const summary = chips([
     {
@@ -1348,23 +1505,28 @@ function auditsBlock(report: ReportFull): string {
       label: types.length === 1 ? "tipología auditada" : "tipologías auditadas",
     },
     {
-      value: num(everyIssue.filter((item) => item.kind === "fail").length),
+      value: num(everything.filter((item) => item.kind === "fail").length),
       label: "problemas a corregir",
     },
     {
-      value: num(everyIssue.filter((item) => item.kind === "warn").length),
+      value: num(everything.filter((item) => item.kind === "warn").length),
       label: "aspectos a mejorar",
     },
   ]);
-  const panels = subTabs(
-    "aud",
-    types.map((type) => ({
-      id: `t${types.indexOf(type)}`,
+  const panels = subTabs("aud", [
+    {
+      id: "all",
+      label: "Todo el sitio",
+      count: everything.length,
+      html: `<p class="lead tabl">Cada tarea indica las tipologías de página a las que afecta y páginas de ejemplo para ver el problema.</p>${issueLists(audits, true)}`,
+    },
+    ...types.map((type, index) => ({
+      id: `t${index}`,
       label: type,
       count: mergeIssues(byType(type)).length,
       html: typePanel(type, byType(type)),
     })),
-  );
+  ]);
   return block(
     report,
     "auditoria",
@@ -1403,33 +1565,55 @@ function discoverBlock(report: ReportFull): string {
 const shortPath = (path: string) =>
   path.length > 38 ? `${path.slice(0, 35)}…` : path;
 
-/** Without AI text the roadmap is built from the data: the few moves that
- *  can change the figures, each as "action — why". */
-function suggestedSteps(report: ReportFull): string[] {
+type Step = { title: string; why: string; how: string[]; impact: string };
+
+/** Without AI text the roadmap is built from the data: the few moves that can
+ *  change the figures, each with why, how and what to expect. */
+function suggestedSteps(report: ReportFull): Step[] {
   const { snapshot } = report;
-  const steps: string[] = [];
+  const steps: Step[] = [];
   const top = [...snapshot.opportunities]
     .sort((a, b) => b.potentialClicks - a.potentialClicks)
     .slice(0, 5);
   const gain = top.reduce((sum, item) => sum + item.potentialClicks, 0);
   if (gain >= 20) {
-    steps.push(
-      `Ejecutar las ${top.length} mejoras de mayor retorno de la pestaña Oportunidades — suman unas ${num(gain)} visitas más al periodo con cambios de título, contenido y enlaces internos`,
-    );
+    steps.push({
+      title: `Ejecutar las ${top.length} mejoras de mayor retorno de la pestaña Oportunidades`,
+      why: "son búsquedas en las que la web ya aparece cerca del top 3 o muy visible pero poco clicada, así que el esfuerzo es pequeño frente al resultado",
+      how: [
+        "Reescribir el título y la descripción de las páginas implicadas",
+        "Ampliar el contenido con la pregunta concreta que busca el usuario",
+        "Enlazar esas páginas desde otras con más tráfico",
+      ],
+      impact: `unas ${num(gain)} visitas más por periodo`,
+    });
   }
   const loser = snapshot.pageLosers[0];
   if (loser && loser.clicksDelta <= -30) {
-    steps.push(
-      `Recuperar las páginas que han perdido tráfico, empezando por ${shortPath(pathOf(loser.key))} — concentra la mayor caída (${signedNum(loser.clicksDelta)} clics) y ya tiene historial en Google`,
-    );
+    steps.push({
+      title: `Recuperar las páginas que pierden tráfico, empezando por ${shortPath(pathOf(loser.key))}`,
+      why: `concentra la mayor caída (${signedNum(loser.clicksDelta)} clics, un ${one.format(Math.abs(percentChange(loser.clicks, loser.prevClicks) ?? 0) * 100)} %) y ya tiene historial en Google, así que es más fácil recuperarla que crear algo nuevo`,
+      how: [
+        "Comprobar que la página sigue indexada y que Google muestra la versión correcta",
+        "Revisar si la búsqueda ha cambiado de intención y adaptar el contenido",
+        "Reforzar el enlazado interno hacia ella",
+      ],
+      impact: `recuperar parte de los ${num(Math.abs(loser.clicksDelta))} clics perdidos`,
+    });
   }
   const topic = [...snapshot.topics].sort(
     (a, b) => b.nearTopShare * b.impressions - a.nearTopShare * a.impressions,
   )[0];
   if (topic && topic.nearTopShare >= 0.4) {
-    steps.push(
-      `Reforzar el tema «${topic.label}» con contenido y enlaces internos — el ${Math.round(topic.nearTopShare * 100)} % de sus impresiones está en posiciones 4 a 20, la zona más fácil de subir al top 3`,
-    );
+    steps.push({
+      title: `Reforzar el tema «${topic.label}» con contenido y enlaces internos`,
+      why: `el ${Math.round(topic.nearTopShare * 100)} % de sus impresiones está en las posiciones 4 a 20, la zona donde un empujón sube al top 3`,
+      how: [
+        "Ampliar las páginas que ya posicionan con las dudas que aún no responden",
+        "Crear las páginas que falten para las búsquedas del tema",
+      ],
+      impact: "más clics en un tema donde ya hay visibilidad",
+    });
   }
   const audits = snapshot.audits ?? [];
   const repeated = new Map<string, Set<string>>();
@@ -1446,31 +1630,73 @@ function suggestedSteps(report: ReportFull): string[] {
     (x, y) => y[1].size - x[1].size,
   )[0];
   if (worst) {
-    steps.push(
-      `Corregir en las plantillas del sitio «${worst[0]}» — falla en ${worst[1].size} de las ${audits.length} páginas tipo auditadas, así que un solo cambio mejora muchas páginas a la vez`,
-    );
+    steps.push({
+      title: `Corregir en las plantillas del sitio «${worst[0]}»`,
+      why: `falla en ${worst[1].size} de las ${audits.length} páginas tipo auditadas, así que un solo cambio mejora muchas páginas a la vez`,
+      how: [
+        "Aplicar el arreglo en la plantilla, no página a página",
+        "Volver a auditar las páginas de ejemplo para comprobarlo",
+      ],
+      impact: "mejor nota técnica en todo el sitio",
+    });
   }
   if (steps.length === 0) {
-    steps.push(
-      "Mantener el ritmo de publicación y de mejora — la web se mueve dentro de lo esperado y conviene medir el efecto en el próximo informe",
-    );
+    steps.push({
+      title: "Mantener el ritmo de publicación y de mejora",
+      why: "la web se mueve dentro de lo esperado y conviene medir el efecto de lo ya hecho",
+      how: ["Revisar la evolución en el próximo informe"],
+      impact: "seguir creciendo de forma estable",
+    });
   }
-  return steps.slice(0, 4);
+  return steps.slice(0, 5);
 }
 
-/** "Action — why" split into a bold action and its reason. */
-function stepHtml(step: string): string {
-  const at = step.indexOf(" — ");
-  return at > 0
-    ? `<li><b>${esc(step.slice(0, at))}</b><span>${esc(step.slice(at + 3))}</span></li>`
-    : `<li><b>${esc(step)}</b></li>`;
+/** Reads the roadmap text. Each step is a block separated by a blank line: the
+ *  first line is the action, then "Por qué:", "Cómo:" (actions separated by
+ *  ";") and "Impacto:". A step on a single line may use "acción — motivo". */
+function parseSteps(text: string): Step[] {
+  const labelled = /^(por qu[eé]|c[oó]mo|impacto)/im.test(text);
+  const blocks =
+    /\n\s*\n/.test(text) || labelled ? text.split(/\n\s*\n/) : text.split("\n");
+  const steps: Step[] = [];
+  for (const block of blocks) {
+    const lines = block
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean);
+    if (lines.length === 0) continue;
+    const first = lines[0].replace(/^(\d+[.)]|[-•])\s*/, "");
+    const dash = first.indexOf(" — ");
+    const step: Step = {
+      title: dash > 0 ? first.slice(0, dash) : first,
+      why: dash > 0 ? first.slice(dash + 3) : "",
+      how: [],
+      impact: "",
+    };
+    for (const line of lines.slice(1)) {
+      const why = /^por qu[eé]:\s*(.*)$/i.exec(line);
+      const how = /^c[oó]mo:\s*(.*)$/i.exec(line);
+      const impact = /^impacto( esperado)?:\s*(.*)$/i.exec(line);
+      if (why) step.why = why[1];
+      else if (how) {
+        step.how = how[1]
+          .split(";")
+          .map((item) => item.trim())
+          .filter(Boolean);
+      } else if (impact) step.impact = impact[2];
+      else step.why = `${step.why} ${line}`.trim();
+    }
+    steps.push(step);
+  }
+  return steps;
+}
+
+function stepHtml(step: Step, index: number): string {
+  return `<li class="st"><span class="sn">${String(index + 1).padStart(2, "0")}</span><div class="sc"><b class="stt">${inline(capital(step.title))}</b>${step.why ? `<p class="sw">${inline(capital(step.why))}</p>` : ""}${step.how.length > 0 ? `<ul class="sh">${step.how.map((item) => `<li>${inline(capital(item))}</li>`).join("")}</ul>` : ""}${step.impact ? `<p class="si"><b>Impacto esperado</b>${inline(capital(step.impact))}</p>` : ""}</div></li>`;
 }
 
 function closing(report: ReportFull): string {
-  const typed = report.notes.nextSteps
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean);
+  const typed = parseSteps(report.notes.nextSteps);
   const steps = typed.length > 0 ? typed : suggestedSteps(report);
   const note = report.notes.sectionNotes.proximos?.trim();
   return `<footer class="end" id="proximos"><div class="wrap">
@@ -1501,6 +1727,7 @@ const TAB_ORDER = [
 export function renderReportDocument(
   report: ReportFull,
   mode: RenderMode,
+  signer: Signer = CARLOS,
 ): string {
   const { snapshot } = report;
   const host = snapshot.siteUrl.startsWith("sc-domain:")
@@ -1537,7 +1764,8 @@ export function renderReportDocument(
         lead("trafico") +
         show("evolucion", () => trendBlock(report)) +
         show("reparto", () => trafficMixBlock(report)) +
-        show("semana", () => weekBlock(report)),
+        show("semana", () => weekBlock(report)) +
+        show("discover", () => discoverBlock(report)),
     },
     {
       id: "posiciones",
@@ -1548,7 +1776,10 @@ export function renderReportDocument(
     {
       id: "busquedas",
       label: "Búsquedas",
-      html: lead("busquedas") + show("consultas", () => searchesBlock(report)),
+      html:
+        lead("busquedas") +
+        show("marca", () => brandBlock(report)) +
+        show("consultas", () => searchesBlock(report)),
     },
     {
       id: "paginas",
@@ -1580,10 +1811,7 @@ export function renderReportDocument(
           "auditoria",
           () => auditsBlock(report) || (mode === "preview" ? auditsHint() : ""),
         ) +
-        columns(
-          show("tecnico", () => healthBlock(report)),
-          show("discover", () => discoverBlock(report)),
-        ),
+        columns(show("tecnico", () => healthBlock(report))),
     },
   ]
     // A panel with only its analysis and no data behind it is not shown.
@@ -1634,11 +1862,11 @@ export function renderReportDocument(
 <div class="top" id="top"><div class="wrap"><span class="iso">${LOGO_MARK_LIGHT}</span><span class="ttl">${esc(clientName)} · Informe SEO</span><span class="per">${esc(rangeShort(snapshot.range.startDate, snapshot.range.endDate))}</span><button class="cta" type="button" onclick="window.print()">${mode === "preview" ? "Vista previa · " : ""}Imprimir / PDF</button></div></div>
 <div class="pfoot" aria-hidden="true"><span>${esc(clientName)} · Informe SEO · ${esc(rangeShort(snapshot.range.startDate, snapshot.range.endDate))}</span><span>carlosortega.page</span></div>
 ${hero(report, host)}
-<div class="pgwrap"><div class="pghead"></div><div class="pgbody">
-${executiveSummary(report)}
+<table class="pgwrap"><thead><tr><td><div class="pgsp h"></div></td></tr></thead><tfoot><tr><td><div class="pgsp f"></div></td></tr></tfoot><tbody><tr><td>
+${executiveSummary(report, signer)}
 <div class="tabsbar" id="tabs"><div class="wrap"><div class="tabs2" role="tablist">${tabButtons}</div></div></div>
 <main class="wrap panels">${panelHtml}</main>
-</div><div class="pgfoot"></div></div>
+</td></tr></tbody></table>
 ${hidden.has("proximos") ? "" : closing(report)}
 <button class="totop" id="totop" type="button" aria-label="Volver arriba"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
 <script type="application/json" id="report-data">${jsonForScript(data)}</script>
