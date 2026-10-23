@@ -754,7 +754,6 @@ details.op>summary:after{content:none}
 .steps .xl{color:#ff8da1;border-bottom-color:rgba(255,141,161,.45)}
 .sumt{display:flex;flex-direction:column;gap:16px}
 .sumt p{margin:0;font-size:16.5px;line-height:1.7;color:var(--ink2)}
-.sumt p:first-child{font-size:19px;line-height:1.6;color:var(--ink)}
 .sumt .rl{margin:0;padding-left:20px;display:grid;gap:6px;font-size:16.5px;line-height:1.6;color:var(--ink2)}
 .sumt .rl li::marker{color:var(--red)}
 .rich strong,.oa strong,.cf strong,.cr2 strong,.idea2 strong,.steps strong{color:var(--ink)}
@@ -788,7 +787,6 @@ details.op.ct>summary{grid-template-columns:44px minmax(0,1fr) auto 18px}
 h2,h3,h4,h5,.sph,.mh,.sl,.ptitle,.ak,.crk{break-after:avoid}
 .sumt{gap:10px}
 .sumt p{font-size:11pt;line-height:1.55}
-.sumt p:first-child{font-size:12.5pt}
 .cr2{grid-template-columns:118px minmax(0,1fr);gap:14px;padding:10px 14px;align-items:center}
 .crm{padding:10px 6px;border-radius:10px}
 .crm b{font-size:22pt}
