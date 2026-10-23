@@ -193,14 +193,38 @@ const emphasise = (html: string) =>
     ? html
     : html.replace(FIGURE_UNIT, "**$1**").replace(FIGURE_PERCENT, "**$1**");
 
-function inline(text: string): string {
-  return emphasise(esc(text))
-    .replace(
-      /\[([^\]]+)\]\((https:\/\/[^\s)]+)\)/g,
-      '<a class="xl" href="$2" target="_blank" rel="noopener noreferrer">$1</a>',
+const BARE_URL = /https?:\/\/[^\s<>"']+/g;
+
+/** Any address written in a text becomes a link (those already inside a
+ *  link are left alone). Punctuation that closes the sentence stays out. */
+function linkify(html: string): string {
+  return html
+    .split(/(<a\b[^>]*>.*?<\/a>)/g)
+    .map((part, at) =>
+      at % 2 === 1
+        ? part
+        : part.replace(BARE_URL, (found) => {
+            const tail = /[.,;:!?)\]]+$/.exec(found)?.[0] ?? "";
+            const url = found.slice(0, found.length - tail.length);
+            return `<a class="xl" href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>${tail}`;
+          }),
     )
-    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-    .replace(/==(.+?)==/g, '<mark class="ac">$1</mark>');
+    .join("");
+}
+
+/** A plain text with its addresses turned into links. */
+const withLinks = (text: string) => linkify(esc(text));
+
+function inline(text: string): string {
+  return linkify(
+    emphasise(esc(text))
+      .replace(
+        /\[([^\]]+)\]\((https:\/\/[^\s)]+)\)/g,
+        '<a class="xl" href="$2" target="_blank" rel="noopener noreferrer">$1</a>',
+      )
+      .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+      .replace(/==(.+?)==/g, '<mark class="ac">$1</mark>'),
+  );
 }
 
 /** A link to an official page, in the brand red. */
@@ -1647,7 +1671,7 @@ const groupPoints = (item: IssueAgg) =>
 function relatedBlock(item: IssueAgg): string {
   if (item.related.length === 0) return "";
   const line = (other: IssueAgg) =>
-    `<div><b>${esc(other.title)}</b>${other.points > 0 ? ` (+${one.format(other.points)} pts)` : ""}${other.detail ? `: ${esc(other.detail)}` : ""}</div>`;
+    `<div><b>${esc(other.title)}</b>${other.points > 0 ? ` (+${one.format(other.points)} pts)` : ""}${other.detail ? `: ${withLinks(other.detail)}` : ""}</div>`;
   return `<div class="rel"><b>Comprobaciones relacionadas, misma causa</b>${item.related.map(line).join("")}</div>`;
 }
 
@@ -1731,7 +1755,7 @@ function issueCard(item: IssueAgg, pageCount: number): string {
         `<a class="lk" href="${esc(source.url)}" target="_blank" rel="noopener noreferrer">${esc(source.label)} ↗</a>`,
     )
     .join(" · ");
-  return `<article class="is"><div class="ish"><span class="ik ${item.kind}">${item.kind === "fail" ? "A corregir" : "A mejorar"}</span><h4>${esc(item.title)}</h4>${groupPoints(item) > 0 ? `<span class="ip">+${one.format(groupPoints(item))} pts</span>` : ""}</div>${pills ? `<div class="pills">${pills}</div>` : ""}<div class="im">${meta}</div>${item.detail ? `<p>${esc(item.detail)}</p>` : ""}${item.evidence ? `<p class="ev">${esc(item.evidence)}</p>` : ""}${relatedBlock(item)}${elements ? `${legend}<div class="els">${elements}</div>` : ""}${sources ? `<div class="src">Documentación oficial: ${sources}</div>` : ""}</article>`;
+  return `<article class="is"><div class="ish"><span class="ik ${item.kind}">${item.kind === "fail" ? "A corregir" : "A mejorar"}</span><h4>${esc(item.title)}</h4>${groupPoints(item) > 0 ? `<span class="ip">+${one.format(groupPoints(item))} pts</span>` : ""}</div>${pills ? `<div class="pills">${pills}</div>` : ""}<div class="im">${meta}</div>${item.detail ? `<p>${withLinks(item.detail)}</p>` : ""}${item.evidence ? `<p class="ev">${withLinks(item.evidence)}</p>` : ""}${relatedBlock(item)}${elements ? `${legend}<div class="els">${elements}</div>` : ""}${sources ? `<div class="src">Documentación oficial: ${sources}</div>` : ""}</article>`;
 }
 
 /** The issues of a set of pages: first what to fix, then what to improve. */

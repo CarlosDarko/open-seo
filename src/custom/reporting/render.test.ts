@@ -292,6 +292,26 @@ describe("renderReportDocument", () => {
     expect(html).not.toContain('href="javascript:');
   });
 
+  it("turns any address written in a text into a link, once, without its closing dot", () => {
+    const html = renderReportDocument(
+      {
+        ...report,
+        notes: {
+          ...report.notes,
+          message:
+            "Revisar https://example.com/es/blog/guia. También [la guía](https://web.dev/articles/vitals).",
+        },
+      },
+      "public",
+    );
+    expect(html).toContain(
+      '<a class="xl" href="https://example.com/es/blog/guia" target="_blank" rel="noopener noreferrer">https://example.com/es/blog/guia</a>.',
+    );
+    expect(
+      html.match(/href="https:\/\/web\.dev\/articles\/vitals"/g),
+    ).toHaveLength(1);
+  });
+
   it("lays the roadmap out as action, why, how and impact, starting with a capital", () => {
     const withSteps = renderReportDocument(
       {

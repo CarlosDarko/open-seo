@@ -801,4 +801,11 @@ h2,h3,h4,h5,.sph,.mh,.sl,.ptitle,.ak,.crk{break-after:avoid}
 .qt th,.qt tr{break-inside:avoid}
 .sp,.tw{break-before:auto}
 }
+/* ---- v10: the arrow of the cards that open ---- */
+@media screen{
+details.op>summary,details.op.ct>summary{grid-template-columns:44px minmax(0,1fr) auto 38px}
+details.op>summary:after{content:"\\25BE";display:flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:50%;background:color-mix(in srgb,var(--red) 10%,#fff);border:1px solid color-mix(in srgb,var(--red) 35%,#fff);color:var(--red);font-size:20px;line-height:1;transition:transform .2s,background .2s,color .2s}
+details.op>summary:hover:after{background:var(--red);color:#fff}
+details.op[open]>summary:after{transform:rotate(180deg)}
+}
 `;
