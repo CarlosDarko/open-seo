@@ -542,7 +542,11 @@ function History() {
             <SelectTrigger size="sm" aria-label="Función">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent
+              align="end"
+              alignItemWithTrigger={false}
+              className="w-auto min-w-72 whitespace-nowrap"
+            >
               {FEATURE_ITEMS.map((item) => (
                 <SelectItem key={item.value} value={item.value}>
                   {item.label}
