@@ -32,7 +32,7 @@ export const CARLOS: Signer = {
 
 const LAURA: Signer = {
   name: "Laura Calvache",
-  title: "Consultora SEO técnico y estratégico independiente",
+  title: "Consultora SEO técnica y estratégica independiente",
   avatar: lauraAvatar,
   social: [
     { network: "x", url: "https://x.com/LauCalvache" },
