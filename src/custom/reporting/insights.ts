@@ -419,12 +419,12 @@ function brandInsight(snapshot: ReportSnapshot): Insight | null {
     weight: share >= 0.5 ? 68 : 42,
     title:
       share >= 0.5
-        ? `El ${pct(share)} de los clics procede de usuarios que ya conocen la marca`
+        ? `El ${pct(share)} de los clics llega buscando la marca por su nombre`
         : `El ${pct(1 - share)} de los clics procede de búsquedas sin marca`,
     body:
       share >= 0.5
-        ? `Más de la mitad llega buscando el nombre de la marca. Es tráfico valioso, pero no demuestra que Google descubra el sitio: el SEO que capta clientes nuevos está en el resto de búsquedas${otherChange !== null ? `, que en este periodo ${otherChange >= 0 ? "crecen" : "caen"} un ${pct(otherChange)}` : ""}.`
-        : `La mayor parte del tráfico llega de usuarios que no buscaban la marca por su nombre, que es justo el tráfico que capta clientes nuevos${otherChange !== null ? ` (${signedPct(otherChange)} frente al periodo anterior)` : ""}.`,
+        ? `Más de la mitad llega buscando la marca por su nombre. Es una señal de notoriedad: muchas personas conocen la marca por otras vías (recomendaciones, redes, asistentes de IA como ChatGPT o Gemini, publicidad…) y después la buscan en Google. Lo que Google reparte por temas, sin marca, ${otherChange !== null ? `${otherChange >= 0 ? "crece" : "cae"} un ${pct(otherChange)} en este periodo` : "se ve en las búsquedas sin marca"}.`
+        : `La mayor parte del tráfico llega de búsquedas sin el nombre de la marca: es el que Google reparte por temas y contenidos${otherChange !== null ? ` (${signedPct(otherChange)} frente al periodo anterior)` : ""}.`,
     stats: [
       { label: "Marca", value: `${num(brand.clicks)} clics` },
       { label: "Sin marca", value: `${num(brand.otherClicks)} clics` },

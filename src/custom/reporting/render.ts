@@ -1285,7 +1285,7 @@ function brandBlock(report: ReportFull): string {
     report,
     "marca",
     "Búsquedas de marca",
-    "Son las búsquedas que llevan el nombre de la marca: quien las hace ya conoce al cliente. Están incluidas en las cifras de todo el informe (en las tablas llevan la etiqueta «Marca»); aquí se ven aparte para distinguir lo que viene de la marca de lo que trae tráfico nuevo.",
+    "Son las búsquedas que llevan el nombre de la marca: quien las hace ya ha oído hablar del cliente, a menudo tras informarse en otros canales, como asistentes de IA (ChatGPT, Gemini…), redes o recomendaciones. Están incluidas en las cifras de todo el informe (en las tablas llevan la etiqueta «Marca»); aquí se ven aparte para distinguir lo que viene de la marca de lo que trae tráfico nuevo.",
     `${summary}${rows.length > 0 ? `<div class="sheet">${queriesTable(rows, comparable)}</div>` : ""}`,
   );
 }

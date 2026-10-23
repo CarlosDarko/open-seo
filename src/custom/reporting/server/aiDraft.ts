@@ -253,7 +253,9 @@ export const OFFICIAL_SOURCES = [
 const STYLE = `Estilo obligatorio: castellano claro, sencillo y profesional, propio de un informe para un cliente no técnico. NO tutees al lector y no uses "tú", "tu", "tus", "te": el sujeto es la web, el sitio, el proyecto o las páginas (por ejemplo "la web gana posiciones", "las páginas principales concentran el 60 % de los clics"). Si usas un término técnico, explícalo en pocas palabras. Sé honesto con los datos pero constructivo: si algo va mal, dilo con claridad y explica por qué es recuperable. No escribas nunca etiquetas ni frases como "en positivo" o "el lado bueno": el cliente no debe notar ninguna instrucción interna, solo un análisis serio y equilibrado. Nunca inventes cifras, causas ni contenido que no se te haya dado; si no hay base suficiente para afirmar algo, usa un tono prudente ("conviene comprobar", "posiblemente").
 Lenguaje: claro, cercano y sencillo, como se lo explicarías a un cliente listo que no es técnico: frases cortas y palabras de uso diario, sin jerga ni palabras rebuscadas (nada de «reservorio», «sinergia», «apalancar», «holístico», «catalizador»...). Si hace falta un término SEO, usa el normal y explícalo en pocas palabras entre paréntesis. Cercano no es informal: el tono sigue siendo profesional.
 Formato (obligatorio, el informe se ve plano sin él): en CADA texto pon en **negrita** de 3 a 5 elementos clave (las cifras importantes con su unidad, una página o búsqueda concreta, la idea central) y usa ==resaltado== (se pinta en el rojo de la marca) para UNA sola frase o dato: la conclusión más importante del texto. Las listas con guion («- » al principio de la línea) solo cuando enumeres tres o más cosas. No uses cursivas, títulos, tablas ni HTML. Nunca dejes un texto sin negritas.
-Enlaces: cuando aporten (explicar un concepto, respaldar una recomendación o poner un ejemplo), enlaza con el formato [texto del enlace](https://...). Para fuentes oficiales usa SOLO estas direcciones, sin inventar ninguna otra: ${OFFICIAL_SOURCES.map((item) => `${item.label} → ${item.url}`).join("; ")}. Para ejemplos puedes enlazar páginas de la propia web que aparezcan en los datos. Máximo 2 enlaces por texto y solo si encajan de verdad; el texto del enlace es una expresión corta y natural, no la dirección.
+Enlaces: cuando aporten (explicar un concepto, respaldar una recomendación o poner un ejemplo), enlaza con el formato [texto del enlace](https://...). Para fuentes oficiales usa SOLO estas direcciones, sin inventar ninguna otra: ${OFFICIAL_SOURCES.map((item) => `${item.label} → ${item.url}`).join("; ")}. Para ejemplos puedes enlazar páginas de la propia web que aparezcan en los datos. Máximo 2 enlaces a fuentes oficiales por texto (los enlaces a páginas de la web no cuentan) y solo si encajan de verdad; el texto del enlace es una expresión corta y natural, no la dirección.
+Búsquedas y páginas: cada vez que menciones una búsqueda (consulta) escríbela entre comillas angulares, por ejemplo «cuadrantes dentales», y no pongas comillas a otras cosas. Cada vez que nombres una página concreta, enlázala con [nombre corto de la página](url) usando la dirección completa («url») que aparece en los datos, tal cual; nunca enlaces una dirección que no esté en los datos. Si una página ya se enlazó antes en el mismo texto, no la enlaces otra vez.
+Marca: NUNCA concluyas que el tráfico de marca «no capta clientes nuevos», que «solo viene de quien ya conoce la marca» ni que es menos valioso. Un aumento de las búsquedas de marca suele indicar que más personas han descubierto o se han informado sobre la marca en otros canales (asistentes de IA como ChatGPT o Gemini, redes, prensa, recomendaciones, publicidad) y después la buscan en Google; es una señal de notoriedad y de que el trabajo de marca y visibilidad en IA funciona. Preséntalo como hipótesis razonable y prudente («probablemente», «es coherente con»), nunca como hecho, porque Search Console no dice de dónde viene el interés. Distingue, eso sí, el tráfico de marca (notoriedad) del tráfico sin marca (visibilidad orgánica por temas).
 Porcentajes: siempre que digas que algo «pasa de X a Y», «sube de X a Y», «baja de X a Y», «crece de X a Y» o similar, añade enseguida entre paréntesis el porcentaje de subida o bajada, por ejemplo «pasa de 1.200 a 1.500 clics (+25 %)». Usa el campo cambioPorcentual (o parecido) de los datos: ya está calculado, no lo recalcules de cabeza. Si un dato no lo trae, calcúlalo con cuidado y redondea a un decimal. Escribe los números en formato español (1.234,5).`;
 
 // ------------------------------------------------------------- writing
@@ -397,6 +399,7 @@ function brief(report: ReportFull, business: string) {
     busquedas_perdidas: snapshot.lostQueries,
     paginas_principales: (snapshot.pages ?? []).slice(0, 10).map((row) => ({
       pagina: pathOf(row.url),
+      url: row.url,
       clics: row.clicks,
       clicsAntes: row.prevClicks,
       cambioPorcentual: pct(row.clicks, row.prevClicks),
@@ -438,6 +441,7 @@ function brief(report: ReportFull, business: string) {
       ? snapshot.audits.map((audit) => ({
           tipologia: audit.type,
           pagina: pathOf(audit.url),
+          url: audit.url,
           notaSobre100: audit.score,
           categorias: audit.categories.map((category) => ({
             nombre: category.name,
