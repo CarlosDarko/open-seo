@@ -31,7 +31,6 @@ import {
   type ReportNotes,
 } from "@/custom/reporting/types";
 import {
-  analyzeClientReportWithAi,
   draftClientReportWithAi,
   getClientReport,
   getReportingAiStatus,
@@ -154,39 +153,6 @@ function Editor({
           : entry,
       ),
     });
-  const analyze = useMutation({
-    mutationFn: () =>
-      analyzeClientReportWithAi({ data: { projectId, reportId: report.id } }),
-    onSuccess: (result) => {
-      if (!result.ok) {
-        setError(
-          result.reason === "no_key"
-            ? "El análisis con IA no está activado (falta la clave de Anthropic)."
-            : result.reason === "nothing"
-              ? "No hay páginas con caída ni oportunidades de título que analizar."
-              : "La IA no ha podido analizar ahora. Prueba de nuevo.",
-        );
-        return;
-      }
-      setError(null);
-      setInfo(
-        `Análisis hecho. Coste de esta llamada: ${euro(result.costEur)}.`,
-      );
-      void refetch();
-      setNotes((previous) => ({
-        ...previous,
-        diagnoses: result.diagnoses,
-        titleIdeas: result.titleIdeas,
-        opportunityIdeas: result.opportunityIdeas,
-        contentIdeas: result.contentIdeas,
-        hidden: previous.hidden.filter(
-          (id) => id !== "diagnostico" && id !== "titulos",
-        ),
-      }));
-      setDirty(true);
-    },
-    onError: () => setError("La IA no ha podido analizar ahora."),
-  });
   const share = useMutation({
     mutationFn: (shared: boolean) =>
       setClientReportShared({
@@ -337,35 +303,24 @@ function Editor({
             variant="outline"
             size="sm"
             disabled={
-              draft.isPending || !aiStatus.data || !aiStatus.data.available
+              draft.isPending ||
+              preparing ||
+              !aiStatus.data ||
+              !aiStatus.data.available
             }
             title={
               aiStatus.data?.available
-                ? `Redacta el resumen y el análisis de cada pestaña con IA (${aiStatus.data.model}). Es un borrador: lo revisas antes de guardar.`
+                ? `El informe se redacta solo al crearlo. Úsalo para volver a redactar el resumen, el análisis de cada pestaña y las ideas (${aiStatus.data.model}); sustituye el texto actual.`
                 : "Para activarlo hay que añadir la clave de Anthropic (ANTHROPIC_API_KEY)."
             }
             onClick={() => draft.mutate()}
           >
             <Sparkles className="size-3.5" aria-hidden />
-            {draft.isPending ? "Redactando…" : "Redactar con IA"}
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={
-              analyze.isPending || !aiStatus.data || !aiStatus.data.available
-            }
-            title={
-              aiStatus.data?.available
-                ? `Lee las páginas que bajan y propone diagnósticos y títulos nuevos (${aiStatus.data.deepModel}). Es un borrador.`
-                : "Para activarlo hay que añadir la clave de Anthropic (ANTHROPIC_API_KEY)."
-            }
-            onClick={() => analyze.mutate()}
-          >
-            <Sparkles className="size-3.5" aria-hidden />
-            {analyze.isPending
-              ? "Analizando páginas…"
-              : "Analizar páginas con IA"}
+            {draft.isPending
+              ? "Redactando…"
+              : notes.message.trim()
+                ? "Volver a redactar con IA"
+                : "Redactar con IA"}
           </Button>
           <Button
             variant="outline"
@@ -523,6 +478,7 @@ function Editor({
             projectId={projectId}
             reportId={report.id}
             audits={report.snapshot.audits}
+            busy={preparing}
             onChanged={() => void refetch()}
           />
 

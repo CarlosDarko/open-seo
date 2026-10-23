@@ -90,11 +90,14 @@ export function AuditCard({
   projectId,
   reportId,
   audits,
+  busy,
   onChanged,
 }: {
   projectId: string;
   reportId: string;
   audits: AuditPage[];
+  /** The report is preparing itself (audits and AI): nothing to launch now. */
+  busy: boolean;
   onChanged: () => void;
 }) {
   const saved = useQuery({
@@ -167,11 +170,17 @@ export function AuditCard({
             <div className="flex flex-wrap items-center gap-2">
               <Button
                 size="sm"
-                disabled={audit.isPending}
+                variant={audits.length > 0 ? "outline" : "default"}
+                disabled={audit.isPending || busy}
+                title="Se audita solo al crear el informe. Úsalo para repetir la auditoría, por ejemplo tras corregir cosas en la web."
                 onClick={() => audit.mutate()}
               >
                 <ScanSearch className="size-3.5" aria-hidden />
-                {audit.isPending ? "Auditando…" : `Auditar ${total} páginas`}
+                {audit.isPending
+                  ? "Auditando…"
+                  : audits.length > 0
+                    ? `Volver a auditar ${total} páginas`
+                    : `Auditar ${total} páginas`}
               </Button>
               <Link
                 to="/p/$projectId/context"
