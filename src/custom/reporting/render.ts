@@ -1,11 +1,13 @@
 // Turns a stored client report into one self-contained web page in Carlos
-// Ortega's brand. The page opens with the cover and an executive summary and
-// then works like a small app: tabs (traffic, positioning, searches, pages,
-// topics, opportunities, technical), sub-tabs and columns keep every table
-// and chart one click away instead of in an endless scroll. Every URL opens in
-// a new tab and every figure that is mentioned can be unfolded into the list
-// behind it. Everything that comes from data is escaped here. The text never
-// addresses the reader as "tú": the subject is the website.
+// Ortega's brand. The page opens with the cover (the analysed period is the
+// first thing it says) and, when there is one, an executive summary written as
+// a paragraph. Then it works like a small app: tabs (traffic, positioning,
+// searches, pages, topics, opportunities, technical), sub-tabs and columns keep
+// every table and chart one click away instead of in an endless scroll. Every
+// table sorts and filters, every URL opens in a new tab and a dedicated print
+// layout turns the same data into a PDF. Everything that comes from data is
+// escaped here. The text never addresses the reader as "tú": the subject is
+// the website.
 import { integer } from "@/custom/radar/format";
 import {
   KIND_COLOR,
@@ -13,12 +15,12 @@ import {
   KIND_SHORT,
 } from "@/custom/radar/googleUpdates";
 import {
+  FAVICON_POSITIVE,
   LOGO_HORIZONTAL_LIGHT,
   LOGO_MARK_LIGHT,
 } from "@/custom/reporting/brandAssets";
 import {
   buildInsights,
-  contributions,
   pathOf,
   updateImpacts,
   weekdayStats,
@@ -28,9 +30,11 @@ import { buildVerdict, percentChange } from "@/custom/reporting/narrative";
 import { REPORT_SCRIPT } from "@/custom/reporting/renderScript";
 import { REPORT_CSS } from "@/custom/reporting/renderStyles";
 import {
-  type BandMove,
+  type AuditPage,
   type ChangeLine,
+  type PageRow,
   type QueryRow,
+  type QueryTableRow,
   type ReportFull,
   type SectionId,
   type SegmentLine,
@@ -61,6 +65,11 @@ const dateFormat = new Intl.DateTimeFormat("es-ES", {
   year: "numeric",
   timeZone: "Europe/Madrid",
 });
+const dayMonth = new Intl.DateTimeFormat("es-ES", {
+  day: "numeric",
+  month: "long",
+  timeZone: "Europe/Madrid",
+});
 const shortDate = new Intl.DateTimeFormat("es-ES", {
   day: "numeric",
   month: "short",
@@ -70,20 +79,34 @@ const shortDate = new Intl.DateTimeFormat("es-ES", {
 const num = (value: number) => integer.format(Math.round(value));
 const pos = (value: number | null) =>
   value === null ? "—" : one.format(value);
-const day = (iso: string) => dateFormat.format(new Date(`${iso}T12:00:00Z`));
-const dayShort = (iso: string) =>
-  shortDate.format(new Date(`${iso}T12:00:00Z`));
+const at = (iso: string) => new Date(`${iso}T12:00:00Z`);
+const day = (iso: string) => dateFormat.format(at(iso));
+const dayShort = (iso: string) => shortDate.format(at(iso));
 const signedNum = (value: number) =>
   `${value >= 0 ? "+" : "−"}${num(Math.abs(value))}`;
+
+/** "1 – 28 de septiembre de 2026": the shortest way to say a range. */
+function rangeText(start: string, end: string): string {
+  if (start === end) return day(end);
+  if (start.slice(0, 4) !== end.slice(0, 4)) {
+    return `${day(start)} – ${day(end)}`;
+  }
+  if (start.slice(5, 7) === end.slice(5, 7)) {
+    return `${at(start).getUTCDate()} – ${day(end)}`;
+  }
+  return `${dayMonth.format(at(start))} – ${day(end)}`;
+}
+
+/** "1 sep – 28 sep 2026" for the narrow top bar. */
+function rangeShort(start: string, end: string): string {
+  return `${dayShort(start)} – ${dayShort(end)} ${end.slice(0, 4)}`;
+}
 
 /** The JSON that travels in a script tag: "<" is written as a unicode escape
  *  so the data can never close the tag. */
 function jsonForScript(value: unknown): string {
   return JSON.stringify(value).replaceAll("<", `${BACKSLASH}u003c`);
 }
-
-/** The brand mark as a favicon (an inline SVG, so no extra request). */
-const FAVICON = `data:image/svg+xml,${encodeURIComponent(LOGO_MARK_LIGHT)}`;
 
 // ---------------------------------------------------------------- links
 
@@ -101,9 +124,6 @@ function pageLink(url: string): string {
 function queryLink(query: string): string {
   return `<a class="lk" href="https://www.google.com/search?q=${encodeURIComponent(query)}&amp;hl=es&amp;gl=es" target="_blank" rel="noopener noreferrer" title="Ver los resultados de Google">${esc(query)}</a>`;
 }
-
-/** A key that is either a page URL or a search. */
-const keyLink = (key: string) => (isWeb(key) ? pageLink(key) : queryLink(key));
 
 // -------------------------------------------------------------- deltas
 
@@ -140,7 +160,39 @@ const TONE_LABEL: Record<Insight["tone"], string> = {
 
 // ----------------------------------------------------------- structure
 
+/** The notes that open a tab (the analysis of the whole panel) and the tab
+ *  they belong to. Every other note stays under its own block. */
+const PANEL_NOTE: Record<string, SectionId> = {
+  trafico: "evolucion",
+  posiciones: "posiciones",
+  busquedas: "consultas",
+  paginas: "origen",
+  temas: "temas",
+  oportunidades: "oportunidades",
+  tecnico: "tecnico",
+};
+const PANEL_NOTE_IDS = new Set<string>(Object.values(PANEL_NOTE));
+
+function paragraphs(text: string): string {
+  return text
+    .split(/\n\s*\n|\n/)
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => `<p>${esc(part)}</p>`)
+    .join("");
+}
+
+/** The reading of a tab: what happened, why and what it means. */
+function analysisCard(report: ReportFull, id: SectionId): string {
+  if (report.notes.hidden.includes(id)) return "";
+  const text = report.notes.sectionNotes[id]?.trim();
+  return text
+    ? `<section class="an"><div class="ak">Análisis</div>${paragraphs(text)}</section>`
+    : "";
+}
+
 function noteOf(report: ReportFull, id: SectionId): string {
+  if (PANEL_NOTE_IDS.has(id)) return "";
   const text = report.notes.sectionNotes[id]?.trim();
   return text
     ? `<div class="note"><b>Nota de Carlos</b>${esc(text)}</div>`
@@ -164,7 +216,8 @@ function block(
 
 type SubTab = { id: string; label: string; count?: number; html: string };
 
-/** Tabs inside a tab, so several lists share one place. */
+/** Tabs inside a tab, so several lists share one place. In print every list
+ *  shows, each under its own small title. */
 function subTabs(group: string, items: SubTab[]): string {
   const shown = items.filter((item) => item.html);
   if (shown.length === 0) return "";
@@ -177,71 +230,267 @@ function subTabs(group: string, items: SubTab[]): string {
   const panels = shown
     .map(
       (item, index) =>
-        `<div class="sp${index === 0 ? " on" : ""}" data-sp="${group}-${item.id}">${item.html}</div>`,
+        `<div class="sp${index === 0 ? " on" : ""}" data-sp="${group}-${item.id}"><h4 class="sph">${esc(item.label)}</h4>${item.html}</div>`,
     )
     .join("");
   return `<div class="stg" data-group="${group}"><div class="subtabs" role="tablist">${buttons}</div>${panels}</div>`;
 }
 
-// ---------------------------------------------------------------- lists
-
-function emptyNote(text: string): string {
-  return `<p class="empty">${esc(text)}</p>`;
+/** A row of figures that sums up a tab before its tables. */
+function chips(
+  items: { value: string; label: string; delta?: string }[],
+): string {
+  return `<div class="chips">${items
+    .map(
+      (item) =>
+        `<div class="chip"><b>${item.value}</b><span>${esc(item.label)}</span>${item.delta ?? ""}</div>`,
+    )
+    .join("")}</div>`;
 }
 
-/** Searches with their figures; scrolls inside its own box. */
-function queryTable(rows: QueryRow[], mode: "now" | "lost"): string {
-  if (rows.length === 0) return emptyNote("No hay búsquedas en este grupo.");
-  const head =
-    mode === "lost"
-      ? '<th>Búsqueda</th><th class="r">Posición antes</th><th class="r">Clics antes</th><th class="r">Impresiones antes</th>'
-      : '<th>Búsqueda</th><th class="r">Posición</th><th class="r">Clics</th><th class="r">Impresiones</th>';
-  const body = rows
-    .map((row) =>
-      mode === "lost"
-        ? `<tr><td>${queryLink(row.query)}</td><td class="r">${pos(row.prevPosition)}</td><td class="r">${num(row.prevClicks)}</td><td class="r">${num(row.impressions)}</td></tr>`
-        : `<tr><td>${queryLink(row.query)}</td><td class="r">${pos(row.position)}</td><td class="r">${num(row.clicks)}</td><td class="r">${num(row.impressions)}</td></tr>`,
+// --------------------------------------------------------------- tables
+
+/** A table cell: its HTML and the value the column sorts by. */
+type Cell = { h: string; v?: number | string | null; cls?: string };
+type Column = {
+  label: string;
+  num?: boolean;
+  cls?: string;
+  /** Positions read best-first: the first click sorts ascending. */
+  asc?: boolean;
+};
+
+const PRINT_ROWS = 15;
+
+/** Every table of the report: sortable by any column (the page script reads
+ *  `data-v`), filterable when it is long, and trimmed to its first rows in
+ *  print. */
+function dataTable(
+  columns: Column[],
+  rows: Cell[][],
+  empty = "No hay datos en este grupo.",
+): string {
+  if (rows.length === 0) return `<p class="empty">${esc(empty)}</p>`;
+  const head = columns
+    .map(
+      (column) =>
+        `<th data-t="${column.num ? "num" : "text"}"${column.asc ? ' data-first="asc"' : ""} class="${[column.num ? "r" : "", column.cls ?? ""].filter(Boolean).join(" ")}"><span>${esc(column.label)}</span></th>`,
     )
     .join("");
-  return `<div class="tbox"><table class="qt sm"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>`;
+  const body = rows
+    .map(
+      (row, index) =>
+        `<tr${index >= PRINT_ROWS ? ' class="xr"' : ""}>${row
+          .map((cell, col) => {
+            const cls = [columns[col]?.num ? "r" : "", cell.cls ?? ""]
+              .filter(Boolean)
+              .join(" ");
+            const value =
+              cell.v === undefined || cell.v === null ? "" : String(cell.v);
+            return `<td${cls ? ` class="${cls}"` : ""} data-v="${esc(value)}">${cell.h}</td>`;
+          })
+          .join("")}</tr>`,
+    )
+    .join("");
+  const tools =
+    rows.length > 8
+      ? `<div class="tools"><input class="flt" type="search" placeholder="Filtrar la lista…" aria-label="Filtrar la lista"><span class="cnt" data-total="${rows.length}">${num(rows.length)} filas</span></div>`
+      : "";
+  const more =
+    rows.length > PRINT_ROWS
+      ? `<p class="onlyprint">Se muestran las ${PRINT_ROWS} primeras de ${num(rows.length)}. La lista completa está en la versión web del informe.</p>`
+      : "";
+  return `<div class="tw">${tools}<div class="tbox"><table class="qt sm sortable"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>${more}</div>`;
+}
+
+const ctr = (clicks: number, impressions: number) =>
+  impressions > 0 ? clicks / impressions : 0;
+const ctrText = (clicks: number, impressions: number) =>
+  impressions > 0 ? `${one.format(ctr(clicks, impressions) * 100)} %` : "—";
+
+/** The clicks of a row, with the previous period's under them. */
+function clicksCell(clicks: number, prev: number | null): Cell {
+  return {
+    h: `<b>${num(clicks)}</b>${prev === null ? "" : `<small>antes ${num(prev)}</small>`}`,
+    v: clicks,
+  };
+}
+
+/** The change of a row in clicks, with the percentage under it. */
+function deltaCell(clicks: number, prev: number): Cell {
+  const diff = clicks - prev;
+  const change = percentChange(clicks, prev);
+  const cls = diff > 0 ? "up" : diff < 0 ? "down" : "flat";
+  const arrow = diff > 0 ? "▲" : diff < 0 ? "▼" : "=";
+  const sub =
+    change === null || diff === 0
+      ? ""
+      : `<small>${change > 0 ? "+" : "−"}${one.format(Math.abs(change) * 100)} %</small>`;
+  return {
+    h: `<span class="dl ${cls}">${arrow} ${diff === 0 ? "igual" : signedNum(diff)}</span>${sub}`,
+    v: diff,
+  };
+}
+
+const positionCell = (prev: number | null, now: number | null): Cell => ({
+  h: posMove(prev, now),
+  v: now,
+});
+
+/** Searches with their figures of both periods. */
+function queriesTable(rows: QueryTableRow[], comparable: boolean): string {
+  const columns: Column[] = [
+    { label: "Búsqueda" },
+    { label: "Posición", num: true, asc: true },
+    { label: "Clics", num: true },
+    ...(comparable ? [{ label: "Variación", num: true }] : []),
+    { label: "Impresiones", num: true },
+    { label: "CTR", num: true },
+  ];
+  return dataTable(
+    columns,
+    rows.map((row) => [
+      {
+        h: `${queryLink(row.query)}${row.brand ? ' <span class="tag">Marca</span>' : ""}`,
+        v: row.query,
+      },
+      comparable
+        ? positionCell(row.prevPosition, row.position)
+        : { h: pos(row.position), v: row.position },
+      clicksCell(row.clicks, comparable ? row.prevClicks : null),
+      ...(comparable ? [deltaCell(row.clicks, row.prevClicks)] : []),
+      { h: num(row.impressions), v: row.impressions },
+      {
+        h: ctrText(row.clicks, row.impressions),
+        v: ctr(row.clicks, row.impressions),
+      },
+    ]),
+  );
+}
+
+/** The searches of a position band, new searches and lost ones. */
+function simpleQueries(rows: QueryRow[], lost: boolean): string {
+  return dataTable(
+    [
+      { label: "Búsqueda" },
+      { label: lost ? "Posición antes" : "Posición", num: true, asc: true },
+      { label: lost ? "Clics antes" : "Clics", num: true },
+      { label: lost ? "Impresiones antes" : "Impresiones", num: true },
+      ...(lost ? [] : [{ label: "CTR", num: true }]),
+    ],
+    rows.map((row) => [
+      { h: queryLink(row.query), v: row.query },
+      {
+        h: pos(lost ? row.prevPosition : row.position),
+        v: lost ? row.prevPosition : row.position,
+      },
+      {
+        h: num(lost ? row.prevClicks : row.clicks),
+        v: lost ? row.prevClicks : row.clicks,
+      },
+      { h: num(row.impressions), v: row.impressions },
+      ...(lost
+        ? []
+        : [
+            {
+              h: ctrText(row.clicks, row.impressions),
+              v: ctr(row.clicks, row.impressions),
+            },
+          ]),
+    ]),
+    "No hay búsquedas en este grupo.",
+  );
 }
 
 /** Searches that entered or left a band. */
-function moveTable(rows: BandMove[], entering: boolean): string {
-  if (rows.length === 0) {
-    return emptyNote(
-      entering ? "Ninguna búsqueda ha entrado." : "Ninguna búsqueda ha salido.",
-    );
-  }
-  const body = rows
-    .map(
-      (row) =>
-        `<tr><td>${queryLink(row.query)}</td><td class="r">${posMove(row.prevPosition, row.position)}</td><td class="r">${num(row.impressions)}</td></tr>`,
-    )
-    .join("");
-  return `<div class="tbox"><table class="qt sm"><thead><tr><th>Búsqueda</th><th class="r">Posición</th><th class="r">Impresiones</th></tr></thead><tbody>${body}</tbody></table></div>`;
+function moveTable(
+  rows: {
+    query: string;
+    position: number | null;
+    prevPosition: number | null;
+    impressions: number;
+  }[],
+  entering: boolean,
+): string {
+  return dataTable(
+    [
+      { label: "Búsqueda" },
+      { label: "Posición", num: true, asc: true },
+      { label: "Impresiones", num: true },
+    ],
+    rows.map((row) => [
+      { h: queryLink(row.query), v: row.query },
+      positionCell(row.prevPosition, row.position),
+      { h: num(row.impressions), v: row.impressions },
+    ]),
+    entering ? "Ninguna búsqueda ha entrado." : "Ninguna búsqueda ha salido.",
+  );
 }
 
-/** Pages or searches that gained or lost clicks, with the figures. */
+/** Pages or searches that gained or lost clicks, with what explains it. */
 function changeTable(rows: ChangeLine[]): string {
-  if (rows.length === 0) return emptyNote("Sin variaciones destacables.");
-  const body = rows
-    .map(
-      (row) =>
-        `<tr><td>${keyLink(row.key)}${
+  const pages = rows.length > 0 && isWeb(rows[0].key);
+  return dataTable(
+    [
+      { label: pages ? "Página" : "Búsqueda" },
+      { label: "Variación", num: true },
+      { label: "Clics", num: true },
+      { label: "Posición", num: true, asc: true },
+    ],
+    rows.map((row) => [
+      {
+        h: `${pages ? pageLink(row.key) : queryLink(row.key)}${
           row.queries && row.queries.length > 0
             ? `<div class="why">${row.queries
-                .slice(0, 2)
+                .slice(0, 3)
                 .map(
                   (item) =>
-                    `<span>${queryLink(item.query)} (${signedNum(item.clicksDelta)})</span>`,
+                    `<span>${queryLink(item.query)} <i>${signedNum(item.clicksDelta)}</i></span>`,
                 )
                 .join("")}</div>`
             : ""
-        }</td><td class="r">${posMove(row.prevPosition, row.position)}</td><td class="r">${num(row.prevClicks)} → ${num(row.clicks)}</td><td class="r"><b class="${row.clicksDelta >= 0 ? "upc" : "dnc"}">${signedNum(row.clicksDelta)}</b></td></tr>`,
-    )
-    .join("");
-  return `<div class="tbox"><table class="qt sm"><thead><tr><th>${isWeb(rows[0].key) ? "Página" : "Búsqueda"}</th><th class="r">Posición</th><th class="r">Clics</th><th class="r">Variación</th></tr></thead><tbody>${body}</tbody></table></div>`;
+        }`,
+        v: pages ? row.key : row.key,
+        cls: pages ? "pg" : "",
+      },
+      deltaCell(row.clicks, row.prevClicks),
+      clicksCell(row.clicks, row.prevClicks),
+      positionCell(row.prevPosition, row.position),
+    ]),
+    "Sin variaciones destacables.",
+  );
+}
+
+/** The pages with most clicks, each with its share drawn as a bar. */
+function pagesTable(rows: PageRow[], comparable: boolean): string {
+  const max = Math.max(...rows.map((row) => row.clicks), 1);
+  return dataTable(
+    [
+      { label: "Página" },
+      { label: "Clics", num: true },
+      ...(comparable ? [{ label: "Variación", num: true }] : []),
+      { label: "Posición", num: true, asc: true },
+      { label: "Impresiones", num: true },
+      { label: "CTR", num: true },
+    ],
+    rows.map((row) => [
+      {
+        h: `${pageLink(row.url)}<div class="sb"><i style="--w:${Math.max(2, (row.clicks / max) * 100).toFixed(0)}%"></i></div>`,
+        v: row.url,
+        cls: "pg",
+      },
+      clicksCell(row.clicks, comparable ? row.prevClicks : null),
+      ...(comparable ? [deltaCell(row.clicks, row.prevClicks)] : []),
+      comparable
+        ? positionCell(row.prevPosition, row.position)
+        : { h: pos(row.position), v: row.position },
+      { h: num(row.impressions), v: row.impressions },
+      {
+        h: ctrText(row.clicks, row.impressions),
+        v: ctr(row.clicks, row.impressions),
+      },
+    ]),
+  );
 }
 
 // ------------------------------------------------------------------ hero
@@ -256,6 +505,18 @@ function areaPath(values: number[]): string {
       `${((index * w) / (values.length - 1)).toFixed(1)},${(h - (value / hi) * (h - 8) - 4).toFixed(1)}`,
   );
   return `<svg class="bgchart" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="hg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f11c41" stop-opacity=".45"/><stop offset="1" stop-color="#f11c41" stop-opacity="0"/></linearGradient></defs><path d="M0,${h} L${pts.join(" L")} L${w},${h} Z" fill="url(#hg)"/><polyline points="${pts.join(" ")}" fill="none" stroke="#f11c41" stroke-width="2" vector-effect="non-scaling-stroke"/></svg>`;
+}
+
+const CALENDAR = `<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>`;
+
+/** The analysed period: the first thing the cover says. */
+function periodCard(report: ReportFull): string {
+  const { snapshot } = report;
+  const { period, range } = snapshot;
+  const compare = period.comparable
+    ? `<div class="pi"><div><small>Comparado con</small><b>${esc(rangeText(period.prevStartDate, period.prevEndDate))}</b><span>${period.compare === "year" ? "mismo periodo del año anterior" : "periodo anterior de la misma duración"}</span></div></div>`
+    : "";
+  return `<div class="period rv d2"><div class="pi main">${CALENDAR}<div><small>Periodo analizado</small><b>${esc(rangeText(range.startDate, range.endDate))}</b><span>${num(period.days)} días de datos de Google Search Console</span></div></div>${compare}</div>`;
 }
 
 function hero(report: ReportFull, host: string): string {
@@ -278,16 +539,14 @@ function hero(report: ReportFull, host: string): string {
   })();
   const name = report.clientName?.trim() || host;
   const heading = report.title.replace(/ — .*$/, "").trim() || "Informe SEO";
-  const compare = snapshot.period.comparable
-    ? ` · comparado con ${snapshot.period.compare === "year" ? "el mismo periodo del año anterior" : "el periodo anterior"}`
-    : "";
   return `<header class="hero">
 ${areaPath(snapshot.daily.map((point) => point.clicks))}
 <div class="wrap">
 <div class="logo rv">${LOGO_HORIZONTAL_LIGHT}</div>
 <span class="eyebrow rv">Informe de rendimiento SEO</span>
 <h1 class="rv d1">${esc(heading)} de <em>${esc(name)}</em></h1>
-<p class="sub rv d2">${esc(host)} · del ${day(snapshot.range.startDate)} al ${day(snapshot.range.endDate)}${compare}${snapshot.scope === "sin marca" ? " · sin contar las búsquedas de marca" : ""}</p>
+<p class="sub rv d1">${esc(host)}${snapshot.scope === "sin marca" ? " · sin contar las búsquedas de marca" : ""}</p>
+${periodCard(report)}
 <div class="kpis rv d3">
 ${kpi("Clics", totals.clicks, "int", num(totals.clicks), comparable ? pctDelta(totals.clicks, prevTotals.clicks) : "")}
 ${kpi("Impresiones", totals.impressions, "int", num(totals.impressions), comparable ? pctDelta(totals.impressions, prevTotals.impressions) : "")}
@@ -300,50 +559,18 @@ ${kpi("Posición media", totals.position, "dec", one.format(totals.position), po
 
 // ---------------------------------------------------- executive summary
 
-/** Which tab explains each finding. */
-const INSIGHT_TAB: Record<string, string> = {
-  traffic: "trafico",
-  update: "trafico",
-  source: "trafico",
-  weekday: "trafico",
-  top3: "posiciones",
-  queries: "busquedas",
-  winner: "paginas",
-  loser: "paginas",
-  concentration: "paginas",
-  brand: "temas",
-  mobile: "temas",
-  topics: "temas",
-  opportunities: "oportunidades",
-  health: "tecnico",
-  discover: "tecnico",
-};
-
-function executiveSummary(report: ReportFull, tabIds: Set<string>): string {
-  const { snapshot } = report;
-  const verdict = buildVerdict(snapshot);
-  const keys = buildInsights(snapshot)
-    .slice(0, 5)
-    .map((item) => {
-      const tab = INSIGHT_TAB[item.id];
-      const go =
-        tab && tabIds.has(tab)
-          ? `<a class="go" href="#tabs" data-go="${tab}">Ver detalle →</a>`
-          : "";
-      return `<li><span class="tone ${item.tone}">${TONE_LABEL[item.tone]}</span><span class="kt">${esc(item.title)}</span>${go}</li>`;
-    })
-    .join("");
+/** The summary is a written paragraph or nothing: a list of findings would
+ *  only repeat the conclusions tab. */
+function executiveSummary(report: ReportFull): string {
   const message = report.notes.message.trim();
-  const side = message
-    ? `<aside class="exr msgc"><div class="av">${LOGO_MARK_LIGHT}</div><p>${esc(message)}</p><small>Carlos Ortega · consultor SEO</small></aside>`
-    : "";
-  return `<section class="s wrap" id="resumen"><div class="ex${side ? "" : " solo"}">
-<div class="exl rv">
+  if (!message) return "";
+  const verdict = buildVerdict(report.snapshot);
+  return `<section class="s wrap" id="resumen"><div class="sum rv">
 <div class="kick">Resumen ejecutivo</div>
-<p class="exh">${esc(verdict.headline)}</p>
-<p class="exp"><b>En positivo</b>${esc(verdict.lining)}</p>
-<ul class="keys">${keys}</ul>
-</div>${side}</div></section>`;
+<h2 class="sumh">${esc(verdict.headline)}</h2>
+<div class="sumt">${paragraphs(message)}</div>
+<div class="sig"><span class="av">${LOGO_MARK_LIGHT}</span><span><b>Carlos Ortega</b>Consultor SEO</span></div>
+</div></section>`;
 }
 
 // ------------------------------------------------------------- insights
@@ -352,10 +579,7 @@ function insightCard(item: Insight): string {
   const stats = item.stats
     .map((stat) => `<span>${esc(stat.label)}<b>${esc(stat.value)}</b></span>`)
     .join("");
-  const upside = item.upside
-    ? `<div class="up2"><b>En positivo</b>${esc(item.upside)}</div>`
-    : "";
-  return `<article class="fd"><div class="top2"><span>${esc(item.topic)}</span><span class="tone ${item.tone}">${TONE_LABEL[item.tone]}</span></div><div class="t">${esc(item.title)}</div><p class="b">${esc(item.body)}</p><div class="st">${stats}</div>${upside}</article>`;
+  return `<article class="fd"><div class="top2"><span>${esc(item.topic)}</span><span class="tone ${item.tone}">${TONE_LABEL[item.tone]}</span></div><div class="t">${esc(item.title)}</div><p class="b">${esc(item.body)}</p><div class="st">${stats}</div></article>`;
 }
 
 function insightsBlock(report: ReportFull): string {
@@ -406,43 +630,72 @@ ${cards ? `<div class="uimp">${cards}</div>` : ""}
   );
 }
 
-function divergeBlock(
+/** One dimension of the traffic: each group with its share of the clicks and
+ *  what it added or took away since the previous period. */
+function mixCard(
   title: string,
-  rows: { label: string; delta: number }[],
+  lines: SegmentLine[],
+  comparable: boolean,
 ): string {
-  const max = Math.max(...rows.map((row) => Math.abs(row.delta)), 1);
-  return `<div><h3>${esc(title)}</h3><div class="diverge">${rows
-    .map((row) => {
-      const half = (Math.abs(row.delta) / max) * 50;
-      const positive = row.delta >= 0;
-      const side = positive ? `left:50%` : `right:50%`;
-      const inside = half > 30;
-      const valueSide = inside
-        ? positive
-          ? `left:calc(50% + ${half.toFixed(1)}% - 8px);transform:translate(-100%,-50%);color:#fff`
-          : `right:calc(50% + ${half.toFixed(1)}% - 8px);transform:translate(100%,-50%);color:#fff`
-        : positive
-          ? `left:calc(50% + ${half.toFixed(1)}% + 6px)`
-          : `right:calc(50% + ${half.toFixed(1)}% + 6px)`;
-      return `<div class="dv"><span class="lab" title="${esc(row.label)}">${esc(row.label)}</span><div class="track"><div class="fill ${positive ? "upb" : "dnb"}" style="${side};--w:${half.toFixed(1)}%"></div><span class="val" style="${valueSide}">${signedNum(row.delta)}</span></div></div>`;
+  if (lines.length === 0) return "";
+  const total = lines.reduce((sum, line) => sum + line.clicks, 0);
+  const prevTotal = lines.reduce((sum, line) => sum + line.prevClicks, 0);
+  const rows = lines
+    .slice(0, 6)
+    .map((line, index) => {
+      const diff = line.clicks - line.prevClicks;
+      const change = percentChange(line.clicks, line.prevClicks);
+      const delta = comparable
+        ? `<span class="dl ${diff > 0 ? "up" : diff < 0 ? "down" : "flat"}">${diff > 0 ? "▲" : diff < 0 ? "▼" : "="} ${diff === 0 ? "igual" : signedNum(diff)}${change !== null && diff !== 0 ? ` <i>(${change > 0 ? "+" : "−"}${one.format(Math.abs(change) * 100)} %)</i>` : ""}</span>`
+        : "";
+      return `<div class="mr${index === 0 ? " first" : ""}"><div class="mt"><span class="mn" title="${esc(line.label)}">${esc(line.label)}</span><b>${num(line.clicks)}</b></div><div class="mb"><i style="--w:${Math.max(2, line.share * 100).toFixed(1)}%"></i></div><div class="mm"><span>${one.format(line.share * 100)} % de los clics</span>${delta}</div></div>`;
     })
-    .join("")}</div></div>`;
+    .join("");
+  const net = comparable ? countDelta(total, prevTotal) : "";
+  return `<div class="sheet mix"><div class="mh"><h3>${esc(title)}</h3>${net}</div>${rows}</div>`;
 }
 
-function originBlock(report: ReportFull): string {
+function trafficMixBlock(report: ReportFull): string {
   const { snapshot } = report;
-  if (!snapshot.period.comparable) return "";
-  const groups = contributions(snapshot);
-  if (groups.length === 0) return "";
+  const comparable = snapshot.period.comparable;
+  const total = snapshot.brand.clicks + snapshot.brand.otherClicks;
+  const brandLines: SegmentLine[] =
+    snapshot.brand.hasBrand && total > 0
+      ? [
+          {
+            label: "Búsquedas de marca",
+            clicks: snapshot.brand.clicks,
+            prevClicks: snapshot.brand.prevClicks,
+            impressions: 0,
+            share: snapshot.brand.clicks / total,
+          },
+          {
+            label: "Resto de búsquedas",
+            clicks: snapshot.brand.otherClicks,
+            prevClicks: snapshot.brand.prevOtherClicks,
+            impressions: 0,
+            share: snapshot.brand.otherClicks / total,
+          },
+        ]
+      : [];
+  const cards = [
+    mixCard("Tipo de página", snapshot.segments.pageType, comparable),
+    mixCard("Dispositivo", snapshot.segments.device, comparable),
+    mixCard("Marca y resto de búsquedas", brandLines, comparable),
+    mixCard("Intención de búsqueda", snapshot.segments.intent, comparable),
+  ].join("");
+  if (!cards) return "";
   const net = snapshot.totals.clicks - snapshot.prevTotals.clicks;
   return block(
     report,
-    "origen",
-    net >= 0
-      ? `Origen de los ${signedNum(net)} clics`
-      : "Origen de la variación de clics",
-    "Cuánto suma o resta cada tipo de página, dispositivo y tipo de búsqueda al total.",
-    `<div class="sheet"><div class="grid g3">${groups.map((group) => divergeBlock(group.title, group.rows)).join("")}</div></div>`,
+    "reparto",
+    comparable
+      ? `De dónde vienen los clics${net !== 0 ? ` y qué ha cambiado (${signedNum(net)})` : ""}`
+      : "De dónde vienen los clics",
+    comparable
+      ? "Cada grupo con su peso sobre el total y lo que ha sumado o restado frente al periodo anterior."
+      : "El peso de cada grupo sobre el total de clics.",
+    `<div class="grid g2">${cards}</div>`,
   );
 }
 
@@ -452,24 +705,22 @@ function weekBlock(report: ReportFull): string {
   const stats = weekdayStats(daily);
   const max = Math.max(...stats.map((item) => item.average), 1);
   const best = stats.reduce((a, b) => (b.average > a.average ? b : a));
-  const rows = stats
+  const cols = stats
     .map(
       (item) =>
-        `<div class="wkr${item === best ? " best" : ""}"><span class="wl">${item.label}</span><div class="wb"><i style="--w:${Math.max(3, (item.average / max) * 100).toFixed(0)}%"></i></div><b>${num(item.average)}</b></div>`,
+        `<div class="wc${item === best ? " best" : ""}"><b>${num(item.average)}</b><div class="wcb"><i style="--h:${Math.max(4, (item.average / max) * 100).toFixed(0)}%"></i></div><span>${item.label}</span></div>`,
     )
     .join("");
   return block(
     report,
     "semana",
-    "Distribución semanal del tráfico",
-    "Clics medios por día de la semana. Permite decidir cuándo publicar y actualizar contenido.",
-    `<div class="sheet"><div class="wk">${rows}</div></div>`,
+    "Clics medios por día de la semana",
+    `El mejor día es ${best.label.toLowerCase()}: conviene publicar y actualizar contenido antes.`,
+    `<div class="sheet"><div class="wkc">${cols}</div></div>`,
   );
 }
 
 // ------------------------------------------------------------ positions
-
-const BAND_COLORS = ["#f11c41", "#1a1a1a", "#7a7a84", "#c4c4cb"];
 
 function positionsBlock(report: ReportFull): string {
   const { snapshot } = report;
@@ -483,23 +734,10 @@ function positionsBlock(report: ReportFull): string {
     ...snapshot.bands.map((band) => Math.max(band.queries, band.prevQueries)),
     1,
   );
-  const stacked = snapshot.bands
-    .filter((band) => band.clicks > 0)
-    .map((band, index) => {
-      const share = totalClicks > 0 ? (band.clicks / totalClicks) * 100 : 0;
-      return `<div style="width:${share.toFixed(2)}%;background:${BAND_COLORS[index % BAND_COLORS.length]}" title="${esc(band.label)}: ${num(band.clicks)} clics">${share >= 12 ? `${Math.round(share)} %` : ""}</div>`;
-    })
-    .join("");
-  const legend = snapshot.bands
-    .map(
-      (band, index) =>
-        `<span><i style="background:${BAND_COLORS[index % BAND_COLORS.length]}"></i>${esc(band.label)} · ${num(band.clicks)} clics</span>`,
-    )
-    .join("");
   const cards = snapshot.bands
     .map((band) => {
       const share = totalClicks > 0 ? (band.clicks / totalClicks) * 100 : 0;
-      return `<div class="bcard"><div class="bk">${esc(band.label)}</div><div class="bn">${num(band.queries)}</div><div class="bs">búsquedas</div>${comparable ? `<div class="bd">${countDelta(band.queries, band.prevQueries)} frente al periodo anterior</div>` : ""}<div class="pair"><div class="now"><i style="--w:${((band.queries / maxQueries) * 100).toFixed(0)}%"></i></div>${comparable ? `<div class="old"><i style="--w:${((band.prevQueries / maxQueries) * 100).toFixed(0)}%"></i></div>` : ""}</div><div class="bm"><b>${num(band.clicks)}</b> clics · <b>${Math.round(share)} %</b> del total</div></div>`;
+      return `<div class="bcard"><div class="bk">${esc(band.label)}</div><div class="bn">${num(band.queries)}</div><div class="bs">búsquedas${comparable ? ` · ${countDelta(band.queries, band.prevQueries)}` : ""}</div><div class="pair"><div class="now"><i style="--w:${((band.queries / maxQueries) * 100).toFixed(0)}%"></i></div>${comparable ? `<div class="old"><i style="--w:${((band.prevQueries / maxQueries) * 100).toFixed(0)}%"></i></div>` : ""}</div><div class="bm"><b>${num(band.clicks)}</b> clics · <b>${Math.round(share)} %</b> del total</div></div>`;
     })
     .join("");
   const lists = subTabs(
@@ -508,7 +746,7 @@ function positionsBlock(report: ReportFull): string {
       id: `b${index}`,
       label: band.label,
       count: band.queries,
-      html: queryTable((snapshot.queriesByBand ?? [])[index] ?? [], "now"),
+      html: simpleQueries((snapshot.queriesByBand ?? [])[index] ?? [], false),
     })),
   );
   const moves = comparable
@@ -517,9 +755,9 @@ function positionsBlock(report: ReportFull): string {
   return block(
     report,
     "posiciones",
-    "Distribución de las búsquedas por posición en Google",
-    `Cuántas búsquedas tiene la web en cada tramo de posiciones y cuántos clics aporta cada uno. En las tarjetas, la barra roja indica el periodo actual${comparable ? " y la gris el anterior" : ""}. Debajo se pueden consultar las búsquedas de cada tramo.`,
-    `<div class="sheet"><h3>Reparto de los clics por tramo de posición</h3><div class="stk">${stacked}</div><div class="stl">${legend}</div></div><div class="bands">${cards}</div><div class="sheet" style="margin-top:18px"><h3>Búsquedas de cada tramo (las 25 con más clics)</h3>${lists}</div>${moves}`,
+    "Las búsquedas por posición en Google",
+    `Cuántas búsquedas tiene la web en cada tramo de posiciones y cuántos clics aporta cada uno. La barra roja es el periodo actual${comparable ? " y la gris el anterior" : ""}.`,
+    `<div class="bands">${cards}</div><div class="sheet" style="margin-top:18px"><h3>Búsquedas de cada tramo (las 25 con más clics)</h3>${lists}</div>${moves}`,
   );
 }
 
@@ -528,41 +766,62 @@ function positionsBlock(report: ReportFull): string {
 function searchesBlock(report: ReportFull): string {
   const { snapshot } = report;
   const comparable = snapshot.period.comparable;
-  const top = snapshot.topQueries.map<QueryRow>((item) => ({
-    query: item.query,
-    clicks: item.clicks,
-    impressions: item.impressions,
-    position: item.position,
-    prevClicks: 0,
-    prevPosition: null,
-  }));
-  const items = [
-    {
-      id: "top",
-      label: "Más tráfico",
-      count: top.length,
-      html: top.length > 0 ? queryTable(top, "now") : "",
-    },
-    ...(comparable
+  const all = snapshot.queryRows ?? [];
+  const own = all.filter((row) => !row.brand);
+  const top3 = snapshot.bands[0];
+  const brandTotal = snapshot.brand.clicks + snapshot.brand.otherClicks;
+  const summary = chips([
+    ...(snapshot.queryCount > 0
       ? [
           {
-            id: "new",
-            label: "Nuevas",
-            count: snapshot.newQueries,
-            html:
-              (snapshot.newQueriesList ?? []).length > 0
-                ? queryTable(snapshot.newQueriesList, "now")
-                : "",
+            value: num(snapshot.queryCount),
+            label: "búsquedas distintas muestran la web",
           },
+        ]
+      : []),
+    ...(top3
+      ? [
           {
-            id: "lost",
-            label: "Perdidas",
-            count: snapshot.lostQueries,
-            html:
-              (snapshot.lostQueriesList ?? []).length > 0
-                ? queryTable(snapshot.lostQueriesList, "lost")
-                : "",
+            value: num(top3.queries),
+            label: "búsquedas en el top 3",
+            delta: comparable ? countDelta(top3.queries, top3.prevQueries) : "",
           },
+        ]
+      : []),
+    ...(comparable
+      ? [
+          { value: num(snapshot.newQueries), label: "búsquedas nuevas" },
+          { value: num(snapshot.lostQueries), label: "búsquedas perdidas" },
+        ]
+      : []),
+    ...(snapshot.brand.hasBrand && brandTotal > 0
+      ? [
+          {
+            value: `${Math.round((snapshot.brand.clicks / brandTotal) * 100)} %`,
+            label: "de los clics viene de la marca",
+          },
+        ]
+      : []),
+  ]);
+  const items = [
+    {
+      id: "all",
+      label: snapshot.scope === "sin marca" ? "Más tráfico" : "Todas",
+      count: all.length,
+      html: all.length > 0 ? queriesTable(all, comparable) : "",
+    },
+    ...(snapshot.brand.hasBrand && own.length > 0 && own.length < all.length
+      ? [
+          {
+            id: "own",
+            label: "Sin marca",
+            count: own.length,
+            html: queriesTable(own, comparable),
+          },
+        ]
+      : []),
+    ...(comparable
+      ? [
           {
             id: "up",
             label: "Suben",
@@ -581,17 +840,54 @@ function searchesBlock(report: ReportFull): string {
                 ? changeTable(snapshot.queryLosers)
                 : "",
           },
+          {
+            id: "new",
+            label: "Nuevas",
+            count: snapshot.newQueries,
+            html:
+              (snapshot.newQueriesList ?? []).length > 0
+                ? simpleQueries(snapshot.newQueriesList, false)
+                : "",
+          },
+          {
+            id: "lost",
+            label: "Perdidas",
+            count: snapshot.lostQueries,
+            html:
+              (snapshot.lostQueriesList ?? []).length > 0
+                ? simpleQueries(snapshot.lostQueriesList, true)
+                : "",
+          },
         ]
       : []),
   ];
+  // Reports saved before the full list existed fall back to the top 30.
+  if (all.length === 0 && snapshot.topQueries.length > 0) {
+    items[0] = {
+      id: "all",
+      label: "Más tráfico",
+      count: snapshot.topQueries.length,
+      html: simpleQueries(
+        snapshot.topQueries.map((item) => ({
+          query: item.query,
+          clicks: item.clicks,
+          impressions: item.impressions,
+          position: item.position,
+          prevClicks: 0,
+          prevPosition: null,
+        })),
+        false,
+      ),
+    };
+  }
   const tabs = subTabs("q", items);
   if (!tabs) return "";
   return block(
     report,
     "consultas",
     "Búsquedas que mueven el tráfico",
-    "Las búsquedas de marca se excluyen. «Nuevas» son búsquedas que antes no mostraban la web y «perdidas» las que ya no la muestran. Cada búsqueda abre sus resultados en Google.",
-    `<div class="sheet">${tabs}</div>`,
+    "Cada búsqueda abre sus resultados en Google. Pulsar el título de una columna ordena la lista, y el cuadro de arriba la filtra.",
+    `${summary}<div class="sheet">${tabs}</div>`,
   );
 }
 
@@ -600,26 +896,77 @@ function searchesBlock(report: ReportFull): string {
 function pagesBlock(report: ReportFull): string {
   const { snapshot } = report;
   const comparable = snapshot.period.comparable;
-  const moves = comparable
-    ? `<div class="grid g2"><div class="sheet"><h3>Páginas que suben</h3>${changeTable(snapshot.pageWinners)}</div><div class="sheet"><h3>Páginas que bajan</h3>${changeTable(snapshot.pageLosers)}</div></div>`
-    : "";
-  const rows = snapshot.topPages
-    .map(
-      (page) =>
-        `<tr><td>${pageLink(page.url)}</td><td class="r">${num(page.clicks)}</td>${comparable ? `<td class="r">${num(page.prevClicks)}</td><td class="r">${pctDelta(page.clicks, page.prevClicks) || "—"}</td>` : ""}</tr>`,
-    )
-    .join("");
-  const top =
-    snapshot.topPages.length > 0
-      ? `<div class="sheet" style="margin-top:18px"><h3>Páginas con más clics</h3><div class="tbox"><table class="qt sm"><thead><tr><th>Página</th><th class="r">Clics</th>${comparable ? '<th class="r">Antes</th><th class="r">Variación</th>' : ""}</tr></thead><tbody>${rows}</tbody></table></div></div>`
+  const rows = snapshot.pages ?? [];
+  const topFive = rows.slice(0, 5).reduce((sum, row) => sum + row.clicks, 0);
+  const lead = rows[0];
+  const summary =
+    rows.length > 0 && snapshot.pageClicksTotal > 0
+      ? chips([
+          { value: num(snapshot.pageCount), label: "páginas reciben clics" },
+          {
+            value: `${Math.round((topFive / snapshot.pageClicksTotal) * 100)} %`,
+            label: "de los clics en las 5 primeras",
+          },
+          ...(lead
+            ? [
+                {
+                  value: `${Math.round((lead.clicks / snapshot.pageClicksTotal) * 100)} %`,
+                  label: `en ${pathOf(lead.url)}`,
+                },
+              ]
+            : []),
+        ])
       : "";
-  if (!moves && !top) return "";
+  const legacy =
+    rows.length === 0 && snapshot.topPages.length > 0
+      ? snapshot.topPages.map<PageRow>((page) => ({
+          url: page.url,
+          clicks: page.clicks,
+          prevClicks: page.prevClicks,
+          impressions: 0,
+          prevImpressions: 0,
+          position: null,
+          prevPosition: null,
+        }))
+      : [];
+  const list = rows.length > 0 ? rows : legacy;
+  const tabs = subTabs("pg", [
+    {
+      id: "top",
+      label: "Más clics",
+      count: list.length,
+      html: list.length > 0 ? pagesTable(list, comparable) : "",
+    },
+    ...(comparable
+      ? [
+          {
+            id: "up",
+            label: "Suben",
+            count: snapshot.pageWinners.length,
+            html:
+              snapshot.pageWinners.length > 0
+                ? changeTable(snapshot.pageWinners)
+                : "",
+          },
+          {
+            id: "down",
+            label: "Bajan",
+            count: snapshot.pageLosers.length,
+            html:
+              snapshot.pageLosers.length > 0
+                ? changeTable(snapshot.pageLosers)
+                : "",
+          },
+        ]
+      : []),
+  ]);
+  if (!tabs) return "";
   return block(
     report,
     "origen",
-    "Páginas que explican el movimiento",
-    "Las páginas con mayor variación de clics, con las búsquedas que más pesan en cada una, y las páginas que más tráfico reciben. Cada página se abre en una pestaña nueva.",
-    moves + top,
+    "Páginas que reciben y mueven el tráfico",
+    "Las páginas con más clics y las que más han cambiado, con las búsquedas que explican cada cambio. Cada página se abre en una pestaña nueva.",
+    `${summary}<div class="sheet">${tabs}</div>`,
   );
 }
 
@@ -673,61 +1020,6 @@ function topicsBlock(report: ReportFull): string {
     "Temas con más tráfico orgánico",
     "Las búsquedas se agrupan por tema para identificar dónde está la autoridad del sitio. La barra indica qué parte del tema está en posiciones 4 a 20, la más fácil de subir.",
     `<div class="topics">${cards}</div>`,
-  );
-}
-
-function audienceCard(
-  title: string,
-  lines: SegmentLine[],
-  comparable: boolean,
-): string {
-  if (lines.length === 0) return "";
-  const rows = lines
-    .slice(0, 6)
-    .map((line, index) => {
-      const delta = comparable ? pctDelta(line.clicks, line.prevClicks) : "";
-      return `<div class="arow${index === 0 ? " first" : ""}"><span class="an" title="${esc(line.label)}">${esc(line.label)}</span><span class="ap">${one.format(line.share * 100)} %</span><span class="dl-slot">${delta}</span><div class="ab"><i style="--w:${Math.max(2, line.share * 100).toFixed(1)}%"></i></div></div>`;
-    })
-    .join("");
-  return `<div class="sheet"><h3>${esc(title)}</h3>${rows}</div>`;
-}
-
-function audienceBlock(report: ReportFull): string {
-  const { snapshot } = report;
-  const comparable = snapshot.period.comparable;
-  const total = snapshot.brand.clicks + snapshot.brand.otherClicks;
-  const brandLines: SegmentLine[] =
-    snapshot.brand.hasBrand && total > 0
-      ? [
-          {
-            label: "Búsquedas de marca",
-            clicks: snapshot.brand.clicks,
-            prevClicks: snapshot.brand.prevClicks,
-            impressions: 0,
-            share: snapshot.brand.clicks / total,
-          },
-          {
-            label: "Resto de búsquedas",
-            clicks: snapshot.brand.otherClicks,
-            prevClicks: snapshot.brand.prevOtherClicks,
-            impressions: 0,
-            share: snapshot.brand.otherClicks / total,
-          },
-        ]
-      : [];
-  const blocks = [
-    audienceCard("Dispositivo", snapshot.segments.device, comparable),
-    audienceCard("Tipo de página", snapshot.segments.pageType, comparable),
-    audienceCard("Marca y resto de búsquedas", brandLines, comparable),
-    audienceCard("Intención de búsqueda", snapshot.segments.intent, comparable),
-  ].join("");
-  if (!blocks) return "";
-  return block(
-    report,
-    "reparto",
-    "Perfil del tráfico orgánico",
-    `Porcentaje de los clics que corresponde a cada grupo${comparable ? " y su variación frente al periodo anterior" : ""}.`,
-    `<div class="aud">${blocks}</div>`,
   );
 }
 
@@ -819,9 +1111,174 @@ function healthBlock(report: ReportFull): string {
   return block(
     report,
     "tecnico",
-    "Estado técnico: cobertura del sitemap en Google",
+    "Cobertura del sitemap en Google",
     "Se compara el sitemap con las páginas que Google ha mostrado en los últimos 3 meses.",
     `<div class="sheet"><div class="hlt"><div class="ring"><svg viewBox="0 0 42 42" aria-hidden="true"><circle cx="21" cy="21" r="15.9155" stroke="#ececee"/><circle cx="21" cy="21" r="15.9155" stroke="#1a1a1a" stroke-linecap="round" stroke-dasharray="${(covered * 100).toFixed(1)} ${(100 - covered * 100).toFixed(1)}"/></svg><div class="ct"><b>${Math.round(covered * 100)} %</b><small>con visibilidad</small></div></div><div class="hs">${tile(health.inSitemap, "páginas en el sitemap")}${tile(health.pagesWithImpressions, "páginas con impresiones")}${tile(health.unseen, "sin impresiones todavía")}${tile(health.notInSitemap, "con impresiones fuera del sitemap")}${tile(health.sitemapErrors, "errores de sitemap")}</div></div></div>`,
+  );
+}
+
+const scoreTone = (score: number | null) =>
+  score === null ? "flat" : score >= 85 ? "up" : score >= 55 ? "mid" : "down";
+
+/** A score out of 100 with a small bar; sorts by the number. */
+function scoreCell(score: number | null): Cell {
+  if (score === null) return { h: '<span class="sn">—</span>', v: null };
+  return {
+    h: `<div class="scv"><b class="${scoreTone(score)}">${Math.round(score)}</b><div class="sb"><i style="--w:${Math.max(2, score).toFixed(0)}%"></i></div></div>`,
+    v: score,
+  };
+}
+
+const mean = (values: (number | null)[]): number | null => {
+  const real = values.filter((value): value is number => value !== null);
+  return real.length === 0
+    ? null
+    : real.reduce((sum, value) => sum + value, 0) / real.length;
+};
+
+/** Microaudit on one example page of each page type: how every template of
+ *  the site scores, what fails in several of them and what to fix first. */
+function auditsBlock(report: ReportFull): string {
+  const audits: AuditPage[] = report.snapshot.audits ?? [];
+  if (audits.length === 0) return "";
+  const types = [...new Set(audits.map((audit) => audit.type))];
+  const categories = new Map<number, string>();
+  for (const audit of audits) {
+    for (const category of audit.categories) {
+      categories.set(category.id, category.name);
+    }
+  }
+  const byType = (type: string) =>
+    audits.filter((audit) => audit.type === type);
+  const matrix = dataTable(
+    [
+      { label: "Categoría" },
+      ...types.map((type) => ({ label: type, num: true })),
+    ],
+    [
+      [
+        { h: "<b>Nota global</b>", v: "" },
+        ...types.map((type) =>
+          scoreCell(mean(byType(type).map((a) => a.score))),
+        ),
+      ],
+      ...[...categories.entries()]
+        .sort((a, b) => a[0] - b[0])
+        .map(([id, name]) => [
+          { h: esc(name), v: name },
+          ...types.map((type) =>
+            scoreCell(
+              mean(
+                byType(type).map(
+                  (audit) =>
+                    audit.categories.find((category) => category.id === id)
+                      ?.score ?? null,
+                ),
+              ),
+            ),
+          ),
+        ]),
+    ],
+  );
+
+  type Agg = {
+    kind: "fail" | "warn";
+    title: string;
+    category: string;
+    points: number;
+    detail: string;
+    pages: Set<string>;
+  };
+  const issues = new Map<string, Agg>();
+  for (const audit of audits) {
+    for (const issue of audit.issues) {
+      const found = issues.get(issue.title);
+      if (found) {
+        found.pages.add(audit.url);
+        found.points = Math.max(found.points, issue.points ?? 0);
+        if (issue.kind === "fail") found.kind = "fail";
+      } else {
+        issues.set(issue.title, {
+          kind: issue.kind,
+          title: issue.title,
+          category: issue.category,
+          points: issue.points ?? 0,
+          detail: issue.detail,
+          pages: new Set([audit.url]),
+        });
+      }
+    }
+  }
+  const ranked = [...issues.values()].sort(
+    (a, b) =>
+      Number(b.kind === "fail") - Number(a.kind === "fail") ||
+      b.pages.size - a.pages.size ||
+      b.points - a.points,
+  );
+  const fixes = dataTable(
+    [
+      { label: "Qué corregir" },
+      { label: "Categoría" },
+      { label: "Páginas", num: true },
+      { label: "Impacto", num: true },
+      { label: "Prioridad" },
+    ],
+    ranked.slice(0, 14).map((item) => [
+      {
+        h: `<b>${esc(item.title)}</b><small>${esc(item.detail)}</small>`,
+        v: item.title,
+        cls: "pg",
+      },
+      { h: esc(item.category), v: item.category },
+      {
+        h: `${item.pages.size} de ${audits.length}`,
+        v: item.pages.size,
+      },
+      {
+        h: item.points > 0 ? `+${one.format(item.points)} pts` : "—",
+        v: item.points,
+      },
+      {
+        h:
+          item.kind === "fail"
+            ? '<span class="dl down">A corregir</span>'
+            : '<span class="dl flat">A mejorar</span>',
+        v: item.kind === "fail" ? 0 : 1,
+      },
+    ]),
+  );
+
+  const cards = audits
+    .map((audit) => {
+      const top = audit.issues.slice(0, 3);
+      return `<article class="acard"><div class="at"><span class="atype">${esc(audit.type)}</span><b class="asc ${scoreTone(audit.score)}">${audit.score === null ? "—" : Math.round(audit.score)}</b></div><div class="au">${pageLink(audit.url)}</div>${audit.rating ? `<div class="ar">${esc(audit.rating)}</div>` : ""}<ul class="ai">${top
+        .map(
+          (issue) =>
+            `<li><span class="k ${issue.kind}">${issue.kind === "fail" ? "Corregir" : "Mejorar"}</span>${esc(issue.title)}<small>${esc(issue.category)}${issue.points ? ` · +${one.format(issue.points)} pts` : ""}</small></li>`,
+        )
+        .join("")}</ul></article>`;
+    })
+    .join("");
+
+  const scores = audits.map((audit) => audit.score);
+  const average = mean(scores);
+  const fails = ranked.filter((item) => item.kind === "fail").length;
+  const warns = ranked.length - fails;
+  const summary = chips([
+    {
+      value: average === null ? "—" : String(Math.round(average)),
+      label: "nota media sobre 100",
+    },
+    { value: num(audits.length), label: "páginas auditadas" },
+    { value: num(fails), label: "problemas a corregir" },
+    { value: num(warns), label: "aspectos a mejorar" },
+  ]);
+  return block(
+    report,
+    "auditoria",
+    "Auditoría técnica de las páginas tipo",
+    `Microaudit ha revisado ${num(audits.length)} ${audits.length === 1 ? "página" : "páginas"} de ejemplo (${types.map(esc).join(", ")}) con más de 90 comprobaciones de SEO y de SEO para asistentes de IA. Una categoría con algún fallo queda limitada a 35 sobre 100 hasta corregirlo.`,
+    `${summary}<div class="sheet"><h3>Nota por categoría y tipo de página</h3>${matrix}</div><div class="sheet" style="margin-top:18px"><h3>Qué corregir primero</h3>${fixes}</div><div class="acards">${cards}</div>`,
   );
 }
 
@@ -877,6 +1334,8 @@ function suggestedSteps(report: ReportFull): string[] {
   return steps.slice(0, 4);
 }
 
+const CONTACT_URL = "https://carlosortega.page/contacto/";
+
 function closing(report: ReportFull): string {
   const typed = report.notes.nextSteps
     .split("\n")
@@ -888,8 +1347,8 @@ function closing(report: ReportFull): string {
 <div class="endgrid"><div><div class="kick">Próximos pasos</div><h2>Hoja de ruta para el próximo periodo</h2>
 <ol class="steps">${steps.map((step) => `<li>${esc(step)}</li>`).join("")}</ol>
 ${note ? `<div class="note" style="background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.16);color:#f6f6f6"><b style="color:#ffb3c0">Nota de Carlos</b>${esc(note)}</div>` : ""}</div>
-<div class="endcta"><a class="big-cta" href="https://carlosortega.page" target="_blank" rel="noopener noreferrer">Contactar con Carlos Ortega</a></div></div>
-<div class="foot"><span class="fm">${LOGO_MARK_LIGHT}</span><span>Informe generado el ${day(report.snapshot.generatedAt.slice(0, 10))} con datos de Google Search Console · carlosortega.page</span></div>
+<div class="endcta"><a class="big-cta" href="${CONTACT_URL}" target="_blank" rel="noopener noreferrer">Contactar con Carlos Ortega</a></div></div>
+<div class="foot"><span class="fm">${LOGO_MARK_LIGHT}</span><span>Informe generado el ${day(report.snapshot.generatedAt.slice(0, 10))} con datos de Google Search Console · <a href="${CONTACT_URL}" target="_blank" rel="noopener noreferrer">carlosortega.page</a></span></div>
 </div></footer>`;
 }
 
@@ -898,6 +1357,17 @@ ${note ? `<div class="note" style="background:rgba(255,255,255,.08);border-color
 export type RenderMode = "public" | "preview";
 
 type Panel = { id: string; label: string; html: string; count?: number };
+
+const TAB_ORDER = [
+  "trafico",
+  "posiciones",
+  "busquedas",
+  "paginas",
+  "temas",
+  "oportunidades",
+  "tecnico",
+  "analisis",
+];
 
 export function renderReportDocument(
   report: ReportFull,
@@ -922,6 +1392,8 @@ export function renderReportDocument(
       ? `<div class="cols${filled.length}">${filled.join("")}</div>`
       : filled.join("");
   };
+  const lead = (tab: string) =>
+    PANEL_NOTE[tab] ? analysisCard(report, PANEL_NOTE[tab]) : "";
 
   const panels: Panel[] = [
     {
@@ -933,78 +1405,64 @@ export function renderReportDocument(
       id: "trafico",
       label: "Tráfico",
       html:
+        lead("trafico") +
         show("evolucion", () => trendBlock(report)) +
-        columns(
-          show("origen", () => originBlock(report)),
-          show("semana", () => weekBlock(report)),
-        ),
+        show("reparto", () => trafficMixBlock(report)) +
+        show("semana", () => weekBlock(report)),
     },
     {
       id: "posiciones",
       label: "Posicionamiento",
-      html: show("posiciones", () => positionsBlock(report)),
+      html:
+        lead("posiciones") + show("posiciones", () => positionsBlock(report)),
     },
     {
       id: "busquedas",
       label: "Búsquedas",
-      html: show("consultas", () => searchesBlock(report)),
+      html: lead("busquedas") + show("consultas", () => searchesBlock(report)),
     },
     {
       id: "paginas",
       label: "Páginas",
       html:
+        lead("paginas") +
         show("origen", () => pagesBlock(report)) +
         show("diagnostico", () => diagnosisBlock(report)),
     },
     {
       id: "temas",
-      label: "Temas y audiencia",
-      html:
-        show("temas", () => topicsBlock(report)) +
-        show("reparto", () => audienceBlock(report)),
+      label: "Temas",
+      html: lead("temas") + show("temas", () => topicsBlock(report)),
     },
     {
       id: "oportunidades",
       label: "Oportunidades",
       html:
+        lead("oportunidades") +
         show("oportunidades", () => opportunitiesBlock(report)) +
         show("titulos", () => titlesBlock(report)),
     },
     {
       id: "tecnico",
       label: "Técnico",
-      html: columns(
-        show("tecnico", () => healthBlock(report)),
-        show("discover", () => discoverBlock(report)),
-      ),
+      html:
+        lead("tecnico") +
+        show("auditoria", () => auditsBlock(report)) +
+        columns(
+          show("tecnico", () => healthBlock(report)),
+          show("discover", () => discoverBlock(report)),
+        ),
     },
   ]
-    .filter((panel) => panel.html.trim() !== "")
-    .sort(
-      (a, b) =>
-        [
-          "trafico",
-          "posiciones",
-          "busquedas",
-          "paginas",
-          "temas",
-          "oportunidades",
-          "tecnico",
-          "analisis",
-        ].indexOf(a.id) -
-        [
-          "trafico",
-          "posiciones",
-          "busquedas",
-          "paginas",
-          "temas",
-          "oportunidades",
-          "tecnico",
-          "analisis",
-        ].indexOf(b.id),
-    );
+    // A panel with only its analysis and no data behind it is not shown.
+    .filter(
+      (panel) =>
+        panel.html
+          .replace(/<section class="an">[\s\S]*?<\/section>/, "")
+          .trim() !== "",
+    )
+    .sort((a, b) => TAB_ORDER.indexOf(a.id) - TAB_ORDER.indexOf(b.id));
 
-  const tabIds = new Set(panels.map((panel) => panel.id));
   const tabButtons = panels
     .map(
       (panel, index) =>
@@ -1029,6 +1487,7 @@ export function renderReportDocument(
       color: KIND_COLOR[update.kind],
     })),
   };
+  const clientName = report.clientName?.trim() || host;
   const title = `${report.title}${report.clientName ? ` · ${report.clientName}` : ""}`;
   return `<!doctype html>
 <html lang="es"><head><meta charset="utf-8">
@@ -1036,15 +1495,18 @@ export function renderReportDocument(
 <meta name="robots" content="noindex,nofollow">
 <meta name="theme-color" content="#1a1a1a">
 <title>${esc(title)}</title>
-<link rel="icon" type="image/svg+xml" href="${FAVICON}">
+<link rel="icon" type="image/png" href="${FAVICON_POSITIVE}">
 <script>document.documentElement.className="js";</script>
 <style>${REPORT_CSS}</style></head>
 <body>
-<div class="top" id="top"><div class="wrap"><span class="iso">${LOGO_MARK_LIGHT}</span><span class="ttl">${esc(report.clientName?.trim() || host)} · Informe SEO</span><button class="cta" type="button" onclick="window.print()">${mode === "preview" ? "Vista previa · " : ""}Imprimir / PDF</button></div></div>
+<div class="top" id="top"><div class="wrap"><span class="iso">${LOGO_MARK_LIGHT}</span><span class="ttl">${esc(clientName)} · Informe SEO</span><span class="per">${esc(rangeShort(snapshot.range.startDate, snapshot.range.endDate))}</span><button class="cta" type="button" onclick="window.print()">${mode === "preview" ? "Vista previa · " : ""}Imprimir / PDF</button></div></div>
+<div class="pfoot" aria-hidden="true"><span>${esc(clientName)} · Informe SEO · ${esc(rangeShort(snapshot.range.startDate, snapshot.range.endDate))}</span><span>carlosortega.page</span></div>
 ${hero(report, host)}
-${executiveSummary(report, tabIds)}
+<div class="pgwrap"><div class="pghead"></div><div class="pgbody">
+${executiveSummary(report)}
 <div class="tabsbar" id="tabs"><div class="wrap"><div class="tabs2" role="tablist">${tabButtons}</div></div></div>
 <main class="wrap panels">${panelHtml}</main>
+</div><div class="pgfoot"></div></div>
 ${hidden.has("proximos") ? "" : closing(report)}
 <button class="totop" id="totop" type="button" aria-label="Volver arriba"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
 <script type="application/json" id="report-data">${jsonForScript(data)}</script>

@@ -124,7 +124,7 @@ export const REPORT_SCRIPT = `
     each(tabPanels,function(p){p.className="panel"+(p.getAttribute("data-panel")===id?" on":"");});
     if(id==="trafico")draw();
     try{history.replaceState(null,"","#"+id);}catch(e){}
-    if(scroll){var bar=document.getElementById("tabs");if(bar)window.scrollTo({top:bar.getBoundingClientRect().top+window.scrollY-56,behavior:reduce?"auto":"smooth"});}
+    if(scroll){var pan=document.querySelector(".panels");if(pan)window.scrollTo({top:Math.max(0,pan.getBoundingClientRect().top+window.scrollY-150),behavior:reduce?"auto":"smooth"});}
   }
   each(tabBtns,function(b){b.addEventListener("click",function(){openTab(b.getAttribute("data-tab"),true);});});
   each(document.querySelectorAll("[data-go]"),function(a){a.addEventListener("click",function(ev){ev.preventDefault();openTab(a.getAttribute("data-go"),true);});});
@@ -138,6 +138,53 @@ export const REPORT_SCRIPT = `
   var first=window.location.hash.slice(1);
   if(first){var exists=false;each(tabBtns,function(b){if(b.getAttribute("data-tab")===first)exists=true;});if(exists)openTab(first,false);}
 
+  /* ---------- sortable and filterable tables ---------- */
+  function cellValue(row,idx,numeric){
+    var c=row.cells[idx];if(!c)return null;
+    var raw=c.getAttribute("data-v");
+    if(raw===null||raw==="")return null;
+    if(numeric){var n=parseFloat(raw);return isNaN(n)?null:n;}
+    return raw.toLowerCase();
+  }
+  function sortTable(table,idx,numeric,dir){
+    var body=table.tBodies[0];var rows=Array.prototype.slice.call(body.rows);
+    rows.sort(function(a,b){
+      var x=cellValue(a,idx,numeric),y=cellValue(b,idx,numeric);
+      if(x===null&&y===null)return 0;
+      if(x===null)return 1;
+      if(y===null)return -1;
+      var r=numeric?(x-y):String(x).localeCompare(String(y),"es",{sensitivity:"base"});
+      return dir==="asc"?r:-r;
+    });
+    rows.forEach(function(r,i){r.className=i>=15?"xr":"";body.appendChild(r);});
+  }
+  each(document.querySelectorAll("table.sortable"),function(table){
+    var heads=table.tHead.rows[0].cells;
+    each(heads,function(h,idx){
+      var numeric=h.getAttribute("data-t")==="num";
+      h.setAttribute("tabindex","0");h.setAttribute("role","button");
+      function go(){
+        var dir=h.classList.contains("asc")?"desc":(h.classList.contains("desc")?"asc":(h.getAttribute("data-first")==="asc"?"asc":(numeric?"desc":"asc")));
+        each(heads,function(o){o.classList.remove("asc");o.classList.remove("desc");});
+        h.classList.add(dir);sortTable(table,idx,numeric,dir);
+      }
+      h.addEventListener("click",go);
+      h.addEventListener("keydown",function(ev){if(ev.key==="Enter"||ev.key===" "){ev.preventDefault();go();}});
+    });
+  });
+  each(document.querySelectorAll(".flt"),function(input){
+    input.addEventListener("input",function(){
+      var wrap=input.closest(".tw");if(!wrap)return;
+      var q=input.value.trim().toLowerCase();var shown=0;
+      each(wrap.querySelectorAll("tbody tr"),function(r){
+        var hit=!q||r.textContent.toLowerCase().indexOf(q)>-1;
+        r.style.display=hit?"":"none";if(hit)shown++;
+      });
+      var cnt=wrap.querySelector(".cnt");
+      if(cnt)cnt.textContent=q?grp(shown)+" de "+grp(parseInt(cnt.getAttribute("data-total"),10))+" filas":grp(shown)+" filas";
+    });
+  });
+
   /* ---------- top bar and menu ---------- */
   var bar=document.getElementById("top");
   var totop=document.getElementById("totop");
@@ -147,6 +194,13 @@ export const REPORT_SCRIPT = `
     if(totop)totop.className=window.scrollY>700?"totop show":"totop";
   }
   window.addEventListener("scroll",onScroll,{passive:true});onScroll();
-  window.addEventListener("beforeprint",function(){each(document.querySelectorAll(".rv"),function(n){n.classList.add("in");});draw();});
+  window.addEventListener("beforeprint",function(){
+    each(document.querySelectorAll(".rv"),function(n){n.classList.add("in");});
+    each(document.querySelectorAll("[data-count]"),function(n){
+      var t=parseFloat(n.getAttribute("data-count"));var k=n.getAttribute("data-kind");
+      if(!isNaN(t))n.textContent=k==="pct"?dec(t)+" %":(k==="dec"?dec(t):grp(t));
+    });
+    draw();
+  });
 })();
 `;

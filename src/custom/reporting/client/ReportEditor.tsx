@@ -22,6 +22,7 @@ import { Label } from "@/client/components/ui/label";
 import { Skeleton } from "@/client/components/ui/skeleton";
 import { Switch } from "@/client/components/ui/switch";
 import { Textarea } from "@/client/components/ui/textarea";
+import { AuditCard } from "@/custom/reporting/client/AuditCard";
 import { publicUrl } from "@/custom/reporting/client/ReportingPage";
 import {
   REPORT_SECTIONS,
@@ -264,7 +265,7 @@ function Editor({
             }
             title={
               aiStatus.data?.available
-                ? `Redacta el mensaje y las notas con IA (${aiStatus.data.model}). Es un borrador: lo revisas antes de guardar.`
+                ? `Redacta el resumen y el análisis de cada pestaña con IA (${aiStatus.data.model}). Es un borrador: lo revisas antes de guardar.`
                 : "Para activarlo hay que añadir la clave de Anthropic (ANTHROPIC_API_KEY)."
             }
             onClick={() => draft.mutate()}
@@ -413,23 +414,32 @@ function Editor({
                 />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="ed-message">Mensaje para el cliente</Label>
+                <Label htmlFor="ed-message">Resumen ejecutivo</Label>
                 <Textarea
                   id="ed-message"
-                  rows={4}
+                  rows={8}
                   value={notes.message}
                   onChange={(event) => change({ message: event.target.value })}
-                  placeholder="Un saludo y lo más importante del mes, con tus palabras. Sale destacado al principio."
+                  placeholder="Dos párrafos: cómo ha ido el periodo y por qué, y qué hay que hacer ahora. Sale al principio del informe. Si lo dejas vacío, el informe no lleva resumen."
                 />
               </div>
             </CardContent>
           </Card>
 
+          <AuditCard
+            projectId={projectId}
+            reportId={report.id}
+            audits={report.snapshot.audits}
+            onChanged={() => void refetch()}
+          />
+
           <Card>
             <CardHeader>
               <CardTitle>Secciones y notas</CardTitle>
               <p className="text-xs text-muted-foreground">
-                Activa o quita secciones y añade una nota tuya bajo cada una.
+                Activa o quita secciones. El texto de las pestañas (Tráfico,
+                Posicionamiento, Búsquedas, Páginas, Temas, Oportunidades y
+                Técnico) es el análisis que se muestra al abrir cada una.
               </p>
             </CardHeader>
             <CardContent className="space-y-4">

@@ -57,6 +57,59 @@ export type QueryRow = {
   prevPosition: number | null;
 };
 
+/** A page with the figures of both periods, to list and sort it. */
+export type PageRow = {
+  url: string;
+  clicks: number;
+  prevClicks: number;
+  impressions: number;
+  prevImpressions: number;
+  position: number | null;
+  prevPosition: number | null;
+};
+
+/** A search with the figures of both periods, to list and sort it. */
+export type QueryTableRow = {
+  query: string;
+  brand: boolean;
+  clicks: number;
+  prevClicks: number;
+  impressions: number;
+  prevImpressions: number;
+  position: number | null;
+  prevPosition: number | null;
+};
+
+/** The score of one category of a Microaudit audit. */
+export type AuditCategory = {
+  id: number;
+  name: string;
+  score: number | null;
+  fails: number;
+  warns: number;
+};
+
+/** One thing Microaudit says to fix, with the points it would add. */
+export type AuditIssue = {
+  kind: "fail" | "warn";
+  title: string;
+  category: string;
+  points: number | null;
+  detail: string;
+};
+
+/** Microaudit's audit of one example page of a page type (home, category,
+ *  product, blog…). */
+export type AuditPage = {
+  type: string;
+  url: string;
+  score: number | null;
+  rating: string;
+  checkedAt: string;
+  categories: AuditCategory[];
+  issues: AuditIssue[];
+};
+
 export type BandLine = {
   label: string;
   queries: number;
@@ -131,6 +184,16 @@ export type ReportSnapshot = {
   /** The pages with most clicks (all queries) and the clicks of every page. */
   topPages: PageLine[];
   pageClicksTotal: number;
+  /** The 60 pages with most clicks, with the previous period's figures. */
+  pages: PageRow[];
+  /** How many different pages received clicks. */
+  pageCount: number;
+  /** The 120 searches with most clicks (brand included, flagged). */
+  queryRows: QueryTableRow[];
+  /** How many different searches showed the site. */
+  queryCount: number;
+  /** Microaudit audits of the example pages of each page type. */
+  audits: AuditPage[];
   pageWinners: ChangeLine[];
   pageLosers: ChangeLine[];
   queryWinners: ChangeLine[];
@@ -228,18 +291,19 @@ export const EMPTY_NOTES: ReportNotes = {
 
 /** The sections a report can show, in order. */
 export const REPORT_SECTIONS = [
-  { id: "hallazgos", label: "Resumen ejecutivo (conclusiones)" },
+  { id: "hallazgos", label: "Conclusiones detalladas" },
   { id: "evolucion", label: "Evolución y actualizaciones de Google" },
-  { id: "origen", label: "Origen del cambio" },
+  { id: "origen", label: "Páginas" },
   { id: "posiciones", label: "Posicionamiento" },
   { id: "temas", label: "Temas" },
-  { id: "consultas", label: "Búsquedas que más aportan" },
-  { id: "reparto", label: "Perfil del tráfico" },
+  { id: "consultas", label: "Búsquedas" },
+  { id: "reparto", label: "De dónde vienen los clics" },
   { id: "semana", label: "Distribución semanal" },
   { id: "oportunidades", label: "Oportunidades de crecimiento" },
   { id: "titulos", label: "Propuestas de títulos (IA)" },
   { id: "diagnostico", label: "Diagnóstico de páginas (IA)" },
-  { id: "tecnico", label: "Estado técnico (sitemap e indexación)" },
+  { id: "auditoria", label: "Auditoría técnica de páginas tipo (Microaudit)" },
+  { id: "tecnico", label: "Cobertura del sitemap" },
   { id: "discover", label: "Google Discover" },
   { id: "proximos", label: "Próximos pasos" },
 ] as const;

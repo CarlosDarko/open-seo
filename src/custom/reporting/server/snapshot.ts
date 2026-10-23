@@ -5,6 +5,7 @@ import { GscService } from "@/server/features/gsc/services/GscService";
 import { updatesBetween } from "@/custom/radar/googleUpdates";
 import {
   canonicalPageKey,
+  compareDimension,
   isBrandQuery,
   mergePageVariants,
   normalizeBrandTerms,
@@ -19,8 +20,10 @@ import type {
   BandMove,
   ChangeLine,
   PageLine,
+  PageRow,
   QueryMove,
   QueryRow,
+  QueryTableRow,
   ReportSnapshot,
   SegmentLine,
 } from "@/custom/reporting/types";
@@ -106,7 +109,7 @@ export async function buildReportSnapshot(
       ? normalizeBrandTerms(report.brand.terms)
       : report.brand.terms;
   const comparable = report.period.comparable;
-  const [queries, pages, prevPages] = await Promise.all([
+  const [queries, pages, prevPages, prevQueries] = await Promise.all([
     GscService.getPerformance({
       projectId,
       startDate: report.range.startDate,
@@ -127,6 +130,15 @@ export async function buildReportSnapshot(
           startDate: report.period.prevStartDate,
           endDate: report.period.prevEndDate,
           dimensions: ["page"],
+          rowLimit: 1000,
+        })
+      : Promise.resolve(null),
+    comparable
+      ? GscService.getPerformance({
+          projectId,
+          startDate: report.period.prevStartDate,
+          endDate: report.period.prevEndDate,
+          dimensions: ["query"],
           rowLimit: 1000,
         })
       : Promise.resolve(null),
@@ -192,6 +204,52 @@ export async function buildReportSnapshot(
         : [],
     );
 
+  // Pages and searches with the figures of both periods, ready to sort.
+  const keyed = (rows: typeof pageRows) =>
+    rows.flatMap((row) =>
+      row.keys?.[0] ? [{ ...row, keys: [canonicalPageKey(row.keys[0])] }] : [],
+    );
+  const urlOf = new Map(
+    pageRows.flatMap((row) =>
+      row.keys?.[0]
+        ? [[canonicalPageKey(row.keys[0]), row.keys[0]] as const]
+        : [],
+    ),
+  );
+  const pagesTable: PageRow[] = compareDimension(
+    keyed(pageRows),
+    keyed(mergePageVariants(prevPages?.rows ?? [], 0)),
+  )
+    .filter((row) => row.status !== "lost")
+    .sort((a, b) => b.clicks - a.clicks || b.impressions - a.impressions)
+    .slice(0, 60)
+    .map((row) => ({
+      url: urlOf.get(row.key) ?? row.key,
+      clicks: row.clicks,
+      prevClicks: row.prevClicks,
+      impressions: row.impressions,
+      prevImpressions: row.prevImpressions,
+      position: row.position,
+      prevPosition: row.prevPosition,
+    }));
+  const queryTable: QueryTableRow[] = compareDimension(
+    queries.rows,
+    prevQueries?.rows ?? [],
+  )
+    .filter((row) => row.status !== "lost")
+    .sort((a, b) => b.clicks - a.clicks || b.impressions - a.impressions)
+    .slice(0, 120)
+    .map((row) => ({
+      query: row.key,
+      brand: isBrandQuery(row.key, tokens),
+      clicks: row.clicks,
+      prevClicks: row.prevClicks,
+      impressions: row.impressions,
+      prevImpressions: row.prevImpressions,
+      position: row.position,
+      prevPosition: row.prevPosition,
+    }));
+
   const extras = await Promise.all([
     buildTopicsReport(projectId, {
       ...input,
@@ -241,6 +299,11 @@ export async function buildReportSnapshot(
       topQueries,
       topPages,
       pageClicksTotal,
+      pages: pagesTable,
+      pageCount: pageRows.filter((row) => row.clicks > 0).length,
+      queryRows: queryTable,
+      queryCount: queries.rows.length,
+      audits: [],
       pageWinners: report.pageChanges.winners.slice(0, 10).map(changeLine),
       pageLosers: report.pageChanges.losers.slice(0, 10).map(changeLine),
       queryWinners: report.queryChanges.winners.slice(0, 10).map(changeLine),

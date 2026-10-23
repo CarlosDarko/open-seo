@@ -12,6 +12,8 @@ import {
   buildInsights,
   pathOf,
   silverLining,
+  updateImpacts,
+  weekdayStats,
 } from "@/custom/reporting/insights";
 import { buildVerdict } from "@/custom/reporting/narrative";
 import { addAiCost } from "@/custom/reporting/server/reportingDb";
@@ -173,18 +175,62 @@ async function businessContext(projectId: string): Promise<string> {
   }
 }
 
-const STYLE = `Estilo obligatorio: castellano claro, sencillo y profesional, propio de un informe para un cliente no técnico. NO tutees al lector y no uses "tú", "tu", "tus", "te": el sujeto es la web, el sitio, el proyecto o las páginas (por ejemplo "la web gana posiciones", "las páginas principales concentran el 60 % de los clics"). Si usas un término técnico, explícalo en pocas palabras. Sé honesto con los datos pero constructivo: si algo va mal, dilo con claridad y explica por qué es recuperable. Nunca inventes cifras, causas ni contenido que no se te haya dado; si no hay base suficiente para afirmar algo, usa un tono prudente ("conviene comprobar", "posiblemente").`;
+const STYLE = `Estilo obligatorio: castellano claro, sencillo y profesional, propio de un informe para un cliente no técnico. NO tutees al lector y no uses "tú", "tu", "tus", "te": el sujeto es la web, el sitio, el proyecto o las páginas (por ejemplo "la web gana posiciones", "las páginas principales concentran el 60 % de los clics"). Si usas un término técnico, explícalo en pocas palabras. Sé honesto con los datos pero constructivo: si algo va mal, dilo con claridad y explica por qué es recuperable. No escribas nunca etiquetas ni frases como "en positivo" o "el lado bueno": el cliente no debe notar ninguna instrucción interna, solo un análisis serio y equilibrado. Nunca inventes cifras, causas ni contenido que no se te haya dado; si no hay base suficiente para afirmar algo, usa un tono prudente ("conviene comprobar", "posiblemente").`;
 
 // ------------------------------------------------------------- writing
 
-const WRITE_SYSTEM = `Eres Carlos Ortega, consultor SEO. Redactas textos para el informe que se entrega a un cliente. ${STYLE} El mensaje inicial puede usar la primera persona del plural ("hemos revisado", "recomendamos"). Relaciona los datos con el negocio del cliente cuando se te dé su contexto. Responde SOLO con un objeto JSON con esta forma exacta:
-{"message": "mensaje de presentación del informe, 3 a 5 frases",
- "sectionNotes": {"hallazgos": "...", "evolucion": "...", "origen": "...", "posiciones": "...", "temas": "...", "oportunidades": "..."},
- "nextSteps": "3 a 4 próximos pasos concretos, uno por línea, sin numerar"}
-Cada nota de sección tiene 1 o 2 frases que ayudan a interpretar esa sección; si no hay nada útil que añadir, déjala como cadena vacía.`;
+const WRITE_SYSTEM = `Eres Carlos Ortega, consultor SEO con muchos años de experiencia. Redactas los textos de análisis de un informe que se entrega a un cliente. ${STYLE}
+Tu trabajo es ARGUMENTAR, no describir: el cliente ya ve las tablas y las gráficas, lo que necesita de ti es entender qué ha pasado, por qué y qué hacer. En cada texto:
+1. Di qué ha ocurrido con las cifras exactas de los datos (nunca redondees ni inventes).
+2. Explica la causa cruzando fuentes: por ejemplo, una página que cae porque las búsquedas que la sostienen han perdido posiciones, un dispositivo que arrastra el total, el efecto de una actualización de Google en las fechas en que coincidió, una marca que crece mientras el resto se estanca. Si los datos no permiten afirmar una causa, dilo y propón cómo comprobarla.
+3. Cierra con lo que implica para el negocio o con la acción concreta que recomiendas.
+Cada sección debe aportar información NUEVA: no repitas en una sección las cifras ya dadas en el resumen o en otra sección, salvo que sean imprescindibles para el razonamiento. Nombra páginas y búsquedas concretas de los datos. Nada de frases hechas ("es importante", "conviene seguir trabajando") ni consejos genéricos. Párrafos cortos y claros.
+Responde SOLO con un objeto JSON con esta forma exacta:
+{"message": "RESUMEN EJECUTIVO: dos párrafos separados por una línea en blanco, de 120 a 180 palabras en total. El primero responde a «¿cómo ha ido el periodo y por qué?» con las dos o tres cifras y causas que de verdad lo explican; el segundo, a «¿qué hay que hacer ahora?» con las prioridades. Puede usar la primera persona del plural.",
+ "sectionNotes": {
+   "evolucion": "Análisis de la evolución del tráfico y de las actualizaciones de Google: 70 a 120 palabras.",
+   "reparto": "Análisis de dónde vienen los clics (tipo de página, dispositivo, marca frente al resto, intención): 60 a 100 palabras. Si no aporta nada nuevo, cadena vacía.",
+   "posiciones": "Análisis de cómo se distribuyen las búsquedas por tramo de posición y qué cambia entre periodos: 60 a 100 palabras.",
+   "consultas": "Análisis de las búsquedas que más mueven el tráfico: cuáles sostienen el sitio, cuáles caen y por qué: 70 a 120 palabras.",
+   "origen": "Análisis de las páginas: qué explica las que suben y las que bajan, y qué hacer con ellas: 70 a 120 palabras.",
+   "temas": "Análisis de los temas con más tráfico y dónde hay margen: 50 a 90 palabras.",
+   "oportunidades": "Análisis de qué oportunidades merecen priorizarse y por qué: 60 a 100 palabras.",
+   "tecnico": "Análisis del estado técnico (sitemap, indexación y, si hay, la auditoría de las páginas tipo): 50 a 100 palabras."
+ },
+ "nextSteps": "4 a 5 próximos pasos concretos y priorizados, uno por línea, sin numerar, cada uno con el motivo entre paréntesis"}
+Si una sección no tiene datos suficientes, déjala como cadena vacía.`;
 
 function brief(report: ReportFull, business: string) {
   const { snapshot } = report;
+  const lines = (
+    items: {
+      label: string;
+      clicks: number;
+      prevClicks: number;
+      share: number;
+    }[],
+  ) =>
+    items.slice(0, 6).map((item) => ({
+      grupo: item.label,
+      clics: item.clicks,
+      clicsAntes: item.prevClicks,
+      porcentajeDelTotal: Math.round(item.share * 1000) / 10,
+    }));
+  const move = (row: {
+    key: string;
+    clicks: number;
+    prevClicks: number;
+    position: number | null;
+    prevPosition: number | null;
+    queries?: { query: string; clicksDelta: number }[];
+  }) => ({
+    clave: row.key,
+    clics: row.clicks,
+    clicsAntes: row.prevClicks,
+    posicion: row.position,
+    posicionAntes: row.prevPosition,
+    busquedasQueExplican: row.queries?.slice(0, 3),
+  });
   return {
     cliente: report.clientName,
     contexto_del_negocio: business || undefined,
@@ -198,20 +244,90 @@ function brief(report: ReportFull, business: string) {
     totales: snapshot.totals,
     totalesAnteriores: snapshot.prevTotals,
     veredicto: buildVerdict(snapshot),
-    lo_mas_positivo: silverLining(snapshot),
-    hallazgos: buildInsights(snapshot)
-      .slice(0, 9)
-      .map((item) => ({
-        titulo: item.title,
-        detalle: item.body,
-        lectura_positiva: item.upside,
+    datos_favorables: silverLining(snapshot),
+    reparto_de_clics: {
+      tipoDePagina: lines(snapshot.segments.pageType),
+      dispositivo: lines(snapshot.segments.device),
+      intencion: lines(snapshot.segments.intent),
+      marca: snapshot.brand.hasBrand ? snapshot.brand : undefined,
+    },
+    tramos_de_posicion: snapshot.bands.map((band) => ({
+      tramo: band.label,
+      busquedas: band.queries,
+      busquedasAntes: band.prevQueries,
+      clics: band.clicks,
+      clicsAntes: band.prevClicks,
+      entranEnElTramo: band.enteredCount,
+      salenDelTramo: band.leftCount,
+    })),
+    busquedas_principales: (snapshot.queryRows ?? [])
+      .slice(0, 15)
+      .map((row) => ({
+        busqueda: row.query,
+        esMarca: row.brand,
+        clics: row.clicks,
+        clicsAntes: row.prevClicks,
+        impresiones: row.impressions,
+        posicion: row.position,
+        posicionAntes: row.prevPosition,
       })),
-    temas: snapshot.topics.slice(0, 5).map((topic) => ({
+    busquedas_que_suben: snapshot.queryWinners.slice(0, 5).map(move),
+    busquedas_que_bajan: snapshot.queryLosers.slice(0, 5).map(move),
+    busquedas_nuevas: snapshot.newQueries,
+    busquedas_perdidas: snapshot.lostQueries,
+    paginas_principales: (snapshot.pages ?? []).slice(0, 10).map((row) => ({
+      pagina: pathOf(row.url),
+      clics: row.clicks,
+      clicsAntes: row.prevClicks,
+      posicion: row.position,
+      posicionAntes: row.prevPosition,
+    })),
+    paginas_que_suben: snapshot.pageWinners.slice(0, 5).map(move),
+    paginas_que_bajan: snapshot.pageLosers.slice(0, 5).map(move),
+    actualizaciones_de_google: updateImpacts(snapshot).map((item) => ({
+      nombre: item.update.label,
+      lectura: item.verdict,
+    })),
+    dias_de_la_semana: weekdayStats(snapshot.daily).map((item) => ({
+      dia: item.label,
+      clicsMedios: Math.round(item.average),
+    })),
+    temas: snapshot.topics.slice(0, 6).map((topic) => ({
       tema: topic.label,
       clics: topic.clicks,
       clicsAntes: topic.prevClicks,
+      posicionMedia: topic.position,
     })),
-    cambiosDeGoogle: snapshot.updates.map((update) => update.label),
+    oportunidades: snapshot.opportunities.slice(0, 6).map((item) => ({
+      busqueda: item.query,
+      tipo: item.kind,
+      posicion: item.position,
+      impresiones: item.impressions,
+      clicsPosibles: item.potentialClicks,
+    })),
+    sitemap_y_cobertura: snapshot.health ?? undefined,
+    auditoria_tecnica: snapshot.audits?.length
+      ? snapshot.audits.map((audit) => ({
+          tipologia: audit.type,
+          pagina: pathOf(audit.url),
+          nota: audit.score,
+          categorias: audit.categories.map((category) => ({
+            nombre: category.name,
+            nota: category.score,
+          })),
+          problemas: audit.issues.slice(0, 6).map((issue) => ({
+            tipo: issue.kind === "fail" ? "a corregir" : "a mejorar",
+            titulo: issue.title,
+            detalle: issue.detail,
+          })),
+        }))
+      : undefined,
+    discover: snapshot.discover
+      ? { clics: snapshot.discover.clicks, antes: snapshot.discover.prevClicks }
+      : undefined,
+    hallazgos_calculados: buildInsights(snapshot)
+      .slice(0, 9)
+      .map((item) => ({ titulo: item.title, detalle: item.body })),
   };
 }
 
@@ -224,10 +340,10 @@ export async function draftWithAi(
 > {
   const business = await businessContext(report.projectId);
   const answer = await callClaude({
-    deep: false,
+    deep: true,
     system: WRITE_SYSTEM,
     user: `Datos del informe:\n${JSON.stringify(brief(report, business))}`,
-    maxTokens: 1800,
+    maxTokens: 4500,
     report,
     who,
     kind: "draft",
@@ -238,7 +354,7 @@ export async function draftWithAi(
   const sectionNotes: Record<string, string> = {};
   for (const [key, value] of Object.entries(raw.sectionNotes ?? {})) {
     if (typeof value === "string" && value.trim()) {
-      sectionNotes[key] = clip(value, 1500);
+      sectionNotes[key] = clip(value, 1800);
     }
   }
   return {

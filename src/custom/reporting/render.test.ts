@@ -229,8 +229,29 @@ describe("renderReportDocument", () => {
     expect(html).toContain("google.com/search?q=seo%20para%20dentistas");
   });
 
-  it("always shows an encouraging reading under each finding", () => {
-    expect(html).toContain('class="up2"');
+  it("never shows the internal tone instruction to the client", () => {
+    expect(html).not.toContain("En positivo");
+  });
+
+  it("states the analysed period clearly on the cover", () => {
+    expect(html).toContain("Periodo analizado");
+    expect(html).toContain("Comparado con");
+    expect(html).toContain("septiembre");
+  });
+
+  it("only writes an executive summary when there is a paragraph for it", () => {
+    expect(html).toContain('id="resumen"');
+    const without = renderReportDocument(
+      { ...report, notes: { ...report.notes, message: "" } },
+      "public",
+    );
+    expect(without).not.toContain('id="resumen"');
+  });
+
+  it("makes every table sortable and sends contact to the contact page", () => {
+    expect(html).toContain('class="qt sm sortable"');
+    expect(html).toContain('data-t="num"');
+    expect(html).toContain("https://carlosortega.page/contacto/");
   });
 
   it("leaves out the sections the consultant hides", () => {

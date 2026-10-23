@@ -14,6 +14,12 @@ import {
   analyzeWithAi,
   draftWithAi,
 } from "@/custom/reporting/server/aiDraft";
+import { parseMicroaudit } from "@/custom/reporting/microauditParse";
+import {
+  getPageTypes,
+  pageTypesSchema,
+  savePageTypes,
+} from "@/custom/reporting/server/pageTypes";
 import { buildReportSnapshot } from "@/custom/reporting/server/snapshot";
 import { EMPTY_NOTES } from "@/custom/reporting/types";
 import { requireProjectContext } from "@/serverFunctions/middleware";
@@ -135,7 +141,64 @@ export const refreshClientReport = createServerFn({ method: "POST" })
       compare: report.snapshot.period.compare,
     });
     if (!built.ok) return { ok: false as const, reason: built.reason };
-    await replaceSnapshot(context.projectId, data.reportId, built.snapshot);
+    // The audits of the page types are slow and limited: a refresh keeps them.
+    await replaceSnapshot(context.projectId, data.reportId, {
+      ...built.snapshot,
+      audits: report.snapshot.audits,
+    });
+    return { ok: true as const };
+  });
+
+/** The page types (and their example URLs) saved for the project. */
+export const getReportPageTypes = createServerFn({ method: "POST" })
+  .middleware(requireProjectContext)
+  .validator(projectInput)
+  .handler(({ context }) => getPageTypes(context.projectId));
+
+export const saveReportPageTypes = createServerFn({ method: "POST" })
+  .middleware(requireProjectContext)
+  .validator(projectInput.extend({ types: pageTypesSchema }))
+  .handler(({ data, context }) => savePageTypes(context.projectId, data.types));
+
+/** Keeps Microaudit's answer for one example page. The browser asks
+ *  Microaudit (it limits audits per IP, and the consultant's is allowed) and
+ *  sends the Markdown here to be read and stored in the report. */
+export const saveReportAudit = createServerFn({ method: "POST" })
+  .middleware(requireProjectContext)
+  .validator(
+    reportInput.extend({
+      type: z.string().trim().min(1).max(40),
+      url: z.url().max(2000),
+      markdown: z.string().min(50).max(300_000),
+    }),
+  )
+  .handler(async ({ data, context }) => {
+    const report = await getReport(context.projectId, data.reportId);
+    if (!report) return { ok: false as const, reason: "missing" as const };
+    const audit = parseMicroaudit(data.markdown, data.type, data.url);
+    if (!audit) return { ok: false as const, reason: "unreadable" as const };
+    const audits = [
+      ...report.snapshot.audits.filter((item) => item.url !== data.url),
+      audit,
+    ];
+    await replaceSnapshot(context.projectId, data.reportId, {
+      ...report.snapshot,
+      audits,
+    });
+    return { ok: true as const, score: audit.score };
+  });
+
+/** Removes the stored audits of a report (the consultant starts over). */
+export const clearReportAudits = createServerFn({ method: "POST" })
+  .middleware(requireProjectContext)
+  .validator(reportInput)
+  .handler(async ({ data, context }) => {
+    const report = await getReport(context.projectId, data.reportId);
+    if (!report) return { ok: false as const };
+    await replaceSnapshot(context.projectId, data.reportId, {
+      ...report.snapshot,
+      audits: [],
+    });
     return { ok: true as const };
   });
 
