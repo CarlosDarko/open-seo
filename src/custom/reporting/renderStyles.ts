@@ -842,4 +842,9 @@ h3.gsh{margin:30px 0 12px}
 .tbox.full .nb{gap:8px}
 .tbox.full .nv{min-width:0}
 @media screen{details.op>summary,details.op.ct>summary{column-gap:30px}}
+/* ---- v15: social icons of the signature ---- */
+.soc{display:flex;align-items:center;gap:16px;margin-top:10px}
+.soc a{display:inline-flex;color:var(--ink);border:0}
+.soc a:hover{color:var(--red);text-decoration:none}
+.soc svg{display:block;width:18px;height:18px}
 `;

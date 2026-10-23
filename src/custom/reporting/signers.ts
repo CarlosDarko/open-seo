@@ -4,18 +4,47 @@
 import carlosAvatar from "../../../logo/avatar-carlos-ortega.jpg?inline";
 import lauraAvatar from "../../../logo/avatar-laura-calvache.jpg?inline";
 
-export type Signer = { name: string; title: string; avatar: string };
+export type Network = "x" | "linkedin" | "instagram" | "youtube" | "tiktok";
+
+export type Signer = {
+  name: string;
+  title: string;
+  avatar: string;
+  /** Profiles shown as icons under the signature, in this order. */
+  social: { network: Network; url: string }[];
+};
 
 export const CARLOS: Signer = {
   name: "Carlos Ortega",
   title: "Consultor SEO técnico y estratégico independiente",
   avatar: carlosAvatar,
+  social: [
+    { network: "x", url: "https://x.com/carlos_darko" },
+    { network: "linkedin", url: "https://www.linkedin.com/in/carlosdarko/" },
+    {
+      network: "instagram",
+      url: "https://www.instagram.com/carlos.darko.seo/",
+    },
+    { network: "youtube", url: "https://www.youtube.com/@carlos_darko" },
+    { network: "tiktok", url: "https://www.tiktok.com/@carlos.darko" },
+  ],
 };
 
 const LAURA: Signer = {
   name: "Laura Calvache",
   title: "Consultora SEO técnico y estratégico independiente",
   avatar: lauraAvatar,
+  social: [
+    { network: "x", url: "https://x.com/LauCalvache" },
+    {
+      network: "linkedin",
+      url: "https://www.linkedin.com/in/laura-calvache-gil/",
+    },
+    {
+      network: "instagram",
+      url: "https://www.instagram.com/lauracalvache.seo/",
+    },
+  ],
 };
 
 // SHA-256 of the account's lowercase email, so the address itself is not in
