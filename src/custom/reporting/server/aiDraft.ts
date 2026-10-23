@@ -31,20 +31,26 @@ import { getOptionalEnvValue } from "@/server/lib/runtime-env";
 const DEFAULT_MODEL = "claude-sonnet-5-5";
 const API_URL = "https://api.anthropic.com/v1/messages";
 
-/** US dollars per million tokens, by model family (an estimate: update when
- *  Anthropic changes its prices). */
+/** US dollars per million tokens (Anthropic's list prices, 2026-10): the
+ *  specific models first, the families after for any other version. Update
+ *  when Anthropic changes its prices. */
 const PRICES = [
-  { match: "haiku", input: 1, output: 5 },
-  { match: "opus", input: 15, output: 75 },
+  { match: "opus-5-5", input: 4, output: 20 },
+  { match: "sonnet-5-5", input: 2, output: 10 },
+  { match: "haiku-5-5", input: 0.1, output: 0.5 },
+  { match: "fable", input: 10, output: 50 },
+  { match: "opus", input: 5, output: 25 },
+  { match: "sonnet-5", input: 2, output: 10 },
   { match: "sonnet", input: 3, output: 15 },
+  { match: "haiku", input: 1, output: 5 },
 ] as const;
 
 function priceOf(model: string) {
   const lower = model.toLowerCase();
   return (
     PRICES.find((price) => lower.includes(price.match)) ?? {
-      input: 3,
-      output: 15,
+      input: 4,
+      output: 20,
     }
   );
 }
