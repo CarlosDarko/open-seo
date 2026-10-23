@@ -1973,7 +1973,7 @@ function suggestedSteps(report: ReportFull): Step[] {
   const loser = snapshot.pageLosers[0];
   if (loser && loser.clicksDelta <= -30) {
     steps.push({
-      title: `Recuperar las páginas que pierden tráfico, empezando por ${shortPath(pathOf(loser.key))}`,
+      title: `Recuperar las páginas que pierden tráfico, empezando por [${shortPath(pathOf(loser.key))}](${loser.key})`,
       why: `concentra la mayor caída (${signedNum(loser.clicksDelta)} clics, un ${one.format(Math.abs(percentChange(loser.clicks, loser.prevClicks) ?? 0) * 100)} %) y ya tiene historial en Google, así que es más fácil recuperarla que crear algo nuevo`,
       how: [
         "Comprobar que la página sigue indexada y que Google muestra la versión correcta",
