@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import {
@@ -22,7 +22,8 @@ import { Label } from "@/client/components/ui/label";
 import { Skeleton } from "@/client/components/ui/skeleton";
 import { Switch } from "@/client/components/ui/switch";
 import { Textarea } from "@/client/components/ui/textarea";
-import { AuditCard } from "@/custom/reporting/client/AuditCard";
+import { AuditCard, auditPageTypes } from "@/custom/reporting/client/AuditCard";
+import { pageTypesKey } from "@/custom/reporting/client/PageTypesSection";
 import { publicUrl } from "@/custom/reporting/client/ReportingPage";
 import {
   REPORT_SECTIONS,
@@ -34,6 +35,7 @@ import {
   draftClientReportWithAi,
   getClientReport,
   getReportingAiStatus,
+  getReportPageTypes,
   refreshClientReport,
   saveClientReport,
   setClientReportShared,
@@ -218,6 +220,103 @@ function Editor({
     onError: () => setError("No se pudieron actualizar los datos."),
   });
 
+  // A new report prepares itself the first time it opens: Microaudit on the
+  // example pages of each page type (when they are defined), then the AI
+  // writes the summary and the analysis of every tab, and it is all saved.
+  const typesQuery = useQuery({
+    queryKey: pageTypesKey(projectId),
+    queryFn: () => getReportPageTypes({ data: { projectId } }),
+  });
+  const notesRef = useRef(notes);
+  notesRef.current = notes;
+  const prepared = useRef(false);
+  const [preparing, setPreparing] = useState(false);
+  useEffect(() => {
+    if (prepared.current || !aiStatus.data || !typesQuery.data) return;
+    const types = typesQuery.data;
+    const needsAi =
+      aiStatus.data.available &&
+      report.aiCalls === 0 &&
+      !report.notes.message.trim();
+    const needsAudit = types.length > 0 && report.snapshot.audits.length === 0;
+    prepared.current = true;
+    if (!needsAi && !needsAudit) return;
+    void (async () => {
+      setPreparing(true);
+      setError(null);
+      try {
+        if (needsAudit) {
+          const run = await auditPageTypes(
+            projectId,
+            report.id,
+            types,
+            setInfo,
+          );
+          if (run.failed) setError(`Microaudit: ${run.failed}`);
+        }
+        let merged = notesRef.current;
+        if (needsAi) {
+          setInfo("Redactando el resumen y el análisis con IA…");
+          const written = await draftClientReportWithAi({
+            data: { projectId, reportId: report.id },
+          });
+          if (written.ok) {
+            merged = {
+              ...merged,
+              message: written.draft.message || merged.message,
+              sectionNotes: {
+                ...merged.sectionNotes,
+                ...written.draft.sectionNotes,
+              },
+              nextSteps: written.draft.nextSteps || merged.nextSteps,
+            };
+          }
+          setInfo("Analizando las páginas con IA…");
+          const analysed = await analyzeClientReportWithAi({
+            data: { projectId, reportId: report.id },
+          });
+          if (analysed.ok) {
+            merged = {
+              ...merged,
+              diagnoses: analysed.diagnoses,
+              titleIdeas: analysed.titleIdeas,
+              opportunityIdeas: analysed.opportunityIdeas,
+              contentIdeas: analysed.contentIdeas,
+              hidden: merged.hidden.filter(
+                (id) => id !== "diagnostico" && id !== "titulos",
+              ),
+            };
+          }
+          if (!written.ok && !analysed.ok) {
+            setError(
+              "La IA no ha podido redactar ahora. Usa «Redactar con IA».",
+            );
+          }
+          await saveClientReport({
+            data: {
+              projectId,
+              reportId: report.id,
+              title: title.trim() || report.title,
+              clientName: client.trim() || null,
+              notes: merged,
+            },
+          });
+          setNotes(merged);
+          setDirty(false);
+        }
+        setInfo("Informe preparado.");
+        await refetch();
+        setVersion((value) => value + 1);
+      } catch {
+        setError(
+          "No se pudo preparar el informe del todo. Revisa los botones.",
+        );
+      } finally {
+        setPreparing(false);
+      }
+    })();
+  }, [aiStatus.data, typesQuery.data]);
+
   // Warns before leaving with unsaved changes.
   useEffect(() => {
     if (!dirty) return;
@@ -253,6 +352,12 @@ function Editor({
           </h1>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {preparing ? (
+            <p className="text-sm text-muted-foreground">
+              Preparando el informe (auditoría e IA): puede tardar un par de
+              minutos.
+            </p>
+          ) : null}
           {error ? <p className="text-sm text-destructive">{error}</p> : null}
           {!error && info ? (
             <p className="text-sm text-muted-foreground">{info}</p>

@@ -24,7 +24,7 @@ export const SOURCE_PATCHES = [
     // A phase instance (one short slice of the research, its own invocation).
     file: "src/server/workflows/AiVisibilityWorkflow.ts",
     from: "const { payload } = event;",
-    to: "const { payload } = event;\n    if (\"researchPhase\" in payload) return runResearchPhase(payload);",
+    to: 'const { payload } = event;\n    if ("researchPhase" in payload) return runResearchPhase(payload);',
   },
   {
     // Prompt Research in the project's own language and market
@@ -71,12 +71,12 @@ export const SOURCE_PATCHES = [
   {
     file: "src/client/features/ai-visibility/PromptResearchKeyword.tsx",
     from: "normalizeAiSuggestion(name) === normalizeAiSuggestion(keyword),",
-    to: 'normalizeAiSuggestion(name) === normalizeAiSuggestion(keyword.split(/ · ?/)[0]),',
+    to: "normalizeAiSuggestion(name) === normalizeAiSuggestion(keyword.split(/ · ?/)[0]),",
   },
   {
     file: "src/client/features/ai-visibility/PromptResearchKeyword.tsx",
     from: ") ?? keyword,",
-    to: ') ?? keyword.split(/ · ?/)[0],',
+    to: ") ?? keyword.split(/ · ?/)[0],",
   },
   {
     // The research works without a tracker (nothing is created on its own now).
@@ -92,12 +92,12 @@ export const SOURCE_PATCHES = [
   {
     file: "src/client/features/ai-visibility/PromptResearchPage.tsx",
     from: "search: { q: keyword },",
-    to: "search: { q: keyword + \" · \" },",
+    to: 'search: { q: keyword + " · " },',
   },
   {
     file: "src/client/features/ai-visibility/PromptResearchPage.tsx",
     from: "search={{ q: keyword }}",
-    to: "search={{ q: keyword + \" · \" }}",
+    to: 'search={{ q: keyword + " · " }}',
   },
   {
     file: "src/client/features/ai-visibility/PromptResearchKeyword.tsx",
@@ -112,12 +112,12 @@ export const SOURCE_PATCHES = [
   {
     file: "src/client/features/ai-visibility/PromptResearchKeyword.tsx",
     from: "title: `No prompts found for “${keyword}”`,",
-    to: "title: / ·( )*$/.test(keyword) ? \"Add a city if you want, then press Search\" : `No prompts found for “${keyword}”`,",
+    to: 'title: / ·( )*$/.test(keyword) ? "Add a city if you want, then press Search" : `No prompts found for “${keyword}”`,',
   },
   {
     file: "src/client/features/ai-visibility/PromptResearchKeyword.tsx",
-    from: "description: \"Try a shorter, broader term.\",",
-    to: "description: / ·( )*$/.test(keyword) ? \"Nothing is searched until you press Search, so it is not charged twice.\" : \"Try a shorter, broader term.\",",
+    from: 'description: "Try a shorter, broader term.",',
+    to: 'description: / ·( )*$/.test(keyword) ? "Nothing is searched until you press Search, so it is not charged twice." : "Try a shorter, broader term.",',
   },
   {
     // Almost no prompt has sources here: the Sources column and its
@@ -125,6 +125,18 @@ export const SOURCE_PATCHES = [
     file: "src/client/features/ai-visibility/PromptResearchTable.tsx",
     from: "...promptColumns,",
     to: "...promptColumns.slice(0, 1),",
+  },
+  {
+    // The page types of the client (examples audited by the reports).
+    file: "src/client/features/projects/project-context/ProjectContextPage.tsx",
+    from: 'import { KeyPagesSection } from "./KeyPagesSection";',
+    to: 'import { KeyPagesSection } from "./KeyPagesSection";\nimport { PageTypesSection } from "@/custom/reporting/client/PageTypesSection";',
+  },
+  {
+    // The page types of the client (examples audited by the reports).
+    file: "src/client/features/projects/project-context/ProjectContextPage.tsx",
+    from: "<KeyPagesSection projectId={projectId} keyPages={context.keyPages} />",
+    to: "<KeyPagesSection projectId={projectId} keyPages={context.keyPages} />\n\n          <PageTypesSection projectId={projectId} />",
   },
   {
     // Nothing is tracked on its own: after the brand research OpenSEO used to

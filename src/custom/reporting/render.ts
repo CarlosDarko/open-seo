@@ -538,7 +538,17 @@ function hero(report: ReportFull, host: string): string {
     return `<span class="dl ${diff > 0 ? "up" : "down"}">${diff > 0 ? "▲" : "▼"} ${one.format(Math.abs(diff))} posiciones</span>`;
   })();
   const name = report.clientName?.trim() || host;
-  const heading = report.title.replace(/ — .*$/, "").trim() || "Informe SEO";
+  // "Informe SEO Dentaltix - Octubre de 2026" reads "Informe SEO de dentaltix.com":
+  // what follows a dash is the period (the cover says it) and the client's
+  // name comes after the "de".
+  const brandWord = name.split(".")[0].toLowerCase();
+  const heading =
+    report.title
+      .split(/\s[—–-]\s/)[0]
+      .split(/\s+/)
+      .filter((word) => word.toLowerCase() !== brandWord)
+      .join(" ")
+      .trim() || "Informe SEO";
   return `<header class="hero">
 ${areaPath(snapshot.daily.map((point) => point.clicks))}
 <div class="wrap">
@@ -596,13 +606,20 @@ function insightsBlock(report: ReportFull): string {
 
 // ---------------------------------------------------------------- trend
 
+/** An update's name, linked to the notice Google published about it. */
+function updateLink(url: string, label: string): string {
+  return isWeb(url)
+    ? `<a class="lk" href="${esc(url)}" target="_blank" rel="noopener noreferrer" title="Ver el comunicado de Google">${esc(label)}</a>`
+    : esc(label);
+}
+
 function trendBlock(report: ReportFull): string {
   const { snapshot } = report;
   const impacts = updateImpacts(snapshot);
   const legend = snapshot.updates
     .map(
       (update) =>
-        `<span><i class="sq" style="background:${KIND_COLOR[update.kind]}"></i>${esc(update.label)}</span>`,
+        `<span><i class="sq" style="background:${KIND_COLOR[update.kind]}"></i>${updateLink(update.url, update.label)}</span>`,
     )
     .join("");
   const cards = impacts
@@ -610,7 +627,7 @@ function trendBlock(report: ReportFull): string {
       const color = KIND_COLOR[item.update.kind];
       const cell = (label: string, value: number | null) =>
         `<div><small>${label}</small><b>${value === null ? "—" : num(value)}</b></div>`;
-      return `<div class="ucard" style="--uc:${color}"><div class="un"><i></i>${esc(item.update.label)}</div><div class="ud">${esc(KIND_NAME[item.update.kind])} · ${dayShort(item.update.begin)} → ${item.update.end ? dayShort(item.update.end) : "en curso"} · clics por día</div><div class="trio">${cell("Antes", item.before)}${cell("Durante", item.during)}${cell("Después", item.after)}</div><p>${esc(item.verdict)}</p></div>`;
+      return `<div class="ucard" style="--uc:${color}"><div class="un"><i></i>${esc(item.update.label)}</div><div class="ud">${esc(KIND_NAME[item.update.kind])} · ${dayShort(item.update.begin)} → ${item.update.end ? dayShort(item.update.end) : "en curso"} · clics por día${isWeb(item.update.url) ? ` · <a class="lk" href="${esc(item.update.url)}" target="_blank" rel="noopener noreferrer">Comunicado de Google ↗</a>` : ""}</div><div class="trio">${cell("Antes", item.before)}${cell("Durante", item.during)}${cell("Después", item.after)}</div><p>${esc(item.verdict)}</p></div>`;
     })
     .join("");
   const body = `<div class="sheet">
@@ -648,7 +665,7 @@ function mixCard(
       const delta = comparable
         ? `<span class="dl ${diff > 0 ? "up" : diff < 0 ? "down" : "flat"}">${diff > 0 ? "▲" : diff < 0 ? "▼" : "="} ${diff === 0 ? "igual" : signedNum(diff)}${change !== null && diff !== 0 ? ` <i>(${change > 0 ? "+" : "−"}${one.format(Math.abs(change) * 100)} %)</i>` : ""}</span>`
         : "";
-      return `<div class="mr${index === 0 ? " first" : ""}"><div class="mt"><span class="mn" title="${esc(line.label)}">${esc(line.label)}</span><b>${num(line.clicks)}</b></div><div class="mb"><i style="--w:${Math.max(2, line.share * 100).toFixed(1)}%"></i></div><div class="mm"><span>${one.format(line.share * 100)} % de los clics</span>${delta}</div></div>`;
+      return `<div class="mr${index === 0 ? " first" : ""}"><div class="ml"><span class="mn" title="${esc(line.label)}">${esc(line.label)}</span><span class="mp">${one.format(line.share * 100)} % de los clics</span></div><div class="mb"><i style="--w:${Math.max(2, line.share * 100).toFixed(1)}%"></i></div><div class="mv"><b>${num(line.clicks)}</b>${delta}</div></div>`;
     })
     .join("");
   const net = comparable ? countDelta(total, prevTotal) : "";
@@ -695,7 +712,7 @@ function trafficMixBlock(report: ReportFull): string {
     comparable
       ? "Cada grupo con su peso sobre el total y lo que ha sumado o restado frente al periodo anterior."
       : "El peso de cada grupo sobre el total de clics.",
-    `<div class="grid g2">${cards}</div>`,
+    `<div class="mixcols">${cards}</div>`,
   );
 }
 
@@ -1303,38 +1320,68 @@ function discoverBlock(report: ReportFull): string {
 
 // ---------------------------------------------------------------- close
 
+/** Without AI text the roadmap is built from the data: the few moves that
+ *  can change the figures, each as "action — why". */
 function suggestedSteps(report: ReportFull): string[] {
   const { snapshot } = report;
   const steps: string[] = [];
+  const top = [...snapshot.opportunities]
+    .sort((a, b) => b.potentialClicks - a.potentialClicks)
+    .slice(0, 5);
+  const gain = top.reduce((sum, item) => sum + item.potentialClicks, 0);
+  if (gain >= 20) {
+    steps.push(
+      `Ejecutar las ${top.length} mejoras de mayor retorno de la pestaña Oportunidades — suman unas ${num(gain)} visitas más al periodo con cambios de título, contenido y enlaces internos`,
+    );
+  }
   const loser = snapshot.pageLosers[0];
-  if (loser && loser.clicksDelta <= -10) {
+  if (loser && loser.clicksDelta <= -30) {
     steps.push(
-      `Revisar y reforzar ${pathOf(loser.key)}, la página con más margen de recuperación.`,
+      `Recuperar las páginas que han perdido tráfico, empezando por ${pathOf(loser.key)} — concentra la mayor caída (${signedNum(loser.clicksDelta)} clics) y ya tiene historial en Google`,
     );
   }
-  const best = [...snapshot.opportunities].sort(
-    (a, b) => b.potentialClicks - a.potentialClicks,
+  const topic = [...snapshot.topics].sort(
+    (a, b) => b.nearTopShare * b.impressions - a.nearTopShare * a.impressions,
   )[0];
-  if (best) {
+  if (topic && topic.nearTopShare >= 0.4) {
     steps.push(
-      `Mejorar el título y el contenido para «${best.query}» (+${num(best.potentialClicks)} clics posibles).`,
+      `Reforzar el tema «${topic.label}» con contenido y enlaces internos — el ${Math.round(topic.nearTopShare * 100)} % de sus impresiones está en posiciones 4 a 20, la zona más fácil de subir al top 3`,
     );
   }
-  const topic = snapshot.topics[0];
-  if (topic) {
+  const audits = snapshot.audits ?? [];
+  const repeated = new Map<string, Set<string>>();
+  for (const audit of audits) {
+    for (const issue of audit.issues) {
+      if (issue.kind !== "fail") continue;
+      repeated.set(
+        issue.title,
+        (repeated.get(issue.title) ?? new Set()).add(audit.url),
+      );
+    }
+  }
+  const worst = [...repeated.entries()].sort(
+    (x, y) => y[1].size - x[1].size,
+  )[0];
+  if (worst) {
     steps.push(
-      `Publicar más contenido sobre «${topic.label}», el tema con más tirón.`,
+      `Corregir en las plantillas del sitio «${worst[0]}» — falla en ${worst[1].size} de las ${audits.length} páginas tipo auditadas, así que un solo cambio mejora muchas páginas a la vez`,
     );
   }
   if (steps.length === 0) {
     steps.push(
-      "Mantener el ritmo de publicación y revisar la evolución en el próximo periodo.",
+      "Mantener el ritmo de publicación y de mejora — la web se mueve dentro de lo esperado y conviene medir el efecto en el próximo informe",
     );
   }
   return steps.slice(0, 4);
 }
 
-const CONTACT_URL = "https://carlosortega.page/contacto/";
+/** "Action — why" split into a bold action and its reason. */
+function stepHtml(step: string): string {
+  const at = step.indexOf(" — ");
+  return at > 0
+    ? `<li><b>${esc(step.slice(0, at))}</b><span>${esc(step.slice(at + 3))}</span></li>`
+    : `<li><b>${esc(step)}</b></li>`;
+}
 
 function closing(report: ReportFull): string {
   const typed = report.notes.nextSteps
@@ -1344,11 +1391,10 @@ function closing(report: ReportFull): string {
   const steps = typed.length > 0 ? typed : suggestedSteps(report);
   const note = report.notes.sectionNotes.proximos?.trim();
   return `<footer class="end" id="proximos"><div class="wrap">
-<div class="endgrid"><div><div class="kick">Próximos pasos</div><h2>Hoja de ruta para el próximo periodo</h2>
-<ol class="steps">${steps.map((step) => `<li>${esc(step)}</li>`).join("")}</ol>
-${note ? `<div class="note" style="background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.16);color:#f6f6f6"><b style="color:#ffb3c0">Nota de Carlos</b>${esc(note)}</div>` : ""}</div>
-<div class="endcta"><a class="big-cta" href="${CONTACT_URL}" target="_blank" rel="noopener noreferrer">Contactar con Carlos Ortega</a></div></div>
-<div class="foot"><span class="fm">${LOGO_MARK_LIGHT}</span><span>Informe generado el ${day(report.snapshot.generatedAt.slice(0, 10))} con datos de Google Search Console · <a href="${CONTACT_URL}" target="_blank" rel="noopener noreferrer">carlosortega.page</a></span></div>
+<div class="kick">Próximos pasos</div><h2>Hoja de ruta para el próximo periodo</h2>
+<ol class="steps">${steps.map(stepHtml).join("")}</ol>
+${note ? `<div class="note" style="background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.16);color:#f6f6f6"><b style="color:#ffb3c0">Nota de Carlos</b>${esc(note)}</div>` : ""}
+<div class="foot"><span class="fm">${LOGO_MARK_LIGHT}</span><span>Informe generado el ${day(report.snapshot.generatedAt.slice(0, 10))} con datos de Google Search Console · <a href="https://carlosortega.page/contacto/" target="_blank" rel="noopener noreferrer">carlosortega.page</a></span></div>
 </div></footer>`;
 }
 

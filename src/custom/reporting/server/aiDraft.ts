@@ -197,7 +197,7 @@ Responde SOLO con un objeto JSON con esta forma exacta:
    "oportunidades": "Análisis de qué oportunidades merecen priorizarse y por qué: 60 a 100 palabras.",
    "tecnico": "Análisis del estado técnico (sitemap, indexación y, si hay, la auditoría de las páginas tipo): 50 a 100 palabras."
  },
- "nextSteps": "4 a 5 próximos pasos concretos y priorizados, uno por línea, sin numerar, cada uno con el motivo entre paréntesis"}
+ "nextSteps": "HOJA DE RUTA: 4 o 5 acciones ESTRATÉGICAS y ejecutables, ordenadas por impacto esperado frente a esfuerzo, una por línea, sin numerar, con este formato exacto: «Acción concreta que empieza por un verbo — por qué y qué impacto se espera, con la cifra de los datos». Cada acción debe ser una palanca que mueva los resultados (por ejemplo, reorientar o crear un grupo de páginas, corregir un fallo de plantilla que afecta a muchas páginas, recuperar un tema que cae, aprovechar un tramo 4-20 con mucho volumen), no un detalle menor como cambiar un título suelto o retocar una página de poco tráfico, salvo que sea la palanca principal. Sin vaguedades como «seguir trabajando» o «mejorar el contenido»."}
 Si una sección no tiene datos suficientes, déjala como cadena vacía.`;
 
 function brief(report: ReportFull, business: string) {

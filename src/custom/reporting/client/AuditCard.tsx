@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Plus, ScanSearch, Trash2 } from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import { ScanSearch } from "lucide-react";
 import { Button } from "@/client/components/ui/button";
 import {
   Card,
@@ -8,19 +9,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/client/components/ui/card";
-import { Input } from "@/client/components/ui/input";
-import { Textarea } from "@/client/components/ui/textarea";
 import { runMicroaudit } from "@/custom/reporting/client/microauditClient";
+import { pageTypesKey } from "@/custom/reporting/client/PageTypesSection";
 import type { AuditPage } from "@/custom/reporting/types";
 import {
   clearReportAudits,
   getReportPageTypes,
   saveReportAudit,
-  saveReportPageTypes,
 } from "@/serverFunctions/reporting";
-
-const NEWLINE = String.fromCharCode(10);
-type Draft = { name: string; urls: string };
 
 const pathOf = (url: string) => {
   try {
@@ -30,7 +26,48 @@ const pathOf = (url: string) => {
   }
 };
 
-/** The page types of the site and the Microaudit audit of their examples. */
+export type AuditRun = { done: number; total: number; failed: string | null };
+
+/** Audits every example page of the saved page types with Microaudit, one
+ *  after the other, and stores each answer in the report. It runs in the
+ *  browser: Microaudit limits audits per IP and the consultant's is allowed. */
+export async function auditPageTypes(
+  projectId: string,
+  reportId: string,
+  types: { name: string; urls: string[] }[],
+  onProgress: (text: string) => void,
+): Promise<AuditRun> {
+  const total = types.reduce((sum, type) => sum + type.urls.length, 0);
+  let done = 0;
+  for (const type of types) {
+    for (const url of type.urls) {
+      onProgress(`Auditando ${done + 1} de ${total}: ${pathOf(url)}…`);
+      const result = await runMicroaudit(url);
+      if (!result.ok) return { done, total, failed: result.message };
+      const stored = await saveReportAudit({
+        data: {
+          projectId,
+          reportId,
+          type: type.name,
+          url,
+          markdown: result.markdown,
+        },
+      });
+      if (!stored.ok) {
+        return {
+          done,
+          total,
+          failed: "No se pudo leer la respuesta de Microaudit.",
+        };
+      }
+      done += 1;
+    }
+  }
+  return { done, total, failed: null };
+}
+
+/** Microaudit's audit of the example pages of each page type (these are set
+ *  in the project's Context page). */
 export function AuditCard({
   projectId,
   reportId,
@@ -43,90 +80,21 @@ export function AuditCard({
   onChanged: () => void;
 }) {
   const saved = useQuery({
-    queryKey: ["report-page-types", projectId],
+    queryKey: pageTypesKey(projectId),
     queryFn: () => getReportPageTypes({ data: { projectId } }),
   });
-  const [types, setTypes] = useState<Draft[]>([]);
-  const [loaded, setLoaded] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [progress, setProgress] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (saved.data && !loaded) {
-      setTypes(
-        saved.data.map((type) => ({
-          name: type.name,
-          urls: type.urls.join(NEWLINE),
-        })),
-      );
-      setLoaded(true);
-    }
-  }, [saved.data, loaded]);
-
-  const parsed = types.map((type) => ({
-    name: type.name.trim(),
-    urls: type.urls
-      .split(NEWLINE)
-      .map((line) => line.trim())
-      .filter(Boolean),
-  }));
-  const valid = parsed.filter((type) => type.name && type.urls.length > 0);
-  const total = valid.reduce((sum, type) => sum + type.urls.length, 0);
-
-  const saveTypes = useMutation({
-    mutationFn: () =>
-      saveReportPageTypes({
-        data: {
-          projectId,
-          types: valid.map((type) => ({
-            name: type.name,
-            urls: type.urls.slice(0, 5),
-          })),
-        },
-      }),
-    onSuccess: () => setMessage("Tipologías guardadas para este cliente."),
-    onError: () =>
-      setMessage(
-        "No se pudieron guardar. Revisa que las direcciones sean válidas.",
-      ),
-  });
+  const types = saved.data ?? [];
+  const total = types.reduce((sum, type) => sum + type.urls.length, 0);
 
   const audit = useMutation({
-    mutationFn: async () => {
-      let done = 0;
-      let failed: string | null = null;
-      for (const type of valid) {
-        for (const url of type.urls.slice(0, 5)) {
-          setProgress(`Auditando ${done + 1} de ${total}: ${pathOf(url)}…`);
-          const result = await runMicroaudit(url);
-          if (!result.ok) {
-            failed = result.message;
-            break;
-          }
-          const stored = await saveReportAudit({
-            data: {
-              projectId,
-              reportId,
-              type: type.name,
-              url,
-              markdown: result.markdown,
-            },
-          });
-          if (!stored.ok) {
-            failed = "No se pudo leer la respuesta de Microaudit.";
-            break;
-          }
-          done += 1;
-        }
-        if (failed) break;
-      }
-      return { done, failed };
-    },
-    onSuccess: ({ done, failed }) => {
+    mutationFn: () => auditPageTypes(projectId, reportId, types, setProgress),
+    onSuccess: ({ done, total: all, failed }) => {
       setProgress(null);
       setMessage(
         failed
-          ? `Se han auditado ${done} de ${total} páginas. Microaudit ha respondido: ${failed}`
+          ? `Se han auditado ${done} de ${all} páginas. Microaudit ha respondido: ${failed}`
           : `Auditoría terminada: ${done} páginas.`,
       );
       onChanged();
@@ -136,7 +104,6 @@ export function AuditCard({
       setMessage("La auditoría se ha interrumpido. Prueba de nuevo.");
     },
   });
-
   const clear = useMutation({
     mutationFn: () => clearReportAudits({ data: { projectId, reportId } }),
     onSuccess: () => {
@@ -145,87 +112,59 @@ export function AuditCard({
     },
   });
 
-  const update = (index: number, patch: Partial<Draft>) =>
-    setTypes((previous) =>
-      previous.map((type, at) => (at === index ? { ...type, ...patch } : type)),
-    );
-
   return (
     <Card>
       <CardHeader>
         <CardTitle>Auditoría técnica de páginas tipo</CardTitle>
         <p className="text-xs text-muted-foreground">
-          Define las tipologías de página del cliente (inicio, categoría,
-          producto, blog…) con de 1 a 5 páginas de ejemplo cada una. Microaudit
-          las audita y el informe habla de las plantillas del sitio. Se lanza
-          desde tu navegador, con tu IP (Microaudit limita las auditorías por
-          IP).
+          Microaudit audita las páginas de ejemplo de cada tipología y el
+          informe habla de las plantillas del sitio. Se lanza desde tu
+          navegador, con tu IP (Microaudit limita las auditorías por IP).
         </p>
       </CardHeader>
       <CardContent className="space-y-3">
-        {types.map((type, index) => (
-          <div key={index} className="space-y-1.5 rounded-lg border p-3">
-            <div className="flex gap-2">
-              <Input
-                value={type.name}
-                onChange={(event) =>
-                  update(index, { name: event.target.value })
-                }
-                placeholder="Tipología (por ejemplo, Producto)"
-                aria-label="Nombre de la tipología"
-                maxLength={40}
-              />
+        {types.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            Aún no hay tipologías de página. Defínelas en{" "}
+            <Link
+              to="/p/$projectId/context"
+              params={{ projectId }}
+              className="font-medium text-foreground underline"
+            >
+              Contexto del proyecto
+            </Link>{" "}
+            (sección «Tipologías de página») y vuelve aquí.
+          </p>
+        ) : (
+          <>
+            <ul className="space-y-0.5 text-xs text-muted-foreground">
+              {types.map((type) => (
+                <li key={type.name}>
+                  <strong className="text-foreground">{type.name}</strong>:{" "}
+                  {type.urls.length}{" "}
+                  {type.urls.length === 1 ? "página" : "páginas"}
+                </li>
+              ))}
+            </ul>
+            <div className="flex flex-wrap items-center gap-2">
               <Button
-                variant="ghost"
-                size="icon"
-                aria-label="Quitar tipología"
-                onClick={() =>
-                  setTypes((previous) =>
-                    previous.filter((_, at) => at !== index),
-                  )
-                }
+                size="sm"
+                disabled={audit.isPending}
+                onClick={() => audit.mutate()}
               >
-                <Trash2 className="size-4" aria-hidden />
+                <ScanSearch className="size-3.5" aria-hidden />
+                {audit.isPending ? "Auditando…" : `Auditar ${total} páginas`}
               </Button>
+              <Link
+                to="/p/$projectId/context"
+                params={{ projectId }}
+                className="text-xs text-muted-foreground underline"
+              >
+                Editar tipologías
+              </Link>
             </div>
-            <Textarea
-              rows={3}
-              value={type.urls}
-              onChange={(event) => update(index, { urls: event.target.value })}
-              placeholder={`https://… (una por línea, máximo 5)`}
-              aria-label="Páginas de ejemplo"
-            />
-          </div>
-        ))}
-        <div className="flex flex-wrap gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={types.length >= 8}
-            onClick={() =>
-              setTypes((previous) => [...previous, { name: "", urls: "" }])
-            }
-          >
-            <Plus className="size-3.5" aria-hidden />
-            Añadir tipología
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={saveTypes.isPending || valid.length === 0}
-            onClick={() => saveTypes.mutate()}
-          >
-            Guardar tipologías
-          </Button>
-          <Button
-            size="sm"
-            disabled={audit.isPending || total === 0}
-            onClick={() => audit.mutate()}
-          >
-            <ScanSearch className="size-3.5" aria-hidden />
-            {audit.isPending ? "Auditando…" : `Auditar ${total} páginas`}
-          </Button>
-        </div>
+          </>
+        )}
         {progress ? (
           <p className="text-xs text-muted-foreground">{progress}</p>
         ) : null}

@@ -63,6 +63,8 @@ describe("parseMicroaudit", () => {
   });
 
   it("gives up on text that is not an audit", () => {
-    expect(parseMicroaudit("Límite de auditorías alcanzado", "x", "u")).toBeNull();
+    expect(
+      parseMicroaudit("Límite de auditorías alcanzado", "x", "u"),
+    ).toBeNull();
   });
 });
