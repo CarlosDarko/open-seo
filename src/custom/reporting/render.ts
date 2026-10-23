@@ -368,6 +368,7 @@ function dataTable(
   columns: Column[],
   rows: Cell[][],
   empty = "No hay datos en este grupo.",
+  full = false,
 ): string {
   if (rows.length === 0) return `<p class="empty">${esc(empty)}</p>`;
   const head = columns
@@ -392,14 +393,14 @@ function dataTable(
     )
     .join("");
   const tools =
-    rows.length > 8
+    rows.length > 8 && !full
       ? `<div class="tools"><input class="flt" type="search" placeholder="Filtrar la lista…" aria-label="Filtrar la lista"><span class="cnt" data-total="${rows.length}">${num(rows.length)} filas</span></div>`
       : "";
   const more =
     rows.length > PRINT_ROWS
       ? `<p class="onlyprint">Se muestran las ${PRINT_ROWS} primeras de ${num(rows.length)}. La lista completa está en la versión web del informe.</p>`
       : "";
-  return `<div class="tw">${tools}<div class="tbox"><table class="qt sm sortable"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>${more}</div>`;
+  return `<div class="tw">${tools}<div class="tbox${full ? " full" : ""}"><table class="qt sm sortable"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>${more}</div>`;
 }
 
 const ctr = (clicks: number, impressions: number) =>
@@ -1585,7 +1586,7 @@ const outOf100 = (score: number | null) =>
 function scoreCell(score: number | null): Cell {
   if (score === null) return { h: '<span class="sn">—</span>', v: null };
   return {
-    h: `<div class="scv">${outOf100(score)}<div class="sb"><i style="--w:${Math.max(2, score).toFixed(0)}%"></i></div></div>`,
+    h: `<div class="scv">${outOf100(score)}</div>`,
     v: score,
   };
 }
@@ -1867,6 +1868,8 @@ function auditsBlock(report: ReportFull): string {
           ),
         ]),
     ],
+    "No hay datos.",
+    true,
   );
   const everything = issuesOf(audits);
   const average = mean(audits.map((audit) => audit.score));
@@ -1916,7 +1919,7 @@ function auditsBlock(report: ReportFull): string {
 /** Only the consultant sees it: the pages Microaudit could not read. */
 function unreadableNotice(pages: AuditPage[]): string {
   if (pages.length === 0) return "";
-  return `<div class="note"><b>Páginas que Microaudit no ha podido leer</b>No devolvieron título ni contenido (normalmente por un bloqueo anti-bots), así que no cuentan en la nota ni en los fallos para no dar datos falsos: ${pages.map((page) => `${esc(page.type)} (${pageLink(page.url)})`).join(", ")}. Vuelve a auditar más tarde o prueba con otra página de ejemplo.</div>`;
+  return `<div class="note" style="margin:0 0 32px"><b>Páginas que Microaudit no ha podido leer</b>No devolvieron título ni contenido (normalmente por un bloqueo anti-bots), así que no cuentan en la nota ni en los fallos para no dar datos falsos: ${pages.map((page) => `${esc(page.type)} (${pageLink(page.url)})`).join(", ")}. Vuelve a auditar más tarde o prueba con otra página de ejemplo.</div>`;
 }
 
 function auditsHint(): string {

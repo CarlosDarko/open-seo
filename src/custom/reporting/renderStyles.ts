@@ -808,4 +808,8 @@ details.op>summary:after{content:"\\25BE";display:flex;align-items:center;justif
 details.op>summary:hover:after{background:var(--red);color:#fff}
 details.op[open]>summary:after{transform:rotate(180deg)}
 }
+/* ---- v11: full tables, spacing ---- */
+.tbox.full{max-height:none;overflow:visible}
+.blk+.note,.note+.blk,.note+.sheet,.sheet+.note{margin-top:22px}
+h2+.sheet,.bh+.sheet{margin-top:0}
 `;
