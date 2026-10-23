@@ -15,6 +15,7 @@ import {
   updateImpacts,
   weekdayStats,
 } from "@/custom/reporting/insights";
+import { parseJson } from "@/custom/reporting/jsonLoose";
 import { buildVerdict } from "@/custom/reporting/narrative";
 import { addAiCost } from "@/custom/reporting/server/reportingDb";
 import type {
@@ -109,8 +110,12 @@ async function callClaude(input: {
     }
     const body = (await response.json()) as {
       content?: { type: string; text?: string }[];
+      stop_reason?: string;
       usage?: { input_tokens?: number; output_tokens?: number };
     };
+    if (body.stop_reason === "max_tokens") {
+      console.error("[report-ai] the answer was cut at max_tokens", input.kind);
+    }
     const price = priceOf(model);
     const costUsd =
       ((body.usage?.input_tokens ?? 0) * price.input +
@@ -146,17 +151,6 @@ async function callClaude(input: {
   }
 }
 
-function parseJson<T>(text: string): T | null {
-  const start = text.indexOf("{");
-  const end = text.lastIndexOf("}");
-  if (start < 0 || end <= start) return null;
-  try {
-    return JSON.parse(text.slice(start, end + 1)) as T;
-  } catch {
-    return null;
-  }
-}
-
 const clip = (value: unknown, max: number) =>
   String(value ?? "")
     .trim()
@@ -185,7 +179,7 @@ Tu trabajo es ARGUMENTAR, no describir: el cliente ya ve las tablas y las gráfi
 2. Explica la causa cruzando fuentes: por ejemplo, una página que cae porque las búsquedas que la sostienen han perdido posiciones, un dispositivo que arrastra el total, el efecto de una actualización de Google en las fechas en que coincidió, una marca que crece mientras el resto se estanca. Si los datos no permiten afirmar una causa, dilo y propón cómo comprobarla.
 3. Cierra con lo que implica para el negocio o con la acción concreta que recomiendas.
 Cada sección debe aportar información NUEVA: no repitas en una sección las cifras ya dadas en el resumen o en otra sección, salvo que sean imprescindibles para el razonamiento. Nombra páginas y búsquedas concretas de los datos. Nada de frases hechas ("es importante", "conviene seguir trabajando") ni consejos genéricos. Párrafos cortos y claros.
-Responde SOLO con un objeto JSON con esta forma exacta:
+Responde SOLO con un objeto JSON válido con esta forma exacta (dentro de los textos escribe los saltos de párrafo como \\n\\n, nunca con saltos de línea reales):
 {"message": "RESUMEN EJECUTIVO: dos párrafos separados por una línea en blanco, de 120 a 180 palabras en total. El primero responde a «¿cómo ha ido el periodo y por qué?» con las dos o tres cifras y causas que de verdad lo explican; el segundo, a «¿qué hay que hacer ahora?» con las prioridades. Puede usar la primera persona del plural.",
  "sectionNotes": {
    "evolucion": "Análisis de la evolución del tráfico y de las actualizaciones de Google: 70 a 120 palabras.",
@@ -343,13 +337,13 @@ export async function draftWithAi(
     deep: true,
     system: WRITE_SYSTEM,
     user: `Datos del informe:\n${JSON.stringify(brief(report, business))}`,
-    maxTokens: 4500,
+    maxTokens: 8000,
     report,
     who,
     kind: "draft",
   });
   if (!answer.ok) return answer;
-  const raw = parseJson<Partial<AiDraft>>(answer.text);
+  const raw = parseJson<Partial<AiDraft>>(answer.text, "draft");
   if (!raw) return { ok: false, reason: "failed" };
   const sectionNotes: Record<string, string> = {};
   for (const [key, value] of Object.entries(raw.sectionNotes ?? {})) {
@@ -485,7 +479,7 @@ export async function analyzeWithAi(
     deep: true,
     system: ANALYSIS_SYSTEM,
     user: `Datos:\n${JSON.stringify(payload)}`,
-    maxTokens: 6000,
+    maxTokens: 8000,
     report,
     who,
     kind: "analyze",
@@ -500,7 +494,7 @@ export async function analyzeWithAi(
       url?: string | null;
       options?: { title?: string; description?: string }[];
     }[];
-  }>(answer.text);
+  }>(answer.text, "analysis");
   if (!raw) return { ok: false, reason: "failed" };
 
   const knownUrls = new Set(urls);

@@ -29,11 +29,25 @@ export async function runMicroaudit(url: string): Promise<MicroauditResult> {
       signal: AbortSignal.timeout(150_000),
     });
     const body = await response.text();
+    if (!response.ok) {
+      return {
+        ok: false,
+        message: `HTTP ${response.status}. ${body.replace(/\s+/g, " ").slice(0, 160)}`,
+      };
+    }
     const dataLine = body.split("\n").find((line) => line.startsWith("data:"));
-    const json = JSON.parse(dataLine ? dataLine.slice(5) : body) as {
+    let json: {
       result?: { isError?: boolean; content?: { text?: string }[] };
       error?: { message?: string };
     };
+    try {
+      json = JSON.parse(dataLine ? dataLine.slice(5) : body);
+    } catch {
+      return {
+        ok: false,
+        message: `Respuesta no válida: ${body.replace(/\s+/g, " ").slice(0, 160)}`,
+      };
+    }
     const text = json.result?.content?.[0]?.text ?? "";
     if (json.result?.isError || json.error || !text) {
       return {
@@ -42,10 +56,10 @@ export async function runMicroaudit(url: string): Promise<MicroauditResult> {
       };
     }
     return { ok: true, markdown: text };
-  } catch {
+  } catch (error) {
     return {
       ok: false,
-      message: "No se pudo conectar con Microaudit. Prueba de nuevo.",
+      message: `No se pudo conectar con Microaudit (${error instanceof Error ? error.name : "error"}).`,
     };
   }
 }

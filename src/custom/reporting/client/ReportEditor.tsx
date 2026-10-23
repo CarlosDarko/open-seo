@@ -193,6 +193,7 @@ function Editor({
   notesRef.current = notes;
   const prepared = useRef(false);
   const [preparing, setPreparing] = useState(false);
+  const [auditNote, setAuditNote] = useState<string | null>(null);
   useEffect(() => {
     if (prepared.current || !aiStatus.data || !typesQuery.data) return;
     const types = typesQuery.data;
@@ -219,7 +220,11 @@ function Editor({
             types,
             setInfo,
           );
-          if (run.failed) setError(`Microaudit: ${run.failed}`);
+          setAuditNote(
+            run.failed
+              ? `Se han auditado ${run.done} de ${run.total} páginas. Microaudit ha respondido: ${run.failed}`
+              : `Auditoría terminada: ${run.done} páginas${run.reused > 0 ? ` (${run.reused} reutilizadas de auditorías anteriores)` : ""}.`,
+          );
         }
         if (needsAi) {
           setInfo(
@@ -479,6 +484,7 @@ function Editor({
             reportId={report.id}
             audits={report.snapshot.audits}
             busy={preparing}
+            note={auditNote}
             onChanged={() => void refetch()}
           />
 

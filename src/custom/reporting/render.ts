@@ -1374,6 +1374,11 @@ function auditsBlock(report: ReportFull): string {
   );
 }
 
+/** Shown only to the consultant, in the editor's preview. */
+function auditsHint(): string {
+  return `<div class="note"><b>Solo en la vista previa</b>Este informe aún no tiene auditoría técnica. Define las tipologías de página en el Contexto del proyecto y usa «Auditar» en el editor: el cliente no verá este aviso.</div>`;
+}
+
 function discoverBlock(report: ReportFull): string {
   const discover = report.snapshot.discover;
   if (!discover) return "";
@@ -1571,7 +1576,10 @@ export function renderReportDocument(
       label: "Técnico",
       html:
         lead("tecnico") +
-        show("auditoria", () => auditsBlock(report)) +
+        show(
+          "auditoria",
+          () => auditsBlock(report) || (mode === "preview" ? auditsHint() : ""),
+        ) +
         columns(
           show("tecnico", () => healthBlock(report)),
           show("discover", () => discoverBlock(report)),

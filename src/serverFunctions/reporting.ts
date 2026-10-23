@@ -15,6 +15,7 @@ import {
   draftWithAi,
 } from "@/custom/reporting/server/aiDraft";
 import { parseMicroaudit } from "@/custom/reporting/microauditParse";
+import { cachedAudits, cacheAudit } from "@/custom/reporting/server/auditCache";
 import { prepareReportWithAi } from "@/custom/reporting/server/prepare";
 import {
   getPageTypes,
@@ -198,7 +199,56 @@ export const saveReportAudit = createServerFn({ method: "POST" })
       ...report.snapshot,
       audits,
     });
+    await cacheAudit(context.projectId, audit).catch(() => undefined);
     return { ok: true as const, score: audit.score };
+  });
+
+/** Fills the report with the audits already saved for the example pages,
+ *  as long as they are not older than `maxAgeHours`: no new audit needed. */
+export const applyCachedAudits = createServerFn({ method: "POST" })
+  .middleware(requireProjectContext)
+  .validator(
+    reportInput.extend({
+      types: pageTypesSchema,
+      maxAgeHours: z
+        .number()
+        .min(1)
+        .max(24 * 90),
+    }),
+  )
+  .handler(async ({ data, context }) => {
+    const report = await getReport(context.projectId, data.reportId);
+    if (!report) return { applied: [] as string[] };
+    const found = await cachedAudits(
+      context.projectId,
+      data.types,
+      data.maxAgeHours,
+    );
+    if (found.length === 0) return { applied: [] as string[] };
+    const urls = new Set(found.map((audit) => audit.url));
+    await replaceSnapshot(context.projectId, data.reportId, {
+      ...report.snapshot,
+      audits: [
+        ...report.snapshot.audits.filter((audit) => !urls.has(audit.url)),
+        ...found,
+      ],
+    });
+    return { applied: [...urls] };
+  });
+
+/** Drops the audits of pages that are no longer an example of any type. */
+export const pruneReportAudits = createServerFn({ method: "POST" })
+  .middleware(requireProjectContext)
+  .validator(reportInput.extend({ urls: z.array(z.url().max(2000)).max(60) }))
+  .handler(async ({ data, context }) => {
+    const report = await getReport(context.projectId, data.reportId);
+    if (!report) return { ok: false as const };
+    const keep = new Set(data.urls);
+    await replaceSnapshot(context.projectId, data.reportId, {
+      ...report.snapshot,
+      audits: report.snapshot.audits.filter((audit) => keep.has(audit.url)),
+    });
+    return { ok: true as const };
   });
 
 /** Removes the stored audits of a report (the consultant starts over). */
