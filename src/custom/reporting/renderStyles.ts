@@ -828,9 +828,18 @@ h3.gsh{margin:30px 0 12px}
 @media print{.exs,.gsn,.cgl{break-after:avoid}.gsc{grid-template-columns:repeat(3,1fr);gap:8px;break-inside:avoid}.gs{padding:12px 8px;border-radius:10px}.gs b{font-size:30pt}.gs b i{font-size:10pt}.gl{font-size:8pt}.spill{min-width:0;padding:2px 8px;font-size:9pt}}
 /* ---- v13: opportunities overview ---- */
 .rkm{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;background:var(--ink);color:#fff;font-size:13px;font-weight:800}
-.rkm.top{background:var(--red)}
+.rkm.hot{background:var(--red)}
 .gain{color:var(--red)}
 .qt td small.pp{margin-top:2px;font-size:12px;font-weight:500;color:var(--muted);overflow-wrap:anywhere}
 .qt td.pg .lk{font-size:15px}
 .qt tbody tr:hover td{background:var(--soft)}
+/* ---- v14: the opportunities table fits its box; room before the arrow ---- */
+.tbox.full{overflow-x:auto;overflow-y:visible}
+.tbox.full .qt.sm th{padding:10px 8px;letter-spacing:.06em}
+.tbox.full .qt.sm td{padding:10px 8px}
+.tbox.full .qt td.pg{min-width:180px;width:auto}
+.tbox.full .tr{width:40px}
+.tbox.full .nb{gap:8px}
+.tbox.full .nv{min-width:0}
+@media screen{details.op>summary,details.op.ct>summary{column-gap:30px}}
 `;

@@ -1439,7 +1439,7 @@ function opportunitiesBlock(report: ReportFull): string {
     ],
     rows.map((row, index) => [
       {
-        h: `<span class="rkm${index < 3 ? " top" : ""}">${index + 1}</span>`,
+        h: `<span class="rkm${index < 3 ? " hot" : ""}">${index + 1}</span>`,
         v: index + 1,
       },
       {
