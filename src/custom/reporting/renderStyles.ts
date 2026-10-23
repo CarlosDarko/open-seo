@@ -899,4 +899,11 @@ h3.gsh{margin:30px 0 12px}
 .sumt{margin-bottom:34px}
 .sig{margin-top:0}
 @media print{.sumt{margin-bottom:12mm}}
+/* ---- v20: one bar per row in the traffic mix ---- */
+.stk{display:none}
+.mxr .sw{display:none}
+.mxbar{height:7px;margin:8px 0 7px;border-radius:4px;background:var(--soft);overflow:hidden}
+.mxbar i{display:block;height:100%;width:var(--w);border-radius:4px;background:var(--ink)}
+.mxr.first .mxbar i{background:var(--red)}
+@media print{.mxbar{height:5px;margin:4px 0}}
 `;

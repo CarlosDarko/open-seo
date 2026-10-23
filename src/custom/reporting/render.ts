@@ -886,16 +886,6 @@ ${cards ? `<div class="uimp">${cards}</div>` : ""}
   );
 }
 
-/** Brand red for the biggest group, then the ink and greys of the report. */
-const MIX_COLORS = [
-  "#f11c41",
-  "#1a1a1a",
-  "#4a4a52",
-  "#7a7a84",
-  "#a8a8b0",
-  "#d0d0d6",
-];
-
 /** One dimension of the traffic: each group with its share of the clicks and
  *  what it added or took away since the previous period. */
 function mixCard(
@@ -907,12 +897,6 @@ function mixCard(
   const total = lines.reduce((sum, line) => sum + line.clicks, 0);
   const prevTotal = lines.reduce((sum, line) => sum + line.prevClicks, 0);
   const shown = lines.slice(0, 6);
-  const stack = `<div class="stk" aria-hidden="true">${shown
-    .map(
-      (line, index) =>
-        `<i style="width:${Math.max(1.5, line.share * 100).toFixed(1)}%;background:${MIX_COLORS[index]}" title="${esc(line.label)}"></i>`,
-    )
-    .join("")}</div>`;
   const rows = shown
     .map((line, index) => {
       const diff = line.clicks - line.prevClicks;
@@ -920,11 +904,11 @@ function mixCard(
       const delta = comparable
         ? `<span class="dl ${diff > 0 ? "up" : diff < 0 ? "down" : "flat"}">${diff > 0 ? "▲" : diff < 0 ? "▼" : "="} ${diff === 0 ? "igual" : signedNum(diff)}${change !== null && diff !== 0 ? ` <i>(${change > 0 ? "+" : "−"}${one.format(Math.abs(change) * 100)} %)</i>` : ""}</span>`
         : "";
-      return `<div class="mxr"><i class="sw" style="background:${MIX_COLORS[index]}"></i><div class="mxb"><div class="mxt"><span class="mxn" title="${esc(line.label)}">${esc(line.label)}</span><b class="mxp${index === 0 ? " first" : ""}">${one.format(line.share * 100)}<small>%</small></b></div><div class="mxm"><span>${num(line.clicks)} clics</span>${delta}</div></div></div>`;
+      return `<div class="mxr${index === 0 ? " first" : ""}"><div class="mxb"><div class="mxt"><span class="mxn" title="${esc(line.label)}">${esc(line.label)}</span><b class="mxp${index === 0 ? " first" : ""}">${one.format(line.share * 100)}<small>%</small></b></div><div class="mxbar"><i style="--w:${Math.max(1.5, line.share * 100).toFixed(1)}%"></i></div><div class="mxm"><span>${num(line.clicks)} clics</span>${delta}</div></div></div>`;
     })
     .join("");
   const net = comparable ? countDelta(total, prevTotal) : "";
-  return `<div class="sheet mix"><div class="mh"><h3>${esc(title)}</h3>${net}</div>${stack}${rows}</div>`;
+  return `<div class="sheet mix"><div class="mh"><h3>${esc(title)}</h3>${net}</div>${rows}</div>`;
 }
 
 function trafficMixBlock(report: ReportFull): string {
