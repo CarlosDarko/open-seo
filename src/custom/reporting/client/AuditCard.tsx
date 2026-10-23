@@ -37,33 +37,51 @@ export async function auditPageTypes(
   types: { name: string; urls: string[] }[],
   onProgress: (text: string) => void,
 ): Promise<AuditRun> {
-  const total = types.reduce((sum, type) => sum + type.urls.length, 0);
-  let done = 0;
-  for (const type of types) {
-    for (const url of type.urls) {
-      onProgress(`Auditando ${done + 1} de ${total}: ${pathOf(url)}…`);
-      const result = await runMicroaudit(url);
-      if (!result.ok) return { done, total, failed: result.message };
-      const stored = await saveReportAudit({
-        data: {
-          projectId,
-          reportId,
-          type: type.name,
-          url,
-          markdown: result.markdown,
-        },
-      });
-      if (!stored.ok) {
-        return {
-          done,
-          total,
-          failed: "No se pudo leer la respuesta de Microaudit.",
-        };
-      }
-      done += 1;
-    }
+  const jobs = types.flatMap((type) =>
+    type.urls.map((url) => ({ type: type.name, url })),
+  );
+  const total = jobs.length;
+  // Microaudit takes 15 to 60 seconds per page: ask for four at a time.
+  const answers: Awaited<ReturnType<typeof runMicroaudit>>[] = [];
+  let finished = 0;
+  onProgress(`Auditando ${total} páginas con Microaudit (0 de ${total})…`);
+  for (let from = 0; from < total; from += 4) {
+    const batch = jobs.slice(from, from + 4);
+    const results = await Promise.all(
+      batch.map(async (job) => {
+        const result = await runMicroaudit(job.url);
+        finished += 1;
+        onProgress(
+          `Auditando ${total} páginas con Microaudit (${finished} de ${total})…`,
+        );
+        return result;
+      }),
+    );
+    answers.push(...results);
   }
-  return { done, total, failed: null };
+  // Saved one after the other: each save reads and rewrites the report.
+  let done = 0;
+  let failed: string | null = null;
+  for (let index = 0; index < jobs.length; index += 1) {
+    const result = answers[index];
+    if (!result.ok) {
+      failed ??= result.message;
+      continue;
+    }
+    const job = jobs[index];
+    const stored = await saveReportAudit({
+      data: {
+        projectId,
+        reportId,
+        type: job.type,
+        url: job.url,
+        markdown: result.markdown,
+      },
+    });
+    if (stored.ok) done += 1;
+    else failed ??= "No se pudo leer la respuesta de Microaudit.";
+  }
+  return { done, total, failed };
 }
 
 /** Microaudit's audit of the example pages of each page type (these are set

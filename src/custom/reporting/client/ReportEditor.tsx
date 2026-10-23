@@ -419,6 +419,23 @@ function Editor({
         </div>
       </div>
 
+      {preparing ? (
+        <div
+          role="status"
+          className="flex items-center gap-3 rounded-lg border bg-muted/50 p-4 text-sm"
+        >
+          <RefreshCw className="size-4 animate-spin" aria-hidden />
+          <div>
+            <p className="font-medium">Preparando el informe</p>
+            <p className="text-muted-foreground">
+              {info ?? "Un momento…"} Primero se auditan las páginas tipo y
+              después la IA redacta el resumen y el análisis de cada pestaña.
+              Tarda unos minutos: no cierres esta página.
+            </p>
+          </div>
+        </div>
+      ) : null}
+
       <div className="grid items-start gap-5 lg:grid-cols-[430px_minmax(0,1fr)]">
         <div className="space-y-4">
           <Card>
