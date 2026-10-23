@@ -179,11 +179,55 @@ const PANEL_NOTE_IDS = new Set<string>(Object.values(PANEL_NOTE));
 /** Light formatting for any text of the report (the AI's and Carlos's):
  *  **bold**, ==accent== in the brand red, and lines starting with "- " as a
  *  list. Escaped first, so nothing typed can become HTML. */
+const FIGURE_UNIT =
+  /(?<![(\w\u2212+\-,.])(\d[\d.,]*[ \u00a0](?:clics|impresiones|búsquedas|visitas|páginas|posiciones))(?![\wáéíóú])/g;
+const FIGURE_PERCENT =
+  /(?<![(\w\u2212+\-,.])([+\u2212-]?\d[\d.,]*[ \u00a0]?%)(?![\w%])/g;
+
+/** A text with no bold at all reads flat, so the figures with a unit and the
+ *  percentages (not the ones in brackets, which only qualify a figure) are
+ *  put in bold. When the writer already marked something, nothing is added. */
+const emphasise = (html: string) =>
+  html.includes("**")
+    ? html
+    : html.replace(FIGURE_UNIT, "**$1**").replace(FIGURE_PERCENT, "**$1**");
+
 function inline(text: string): string {
-  return esc(text)
+  return emphasise(esc(text))
+    .replace(
+      /\[([^\]]+)\]\((https:\/\/[^\s)]+)\)/g,
+      '<a class="xl" href="$2" target="_blank" rel="noopener noreferrer">$1</a>',
+    )
     .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-    .replace(/==(.+?)==/g, '<mark class="hl">$1</mark>');
+    .replace(/==(.+?)==/g, '<mark class="ac">$1</mark>');
 }
+
+/** A link to an official page, in the brand red. */
+const xlink = (label: string, url: string) =>
+  `<a class="xl" href="${url}" target="_blank" rel="noopener noreferrer">${esc(label)}</a>`;
+
+const GUIDE = {
+  title: xlink(
+    "Cómo elige Google el título",
+    "https://developers.google.com/search/docs/appearance/title-link",
+  ),
+  snippet: xlink(
+    "Descripciones y fragmentos",
+    "https://developers.google.com/search/docs/appearance/snippet",
+  ),
+  helpful: xlink(
+    "Contenido útil",
+    "https://developers.google.com/search/docs/fundamentals/creating-helpful-content",
+  ),
+  links: xlink(
+    "Enlaces que Google puede rastrear",
+    "https://developers.google.com/search/docs/crawling-indexing/links-crawlable",
+  ),
+  url: xlink(
+    "Estructura de URLs",
+    "https://developers.google.com/search/docs/crawling-indexing/url-structure",
+  ),
+};
 
 const capital = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
@@ -685,7 +729,8 @@ function featuredInsight(item: Insight, index: number): string {
 
 function insightRow(item: Insight): string {
   const main = item.stats[0];
-  return `<div class="cr2"><div class="crm">${main ? `<b>${esc(main.value)}</b><span>${esc(main.label)}</span>` : `<i class="dot ${item.tone}"></i>`}</div><div class="crt"><span class="crk"><i class="dot ${item.tone}"></i>${esc(item.topic)}</span><h4>${esc(item.title)}</h4><p>${esc(item.body)}</p>${item.stats.length > 1 ? `<div class="cfs">${statChips(item, 1)}</div>` : ""}</div>${goLink(item)}</div>`;
+  const long = main && main.value.length > 9 ? " lg" : "";
+  return `<div class="cr2 ${item.tone}"><div class="crm${long}">${main ? `<b>${esc(main.value)}</b><span>${esc(main.label)}</span>` : `<i class="dot ${item.tone}"></i>`}</div><div class="crt"><span class="crk"><i class="dot ${item.tone}"></i>${esc(item.topic)}</span><h4>${esc(item.title)}</h4><p>${esc(item.body)}</p>${item.stats.length > 1 ? `<div class="cfs">${statChips(item, 1)}</div>` : ""}</div>${goLink(item)}</div>`;
 }
 
 const INSIGHT_GROUPS: {
@@ -1381,7 +1426,7 @@ function opportunitiesBlock(report: ReportFull): string {
     ]),
   );
 
-  const shown = rows.slice(0, 10);
+  const shown = rows;
   const cards = shown
     .map((row, index) => {
       const idea = ideas.get(row.query);
@@ -1408,19 +1453,24 @@ function opportunitiesBlock(report: ReportFull): string {
             )
             .join("")}</div>`
         : "";
-      return `<details class="op"${index < 3 ? " open" : ""}><summary><span class="rk">${index + 1}</span><span class="ot"><b>${queryLink(row.query)}</b><span class="kd ${row.kind}">${OPP_KIND_LABEL[row.kind]}</span></span><span class="om"><span><small>Posición</small>${pos(row.position)}</span><span><small>Impresiones</small>${num(row.impressions)}</span><span><small>Esfuerzo</small>${effortDots(effortOf(row))}</span><span class="og">+${num(row.potentialClicks)}<small>clics posibles</small></span></span></summary><div class="ob${serps ? " two" : ""}"><div class="oc"><h5>Qué pasa</h5><div class="rich">${paragraphs(analysis)}</div><h5>Qué hacer, en este orden</h5><ol class="oa">${actions.map((action) => `<li>${inline(action)}</li>`).join("")}</ol><h5>Resultado esperado</h5><div class="rich">${paragraphs(result)}</div>${row.page ? `<div class="opg">Página que hoy posiciona: ${pageLink(row.page)}</div>` : ""}</div>${serps}</div></details>`;
+      return `<details class="op"${index < 3 ? " open" : ""}><summary><span class="rk">${index + 1}</span><span class="ot"><b>${queryLink(row.query)}</b><span class="kd ${row.kind}">${OPP_KIND_LABEL[row.kind]}</span></span><span class="om"><span><small>Posición</small>${pos(row.position)}</span><span><small>Impresiones</small>${num(row.impressions)}</span><span><small>Esfuerzo</small>${effortDots(effortOf(row))}</span><span class="og">+${num(row.potentialClicks)}<small>clics posibles</small></span></span></summary><div class="ob${serps ? " two" : ""}"><div class="oc"><h5>Qué pasa</h5><div class="rich">${paragraphs(analysis)}</div><h5>Qué hacer, en este orden</h5><ol class="oa">${actions.map((action) => `<li>${inline(action)}</li>`).join("")}</ol><h5>Resultado esperado</h5><div class="rich">${paragraphs(result)}</div>${row.page ? `<div class="opg">Página que hoy posiciona: ${pageLink(row.page)}</div>` : ""}<div class="opg">Guías oficiales de Google: ${row.kind === "snippet" ? `${GUIDE.title} · ${GUIDE.snippet}` : `${GUIDE.helpful} · ${GUIDE.links}`}</div></div>${serps}</div></details>`;
     })
     .join("");
 
   const content = report.notes.contentIdeas.filter((item) => item.title.trim());
+  const contentCard = (item: (typeof content)[number], index: number) => {
+    const outline = (item.outline ?? []).filter((line) => line.trim());
+    const links = item.linkFrom ?? [];
+    const slug = item.slug?.replace(/^\/+/, "");
+    const serp =
+      item.metaTitle || item.metaDescription || slug
+        ? `<div class="os"><h5>Cómo se vería en Google</h5>${serpPreview(host, slug ? `https://${host}/${slug}` : null, item.metaTitle || item.title, item.metaDescription ?? "", "Propuesta")}${slug ? `<p class="slg">Dirección sugerida: <b>/${esc(slug)}</b></p>` : ""}</div>`
+        : "";
+    return `<details class="op ct"${index < 2 ? " open" : ""}><summary><span class="rk">${index + 1}</span><span class="ot"><b>${esc(item.title)}</b>${item.target ? `<span class="itg">Apunta a: ${queryLink(item.target)}</span>` : ""}</span><span class="ik2">${esc(item.format || "Contenido")}</span></summary><div class="ob${serp ? " two" : ""}"><div class="oc"><h5>Por qué merece la pena</h5><div class="rich">${paragraphs(item.reason)}</div>${item.intent ? `<h5>Qué debe resolver la página</h5><div class="rich">${paragraphs(item.intent)}</div>` : ""}${outline.length > 0 ? `<h5>Estructura recomendada</h5><ol class="oa">${outline.map((line) => `<li>${inline(line)}</li>`).join("")}</ol>` : ""}${links.length > 0 ? `<h5>Enlazado interno</h5><div class="rich"><p>Para que la nueva página reciba tráfico desde el primer día, enlazar hacia ella desde:</p></div><ul class="lkl">${links.map((url) => `<li>${pageLink(url)}</li>`).join("")}</ul>` : ""}${item.result ? `<h5>Resultado esperado</h5><div class="rich">${paragraphs(item.result)}</div>` : ""}<div class="opg">Guías oficiales de Google: ${GUIDE.helpful} · ${GUIDE.title} · ${GUIDE.url}</div></div>${serp}</div></details>`;
+  };
   const contentHtml =
     content.length > 0
-      ? `<div class="blk"><div class="bh"><h2>Contenidos nuevos que merecen la pena</h2><p class="lead">Ideas de páginas o artículos que aún no existen, sacadas de los temas y las búsquedas donde la web ya tiene recorrido.</p></div><div class="ideas2">${content
-          .map(
-            (item) =>
-              `<article class="idea2"><div class="ik2">${esc(item.format || "Contenido")}</div><b>${esc(item.title)}</b>${item.target ? `<div class="itg">Apunta a: ${queryLink(item.target)}</div>` : ""}<p>${inline(item.reason)}</p></article>`,
-          )
-          .join("")}</div></div>`
+      ? `<div class="blk"><div class="bh"><h2>Contenidos nuevos que merecen la pena</h2><p class="lead">Páginas o artículos que aún no existen, sacados de los temas y las búsquedas donde la web ya tiene recorrido. Cada idea trae lo necesario para encargarla: qué debe resolver, la estructura, el título y la descripción propuestos, y desde dónde enlazarla.</p></div><div class="ops">${content.map(contentCard).join("")}</div></div>`
       : "";
 
   return (
@@ -1431,7 +1481,7 @@ function opportunitiesBlock(report: ReportFull): string {
       "Búsquedas en las que la web ya aparece y que, con una mejora concreta de título, contenido o enlaces, pueden traducirse en más clics.",
       `${summary}<div class="sheet">${howTo}</div><div class="sheet" style="margin-top:18px"><h3>Todas las oportunidades</h3>${overview}</div>`,
     ) +
-    `<div class="blk"><div class="bh"><h2>Plan de acción por búsqueda</h2><p class="lead">Qué ocurre en cada una, qué hacer y en qué orden, y qué resultado cabe esperar.${rows.length > shown.length ? ` Se detallan las ${shown.length} primeras; el resto está en la tabla de arriba.` : ""}</p></div><div class="ops">${cards}</div></div>` +
+    `<div class="blk"><div class="bh"><h2>Plan de acción por búsqueda</h2><p class="lead">Qué ocurre en cada una, qué hacer y en qué orden, cómo se vería en Google y qué resultado cabe esperar. Se abren y se cierran con un clic.</p></div><div class="ops">${cards}</div></div>` +
     contentHtml
   );
 }
@@ -1442,7 +1492,6 @@ function titlesBlock(report: ReportFull): string {
   const inCards = new Set(
     [...report.snapshot.opportunities]
       .sort((a, b) => priorityOf(b) - priorityOf(a))
-      .slice(0, 10)
       .map((row) => row.query),
   );
   const items = report.notes.titleIdeas.filter(

@@ -267,10 +267,29 @@ describe("renderReportDocument", () => {
       "public",
     );
     expect(rich).toContain("<strong>mucho</strong>");
-    expect(rich).toContain('<mark class="hl">Lo más importante.</mark>');
+    expect(rich).toContain('<mark class="ac">Lo más importante.</mark>');
     expect(rich).toContain(
       '<ul class="rl"><li>uno</li><li>dos &lt;b&gt;x&lt;/b&gt;</li></ul>',
     );
+  });
+
+  it("links only to https pages, in the brand red, and bolds figures when the writer marked nothing", () => {
+    const html = renderReportDocument(
+      {
+        ...report,
+        notes: {
+          ...report.notes,
+          message:
+            "Bajan 120 clics (−3,3 %). Ver [la guía](https://developers.google.com/search/docs/appearance/title-link) y [esto](javascript:alert(1)).",
+        },
+      },
+      "public",
+    );
+    expect(html).toContain("<strong>120 clics</strong>");
+    expect(html).toContain(
+      '<a class="xl" href="https://developers.google.com/search/docs/appearance/title-link"',
+    );
+    expect(html).not.toContain('href="javascript:');
   });
 
   it("lays the roadmap out as action, why, how and impact, starting with a capital", () => {
@@ -288,7 +307,9 @@ describe("renderReportDocument", () => {
     expect(withSteps).toContain(
       '<b class="stt">Recuperar la página de producto</b>',
     );
-    expect(withSteps).toContain('<p class="sw">Cae un 40 %</p>');
+    expect(withSteps).toContain(
+      '<p class="sw">Cae un <strong>40 %</strong></p>',
+    );
     expect(withSteps).toContain("<li>Reforzar enlaces</li>");
     expect(withSteps).toContain("Impacto esperado");
   });

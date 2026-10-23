@@ -59,7 +59,7 @@ const notesSchema = z.object({
           .max(4),
       }),
     )
-    .max(10),
+    .max(20),
   opportunityIdeas: z
     .array(
       z.object({
@@ -69,7 +69,7 @@ const notesSchema = z.object({
         result: z.string().max(600).optional(),
       }),
     )
-    .max(12),
+    .max(20),
   contentIdeas: z
     .array(
       z.object({
@@ -77,6 +77,13 @@ const notesSchema = z.object({
         reason: z.string().max(700),
         format: z.string().max(80).optional(),
         target: z.string().max(160).optional(),
+        intent: z.string().max(500).optional(),
+        outline: z.array(z.string().max(300)).max(10).optional(),
+        metaTitle: z.string().max(120).optional(),
+        metaDescription: z.string().max(250).optional(),
+        slug: z.string().max(120).optional(),
+        linkFrom: z.array(z.string().max(500)).max(6).optional(),
+        result: z.string().max(500).optional(),
       }),
     )
     .max(8),

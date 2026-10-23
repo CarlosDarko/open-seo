@@ -192,9 +192,68 @@ async function businessContext(projectId: string): Promise<string> {
   }
 }
 
+/** The only official pages the AI may link to (and the renderer's own
+ *  guide links reuse): nothing else is invented. */
+export const OFFICIAL_SOURCES = [
+  {
+    label: "informe de rendimiento de Search Console",
+    url: "https://support.google.com/webmasters/answer/7042828",
+  },
+  {
+    label: "cómo elige Google el título",
+    url: "https://developers.google.com/search/docs/appearance/title-link",
+  },
+  {
+    label: "descripciones y fragmentos",
+    url: "https://developers.google.com/search/docs/appearance/snippet",
+  },
+  {
+    label: "contenido útil",
+    url: "https://developers.google.com/search/docs/fundamentals/creating-helpful-content",
+  },
+  {
+    label: "datos estructurados",
+    url: "https://developers.google.com/search/docs/appearance/structured-data/intro-structured-data",
+  },
+  {
+    label: "sitemaps",
+    url: "https://developers.google.com/search/docs/crawling-indexing/sitemaps/overview",
+  },
+  {
+    label: "enlaces rastreables",
+    url: "https://developers.google.com/search/docs/crawling-indexing/links-crawlable",
+  },
+  {
+    label: "URLs duplicadas y canonical",
+    url: "https://developers.google.com/search/docs/crawling-indexing/consolidate-duplicate-urls",
+  },
+  {
+    label: "versiones por idioma (hreflang)",
+    url: "https://developers.google.com/search/docs/specialty/international/localized-versions",
+  },
+  {
+    label: "estructura de URLs",
+    url: "https://developers.google.com/search/docs/crawling-indexing/url-structure",
+  },
+  {
+    label: "políticas de spam",
+    url: "https://developers.google.com/search/docs/essentials/spam-policies",
+  },
+  {
+    label: "Google Discover",
+    url: "https://developers.google.com/search/docs/appearance/google-discover",
+  },
+  { label: "Core Web Vitals", url: "https://web.dev/articles/vitals" },
+  {
+    label: "estado de las actualizaciones de Google",
+    url: "https://status.search.google.com/summary",
+  },
+];
+
 const STYLE = `Estilo obligatorio: castellano claro, sencillo y profesional, propio de un informe para un cliente no técnico. NO tutees al lector y no uses "tú", "tu", "tus", "te": el sujeto es la web, el sitio, el proyecto o las páginas (por ejemplo "la web gana posiciones", "las páginas principales concentran el 60 % de los clics"). Si usas un término técnico, explícalo en pocas palabras. Sé honesto con los datos pero constructivo: si algo va mal, dilo con claridad y explica por qué es recuperable. No escribas nunca etiquetas ni frases como "en positivo" o "el lado bueno": el cliente no debe notar ninguna instrucción interna, solo un análisis serio y equilibrado. Nunca inventes cifras, causas ni contenido que no se te haya dado; si no hay base suficiente para afirmar algo, usa un tono prudente ("conviene comprobar", "posiblemente").
 Lenguaje: claro, cercano y sencillo, como se lo explicarías a un cliente listo que no es técnico: frases cortas y palabras de uso diario, sin jerga ni palabras rebuscadas (nada de «reservorio», «sinergia», «apalancar», «holístico», «catalizador»...). Si hace falta un término SEO, usa el normal y explícalo en pocas palabras entre paréntesis. Cercano no es informal: el tono sigue siendo profesional.
-Formato: puedes usar **negritas** para las cifras, páginas o ideas clave; ==resaltado== (se pinta en el rojo de la marca) solo para LA idea más importante del texto, una o dos veces como máximo; y listas con guion («- » al principio de la línea) cuando enumeres tres o más cosas. No uses nada más: ni cursivas, ni títulos, ni tablas, ni HTML.
+Formato (obligatorio, el informe se ve plano sin él): en CADA texto pon en **negrita** de 3 a 5 elementos clave (las cifras importantes con su unidad, una página o búsqueda concreta, la idea central) y usa ==resaltado== (se pinta en el rojo de la marca) para UNA sola frase o dato: la conclusión más importante del texto. Las listas con guion («- » al principio de la línea) solo cuando enumeres tres o más cosas. No uses cursivas, títulos, tablas ni HTML. Nunca dejes un texto sin negritas.
+Enlaces: cuando aporten (explicar un concepto, respaldar una recomendación o poner un ejemplo), enlaza con el formato [texto del enlace](https://...). Para fuentes oficiales usa SOLO estas direcciones, sin inventar ninguna otra: ${OFFICIAL_SOURCES.map((item) => `${item.label} → ${item.url}`).join("; ")}. Para ejemplos puedes enlazar páginas de la propia web que aparezcan en los datos. Máximo 2 enlaces por texto y solo si encajan de verdad; el texto del enlace es una expresión corta y natural, no la dirección.
 Porcentajes: siempre que digas que algo «pasa de X a Y», «sube de X a Y», «baja de X a Y», «crece de X a Y» o similar, añade enseguida entre paréntesis el porcentaje de subida o bajada, por ejemplo «pasa de 1.200 a 1.500 clics (+25 %)». Usa el campo cambioPorcentual (o parecido) de los datos: ya está calculado, no lo recalcules de cabeza. Si un dato no lo trae, calcúlalo con cuidado y redondea a un decimal. Escribe los números en formato español (1.234,5).`;
 
 // ------------------------------------------------------------- writing
@@ -206,7 +265,7 @@ Tu trabajo es ARGUMENTAR, no describir: el cliente ya ve las tablas y las gráfi
 3. Cierra con lo que implica para el negocio o con la acción concreta que recomiendas.
 Los totales y las tablas INCLUYEN las búsquedas de marca (los temas no). Para distinguir cuánto viene de la marca usa los datos de la clave «marca» y di cuánto pesa en cada análisis donde importe. Cada sección debe aportar información NUEVA: no repitas en una sección las cifras ya dadas en el resumen o en otra sección, salvo que sean imprescindibles para el razonamiento. Nombra páginas y búsquedas concretas de los datos. Nada de frases hechas ("es importante", "conviene seguir trabajando") ni consejos genéricos. Párrafos cortos y claros.
 Responde SOLO con un objeto JSON válido con esta forma exacta (dentro de los textos escribe los saltos de párrafo como \\n\\n, nunca con saltos de línea reales):
-{"message": "RESUMEN EJECUTIVO: dos párrafos separados por una línea en blanco, de 120 a 180 palabras en total. El primero responde a «¿cómo ha ido el periodo y por qué?» con las dos o tres cifras y causas que de verdad lo explican; el segundo, a «¿qué hay que hacer ahora?» con las prioridades. Puede usar la primera persona del plural.",
+{"message": "RESUMEN EJECUTIVO: exactamente dos párrafos separados por UNA línea en blanco (\\n\\n), de 110 a 160 palabras en total, sin listas. El primero responde a «¿cómo ha ido el periodo y por qué?» con las dos o tres cifras y causas que de verdad lo explican; el segundo, a «¿qué hay que hacer ahora?» con las prioridades en orden (primero, segundo, tercero). Con **negritas** en las cifras y páginas clave y UN ==resaltado== con la frase más importante. Puede usar la primera persona del plural.",
  "sectionNotes": {
    "evolucion": "Análisis de la evolución del tráfico y de las actualizaciones de Google: 70 a 120 palabras.",
    "reparto": "Análisis de dónde vienen los clics (tipo de página, dispositivo, marca frente al resto, intención): 60 a 100 palabras. Si no aporta nada nuevo, cadena vacía.",
@@ -455,25 +514,37 @@ export async function draftWithAi(
 
 // ------------------------------------------------------------ analysis
 
-const ANALYSIS_SYSTEM = `Eres un consultor SEO senior que revisa un sitio web para un cliente. ${STYLE}
-Recibes: (1) páginas que han perdido tráfico, con lo que hay en cada una (título, descripción, H1, encabezados, número de palabras) y las búsquedas que más han caído con su posición antes y ahora; (2) oportunidades de crecimiento: búsquedas donde el sitio ya aparece, con su posición, impresiones, clics, CTR actual y esperado, clics potenciales, tipo ("push": está cerca del top 3; "snippet": se ve mucho y se clica poco) y la página que posiciona con su título y encabezados; (3) los temas con más tráfico y las búsquedas que más aportan.
-Tu trabajo es dar ideas que de verdad aporten, no generalidades:
-- Diagnóstico de cada página que cae: causa más probable y arreglos concretos (qué cambiar en título, H1, encabezados o contenido respecto a la búsqueda que cae).
-- Para CADA oportunidad que recibes, sin dejar ninguna:
-  · "analysis": 3 o 4 frases. Qué intención de búsqueda hay detrás, qué pasa hoy (con las cifras: posición, impresiones, CTR actual frente al esperado) y qué le falta a la página actual, apoyándote en su título y encabezados. Puedes usar **negritas**.
+const OPPORTUNITIES_SYSTEM = `Eres un consultor SEO senior que revisa un sitio web para un cliente. ${STYLE}
+Recibes las oportunidades de crecimiento: búsquedas donde el sitio ya aparece, con su posición, impresiones, clics, CTR actual y esperado, clics potenciales, tipo ("push": está cerca del top 3; "snippet": se ve mucho y se clica poco) y la página que posiciona con su título, descripción y encabezados.
+Para CADA oportunidad que recibes, sin dejar ninguna, devuelves un plan completo:
+  · "analysis": 3 o 4 frases. Qué intención de búsqueda hay detrás, qué pasa hoy (con las cifras: posición, impresiones, CTR actual frente al esperado) y qué le falta a la página actual, apoyándote en su título y encabezados. Con **negritas** en lo importante.
   · "actions": de 3 a 4 pasos concretos, distintos entre sí y en el orden en que conviene hacerlos. Cada paso empieza por un verbo y dice qué tocar exactamente (por ejemplo: ampliar tal sección, añadir un encabezado con la pregunta y una respuesta corta debajo, enlazar desde tal tipo de página con tal texto, separar la intención en una página nueva, reescribir el título para que empiece por la búsqueda). Sin consejos vacíos como «mejorar el contenido».
   · "result": una frase con el resultado que se espera (usa los clics posibles de los datos) y cómo comprobarlo en Search Console: qué métrica mirar y en cuánto tiempo.
-- Ideas de contenido nuevo (de 4 a 6), basadas en los temas y las búsquedas dadas. Cada una con: "title" (el título del contenido), "format" (guía, comparativa, ficha, preguntas frecuentes, caso práctico...), "target" (la búsqueda principal a la que apunta, tomada de los datos) y "reason" (2 frases con el dato que lo justifica: tema, impresiones, posición). No inventes volúmenes de búsqueda.
-- Títulos nuevos para las oportunidades de tipo "snippet" y para las 3 primeras de tipo "push": máximo 60 caracteres el título y 155 la descripción, naturales, con la búsqueda o su intención al principio, sin clickbait ni promesas falsas.
+  · Y en "titleIdeas", dos propuestas de título y descripción para TODAS las oportunidades, sean "snippet" o "push": máximo 60 caracteres el título y 155 la descripción, naturales, con la búsqueda o su intención al principio, sin clickbait ni promesas falsas. En las de tipo "push" el título debe reforzar que la página responde exactamente a la búsqueda y la descripción adelantar la respuesta.
 Responde SOLO con un objeto JSON válido con esta forma exacta (dentro de los textos escribe los saltos de línea como \\n, nunca reales):
-{"diagnoses": [{"url": "...", "text": "2 a 4 frases", "fixes": ["...", "...", "..."]}],
- "opportunityIdeas": [{"query": "...", "analysis": "...", "actions": ["...", "...", "..."], "result": "..."}],
- "contentIdeas": [{"title": "...", "format": "...", "target": "...", "reason": "..."}],
+{"opportunityIdeas": [{"query": "...", "analysis": "...", "actions": ["...", "...", "..."], "result": "..."}],
  "titleIdeas": [{"query": "...", "url": "...", "options": [{"title": "...", "description": "..."}, {"title": "...", "description": "..."}]}]}`;
 
+const STRATEGY_SYSTEM = `Eres un consultor SEO senior que revisa un sitio web para un cliente. ${STYLE}
+Recibes: (1) páginas que han perdido tráfico, con lo que hay en cada una (título, descripción, H1, encabezados, número de palabras) y las búsquedas que más han caído con su posición antes y ahora; (2) los temas con más tráfico y las búsquedas que más aportan; (3) un resumen de las oportunidades ya detectadas y las páginas existentes de la web.
+Tu trabajo es dar ideas que de verdad aporten, no generalidades:
+- Diagnóstico de cada página que cae: causa más probable y arreglos concretos (qué cambiar en título, H1, encabezados o contenido respecto a la búsqueda que cae).
+- Ideas de contenido nuevo (de 4 a 6) que NO existan ya en la web, basadas en los temas y las búsquedas dadas. Cada una es un mini-briefing que un redactor pueda ejecutar sin preguntar nada:
+  · "title": el título del contenido; "format": guía, comparativa, ficha, preguntas frecuentes, caso práctico…; "target": la búsqueda principal a la que apunta, tomada de los datos.
+  · "intent": 1 o 2 frases con lo que la persona quiere resolver y qué debe contestar la página.
+  · "reason": 2 o 3 frases con el dato que lo justifica (tema, impresiones, posición, tendencia). No inventes volúmenes de búsqueda.
+  · "outline": de 5 a 7 apartados (encabezados H2) en el orden en que irían, cada uno en una frase corta que diga qué contiene; el primero debe ser la respuesta directa.
+  · "metaTitle" (máximo 60 caracteres) y "metaDescription" (máximo 155), naturales y con la búsqueda al principio.
+  · "slug": la ruta corta en minúsculas con guiones, sin dominio ni barras.
+  · "linkFrom": de 2 a 4 direcciones de «paginas_existentes» desde las que enlazar a la nueva, copiadas tal cual.
+  · "result": una frase con lo que cabe esperar y cómo comprobarlo en Search Console.
+Responde SOLO con un objeto JSON válido con esta forma exacta (dentro de los textos escribe los saltos de línea como \\n, nunca reales):
+{"diagnoses": [{"url": "...", "text": "2 a 4 frases", "fixes": ["...", "...", "..."]}],
+ "contentIdeas": [{"title": "...", "format": "...", "target": "...", "intent": "...", "reason": "...", "outline": ["...", "..."], "metaTitle": "...", "metaDescription": "...", "slug": "...", "linkFrom": ["..."], "result": "..."}]}`;
+
 const MAX_LOSERS = 3;
-const MAX_TITLES = 6;
-const MAX_OPPORTUNITIES = 10;
+const MAX_TITLES = 16;
+const MAX_OPPORTUNITIES = 16;
 
 export type AiAnalysis = {
   diagnoses: Diagnosis[];
@@ -534,17 +605,36 @@ export async function analyzeWithAi(
   };
 
   const business = await businessContext(report.projectId);
-  const payload = {
+  const lossRows = losers.map((row) => ({
+    url: row.key,
+    ruta: pathOf(row.key),
+    clics: { antes: row.prevClicks, ahora: row.clicks },
+    posicion: { antes: row.prevPosition, ahora: row.position },
+    causa_detectada: row.cause,
+    busquedas_que_mas_caen: row.queries,
+    pagina: pageInfo(row.key),
+  }));
+  const topicRows = snapshot.topics.slice(0, 8).map((topic) => ({
+    tema: topic.label,
+    clics: topic.clicks,
+    clics_antes: topic.prevClicks,
+    posicion_media: topic.position,
+    busquedas_principales: topic.topQueries.map((item) => item.query),
+  }));
+  const topQueryRows = snapshot.topQueries.slice(0, 10).map((item) => ({
+    busqueda: item.query,
+    clics: item.clicks,
+    posicion: item.position,
+  }));
+  const existingPages = [
+    ...new Set([
+      ...(snapshot.pages ?? []).slice(0, 25).map((row) => row.url),
+      ...urls,
+    ]),
+  ];
+
+  const opportunityPayload = {
     contexto_del_negocio: business || undefined,
-    paginas_que_caen: losers.map((row) => ({
-      url: row.key,
-      ruta: pathOf(row.key),
-      clics: { antes: row.prevClicks, ahora: row.clicks },
-      posicion: { antes: row.prevPosition, ahora: row.position },
-      causa_detectada: row.cause,
-      busquedas_que_mas_caen: row.queries,
-      pagina: pageInfo(row.key),
-    })),
     oportunidades: opportunities.map((item) => ({
       busqueda: item.query,
       tipo: item.kind,
@@ -565,53 +655,76 @@ export async function analyzeWithAi(
       clics_potenciales: item.potentialClicks,
       pagina: item.page ? pageInfo(item.page) : undefined,
     })),
-    temas: snapshot.topics.slice(0, 8).map((topic) => ({
-      tema: topic.label,
-      clics: topic.clicks,
-      clics_antes: topic.prevClicks,
-      posicion_media: topic.position,
-      busquedas_principales: topic.topQueries.map((item) => item.query),
-    })),
-    busquedas_que_mas_aportan: snapshot.topQueries.slice(0, 10).map((item) => ({
+  };
+  const strategyPayload = {
+    contexto_del_negocio: business || undefined,
+    paginas_que_caen: lossRows,
+    temas: topicRows,
+    busquedas_que_mas_aportan: topQueryRows,
+    oportunidades_detectadas: opportunities.map((item) => ({
       busqueda: item.query,
-      clics: item.clicks,
       posicion: item.position,
+      impresiones: item.impressions,
     })),
+    paginas_existentes: existingPages,
   };
 
-  const answer = await callClaude({
-    deep: true,
-    system: ANALYSIS_SYSTEM,
-    user: `Datos:\n${JSON.stringify(payload)}`,
-    maxTokens: 16000,
-    report,
-    who,
-    kind: "analyze",
-  });
-  if (!answer.ok) return answer;
-  const raw = parseJson<{
-    diagnoses?: Partial<Diagnosis>[];
+  const [opportunityAnswer, strategyAnswer] = await Promise.all([
+    opportunities.length > 0
+      ? callClaude({
+          deep: true,
+          system: OPPORTUNITIES_SYSTEM,
+          user: `Datos:\n${JSON.stringify(opportunityPayload)}`,
+          maxTokens: 16000,
+          report,
+          who,
+          kind: "analyze",
+        })
+      : Promise.resolve(null),
+    callClaude({
+      deep: true,
+      system: STRATEGY_SYSTEM,
+      user: `Datos:\n${JSON.stringify(strategyPayload)}`,
+      maxTokens: 12000,
+      report,
+      who,
+      kind: "analyze",
+    }),
+  ]);
+  const answers = [opportunityAnswer, strategyAnswer];
+  const read = <T>(answer: CallResult | null, label: string): T | null =>
+    answer?.ok ? parseJson<T>(answer.text, label) : null;
+  const opportunityRaw = read<{
     opportunityIdeas?: Partial<OpportunityIdea>[];
-    contentIdeas?: Partial<ContentIdea>[];
     titleIdeas?: {
       query?: string;
       url?: string | null;
       options?: { title?: string; description?: string }[];
     }[];
-  }>(answer.text, "analysis");
-  if (!raw) {
+  }>(opportunityAnswer, "opportunities");
+  const strategyRaw = read<{
+    diagnoses?: Partial<Diagnosis>[];
+    contentIdeas?: Partial<ContentIdea>[];
+  }>(strategyAnswer, "strategy");
+  if (!opportunityRaw && !strategyRaw) {
+    for (const answer of answers) if (answer && !answer.ok) return answer;
+    const cut = answers.some((answer) => answer?.ok && answer.truncated);
     return {
       ok: false,
       reason: "failed",
-      detail: answer.truncated
+      detail: cut
         ? "la respuesta de la IA se cortó por longitud"
         : "la respuesta de la IA no tenía el formato esperado",
     };
   }
+  const costEur = answers.reduce(
+    (sum, answer) => sum + (answer?.ok ? answer.costEur : 0),
+    0,
+  );
 
-  const knownUrls = new Set(urls);
+  const knownUrls = new Set(existingPages);
   const knownQueries = new Set(opportunities.map((item) => item.query));
-  const diagnoses: Diagnosis[] = (raw.diagnoses ?? [])
+  const diagnoses: Diagnosis[] = (strategyRaw?.diagnoses ?? [])
     .filter((item) => item.url && knownUrls.has(item.url))
     .slice(0, MAX_LOSERS)
     .map((item) => ({
@@ -619,7 +732,9 @@ export async function analyzeWithAi(
       text: clip(item.text, 900),
       fixes: (item.fixes ?? []).slice(0, 4).map((fix) => clip(fix, 300)),
     }));
-  const opportunityIdeas: OpportunityIdea[] = (raw.opportunityIdeas ?? [])
+  const opportunityIdeas: OpportunityIdea[] = (
+    opportunityRaw?.opportunityIdeas ?? []
+  )
     .filter((item) => item.query && knownQueries.has(item.query))
     .slice(0, MAX_OPPORTUNITIES)
     .map((item) => ({
@@ -628,16 +743,32 @@ export async function analyzeWithAi(
       actions: (item.actions ?? []).slice(0, 5).map((a) => clip(a, 400)),
       result: clip(item.result, 500) || undefined,
     }));
-  const contentIdeas: ContentIdea[] = (raw.contentIdeas ?? [])
+  const contentIdeas: ContentIdea[] = (strategyRaw?.contentIdeas ?? [])
     .filter((item) => item.title)
     .slice(0, 6)
     .map((item) => ({
       title: clip(item.title, 160),
-      reason: clip(item.reason, 500),
+      reason: clip(item.reason, 600),
       format: clip(item.format, 60) || undefined,
       target: clip(item.target, 120) || undefined,
+      intent: clip(item.intent, 400) || undefined,
+      outline: (item.outline ?? [])
+        .slice(0, 8)
+        .map((line) => clip(line, 220))
+        .filter(Boolean),
+      metaTitle: clip(item.metaTitle, 90) || undefined,
+      metaDescription: clip(item.metaDescription, 200) || undefined,
+      slug:
+        clip(item.slug, 90)
+          .toLowerCase()
+          .replace(/^\/+|\/+$/g, "")
+          .replace(/[^a-z0-9/-]+/g, "-") || undefined,
+      linkFrom: (item.linkFrom ?? [])
+        .filter((url) => knownUrls.has(url))
+        .slice(0, 4),
+      result: clip(item.result, 400) || undefined,
     }));
-  const titleIdeas: TitleIdea[] = (raw.titleIdeas ?? [])
+  const titleIdeas: TitleIdea[] = (opportunityRaw?.titleIdeas ?? [])
     .filter((item) => item.query)
     .slice(0, MAX_TITLES)
     .map((item) => ({
@@ -651,7 +782,7 @@ export async function analyzeWithAi(
     }));
   return {
     ok: true,
-    costEur: answer.costEur,
+    costEur,
     diagnoses,
     titleIdeas,
     opportunityIdeas,

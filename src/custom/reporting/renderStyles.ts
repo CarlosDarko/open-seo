@@ -1,4 +1,4 @@
-// The look of a client report: a single self-contained stylesheet in Carlos
+﻿// The look of a client report: a single self-contained stylesheet in Carlos
 // Ortega's brand (ink #1a1a1a, red #f11c41, soft greys). Editorial and sober:
 // a dark cover, white sheets with hairlines, big numerals and almost no
 // colour besides the brand red. Good and bad news are told with a small
@@ -547,7 +547,7 @@ span.dl.down{color:var(--down)}
 .scv .of,.cs .of{font-size:11px}
 .chip b .of{font-size:15px}
 /* ---- v6: rich text, bars in tables, topic bands, pills, roadmap, signature ---- */
-mark.hl{background:none;color:var(--red);font-weight:700}
+mark.ac{background:none;color:var(--red);font-weight:700}
 .an strong,.sumt strong,.is strong{color:var(--ink);font-weight:700}
 .rl{margin:0 0 12px;padding-left:22px;font-size:16.5px;line-height:1.7;color:var(--ink2)}
 .rl li{margin:4px 0}
@@ -589,7 +589,7 @@ a.el:hover{color:var(--red);background:#fde8ec;text-decoration:none}
 .steps .sh li::marker{color:var(--red)}
 .steps .si{margin:12px 0 0;font-size:15px;color:#fff}
 .steps .si b{display:block;margin-bottom:2px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#ff8da1}
-.steps mark.hl{color:#ff8da1}
+.steps mark.ac{color:#ff8da1}
 .steps strong{color:#fff}
 .sig .av{width:54px;height:54px;padding:3px;background:var(--red);overflow:hidden}
 .sig .av img{display:block;width:100%;height:100%;border-radius:50%;object-fit:cover}
@@ -748,4 +748,59 @@ details.op>summary:after{content:none}
 
 .kd{white-space:nowrap;overflow-wrap:normal}
 .qt td .kd{font-size:11px;padding:1px 8px}
+/* ---- v9: summary, links, tables, conclusions, content briefings ---- */
+.xl{color:var(--red);font-weight:600;border-bottom:1px solid rgba(241,28,65,.35)}
+.xl:hover{border-bottom-color:var(--red);text-decoration:none}
+.steps .xl{color:#ff8da1;border-bottom-color:rgba(255,141,161,.45)}
+.sumt{display:flex;flex-direction:column;gap:16px}
+.sumt p{margin:0;font-size:16.5px;line-height:1.7;color:var(--ink2)}
+.sumt p:first-child{font-size:19px;line-height:1.6;color:var(--ink)}
+.sumt .rl{margin:0;padding-left:20px;display:grid;gap:6px;font-size:16.5px;line-height:1.6;color:var(--ink2)}
+.sumt .rl li::marker{color:var(--red)}
+.rich strong,.oa strong,.cf strong,.cr2 strong,.idea2 strong,.steps strong{color:var(--ink)}
+.steps strong{color:#fff}
+.an p strong{font-weight:700}
+.qt th.r,.qt td.r{text-align:center}
+.nb{justify-content:center}
+.nv{min-width:62px}
+.mv{align-items:center;text-align:center}
+.cs,.scv{text-align:center}
+.cr2{grid-template-columns:210px minmax(0,1fr) auto;gap:26px;align-items:center;padding:20px 26px}
+.crm{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;align-self:stretch;padding:18px 12px;border-radius:16px;text-align:center;background:var(--soft)}
+.crm b{font-size:40px;font-weight:800;letter-spacing:-.045em;line-height:1;color:var(--ink)}
+.crm.lg b{font-size:27px;line-height:1.1;letter-spacing:-.03em}
+.crm span{font-size:11.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.cr2.bad .crm{background:color-mix(in srgb,var(--down) 9%,#fff)}
+.cr2.bad .crm b{color:var(--down)}
+.cr2.good .crm{background:color-mix(in srgb,var(--up) 10%,#fff)}
+.cr2.good .crm b{color:var(--up)}
+.cr2.warn .crm{background:color-mix(in srgb,var(--warn) 11%,#fff)}
+.cr2.warn .crm b{color:var(--warn)}
+details.op.ct>summary{grid-template-columns:44px minmax(0,1fr) auto 18px}
+.ct .ik2{margin:0;white-space:nowrap;padding:3px 10px;border:1px solid var(--red);border-radius:999px;font-size:10.5px}
+.ct .itg{margin:0;font-size:13px;font-weight:500;color:var(--muted)}
+.lkl{margin:0;padding-left:20px;display:grid;gap:5px;font-size:14px;color:var(--ink2)}
+.lkl li::marker{color:var(--red)}
+.slg{margin:8px 0 0;font-size:13px;color:var(--muted)}
+.slg b{color:var(--ink)}
+@media screen and (max-width:900px){.cr2{grid-template-columns:1fr;gap:12px}.crm{align-self:auto;flex-direction:row;justify-content:flex-start;gap:12px;padding:12px 16px}.crm b{font-size:30px}}
+@media print{
+h2,h3,h4,h5,.sph,.mh,.sl,.ptitle,.ak,.crk{break-after:avoid}
+.sumt{gap:10px}
+.sumt p{font-size:11pt;line-height:1.55}
+.sumt p:first-child{font-size:12.5pt}
+.cr2{grid-template-columns:118px minmax(0,1fr);gap:14px;padding:10px 14px;align-items:center}
+.crm{padding:10px 6px;border-radius:10px}
+.crm b{font-size:22pt}
+.crm.lg b{font-size:14pt}
+.crm span{font-size:7pt}
+.ct .ik2{display:none}
+.hero{height:296.5mm!important;min-height:0!important}
+.cgh,.cgl{break-after:avoid}
+.sheet{break-inside:auto;border:0;padding:0;border-radius:0;background:none}
+.sheet.mix,.grid>.sheet{break-inside:avoid;border:1px solid var(--line);padding:14px 16px;border-radius:10px}
+.chartbox,.upd,.wkc,.hlt,.serp,.chips,.how2,.bands,.ctop,.cf,.acard,.topic{break-inside:avoid}
+.qt th,.qt tr{break-inside:avoid}
+.sp,.tw{break-before:auto}
+}
 `;

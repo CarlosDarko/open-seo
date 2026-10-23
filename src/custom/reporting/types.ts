@@ -292,6 +292,17 @@ export type ContentIdea = {
   format?: string;
   /** The main search it aims at. */
   target?: string;
+  /** What the person wants to solve and what the page must answer. */
+  intent?: string;
+  /** The sections of the piece, in order. */
+  outline?: string[];
+  metaTitle?: string;
+  metaDescription?: string;
+  slug?: string;
+  /** Pages of the site to link from, so the new piece gets traffic. */
+  linkFrom?: string[];
+  /** What to expect and how to check it. */
+  result?: string;
 };
 
 /** What the consultant adds on top of the numbers. */
